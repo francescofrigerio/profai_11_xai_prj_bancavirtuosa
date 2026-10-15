@@ -1,5 +1,6 @@
 COMPITO : Leggi i seguenti punti
-e analizza il nuovo sorgente allegato.
+e analizza il nuovo sorgente allegato oltre all'output del comando --quick
+Ho anche i files delle immagini se le desideri te li passo dopo.
 
 1) Implementate tutte le modifiche indicate nel file errata a parte F7
 | F1 | CORRETTO OK. |
@@ -27,5 +28,190 @@ e analizza il nuovo sorgente allegato.
 4) Creata directory fase_0 nella root repository su github 
    in modo da contenere tutti i file usati in questo contesto
     
-5) OUTPUT RICHIESTO SULLA CONSOLE
+5) COMANDO ESEGUITO
+!git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
+%cd profai_11_xai_prj_bancavirtuosa/1_design/fase_0/
+!pip -q install captum lime shap scikit-image
+%run phase0_checks.py --quick
+
+6) OUTPOT CONSOLE
+
+OUTPUT RICHIESTO SULLA CONSOLE
 L’output della console del --quick (o gli errori, se ce ne sono), per correggere lo script prima del run completo.
+
+Cloning into 'profai_11_xai_prj_bancavirtuosa'...
+remote: Enumerating objects: 62, done.
+remote: Counting objects: 100% (62/62), done.
+remote: Compressing objects: 100% (56/56), done.
+remote: Total 62 (delta 16), reused 39 (delta 4), pack-reused 0 (from 0)
+Receiving objects: 100% (62/62), 112.19 KiB | 941.00 KiB/s, done.
+Resolving deltas: 100% (16/16), done.
+/content/profai_11_xai_prj_bancavirtuosa/profai_11_xai_prj_bancavirtuosa/profai_11_xai_prj_bancavirtuosa/1_design/fase_0
+QUICK RUN: random weights and tiny data. Results are NOT valid for decisions.
+
+=== CHECK 1: Environment, versions, GPU, no-restart ====================
+  [PASS] all required libraries import: torch=2.11.0+cu130, torchvision=0.26.0+cu130, numpy=2.1.3, scipy=1.16.3, scikit-learn=1.6.1, captum=0.9.0, lime=0.2.0.1, shap=0.52.0, scikit-image=0.25.2, matplotlib=3.10.0, pandas=2.2.3, seaborn=0.13.2
+  [PASS] no package changed after being loaded (no restart needed)
+  [PASS] torch <-> numpy round trip works (ABI compatible)
+  [PASS] GPU available: Tesla T4
+  [INFO] candidate pins written to outputs/phase0/requirements_candidate.txt
+  -> check 1 status: PASS (10.9s)
+
+=== CHECK 2: In-place ReLU patch and Grad-CAM ====================
+  [INFO] in-place ReLU modules in torchvision DenseNet121: 120 (plus the functional F.relu(inplace=True) in forward)
+  [INFO] unpatched model: Grad-CAM ran without error (the patch is still applied: Captum/SHAP backward is the real risk)
+  [PASS] patch removes every in-place ReLU and leaves logits unchanged (max diff 0.00e+00)
+  [PASS] Grad-CAM on features.norm5: shape (1, 1, 4, 4) (expected (1,1,4,4)), finite, non-negative: True; 21 ms
+  [PASS] Grad-CAM on features.denseblock3: shape (1, 1, 8, 8) (expected (1,1,8,8)), finite, non-negative: True; 25 ms
+  -> check 2 status: PASS (3.3s)
+
+=== CHECK 5: Logistic regression (convergence, accuracy, exactness) ====================
+100%|¦¦¦¦¦¦¦¦¦¦| 9.91M/9.91M [00:00<00:00, 18.2MB/s]
+100%|¦¦¦¦¦¦¦¦¦¦| 28.9k/28.9k [00:00<00:00, 494kB/s]
+100%|¦¦¦¦¦¦¦¦¦¦| 1.65M/1.65M [00:00<00:00, 4.63MB/s]
+100%|¦¦¦¦¦¦¦¦¦¦| 4.54k/4.54k [00:00<00:00, 14.1MB/s]
+  [INFO] sklearn 1.6.1; LR input range [0.0, 1.0], 784 features, not standardized
+  [INFO] C=1.0: fit 2.1s, n_iter 104, val acc 0.8600
+  [PASS] C=1.0: ConvergenceWarning=False
+  [WARN] C=1.0: validation accuracy 0.8600 (design expects ~0.92, range 0.9-0.94)
+  [PASS] C=1.0: logit = sum(w*x)+b exactly (max error 0.0e+00)
+  [PASS] C=1.0: classes_ == 0..9 (coefficient rows aligned)
+  [PASS] C=1.0: per-pixel sum of coefficients over classes max 9.0e-15 (~0 with l2: relative and absolute coefficients coincide)
+  [INFO] C=1.0: other warnings raised: ['DeprecationWarning']
+  figure saved: outputs/phase0/phase0_05_lr_global_maps_C1.0.png
+
+  [REVIEW] look at the phase0_05_lr_global_maps_*.png: are the maps readable (smooth, digit-shaped) at the configured LR_C?
+  -> check 5 status: WARN (6.3s)
+
+=== CHECK 6: Frozen DenseNet training (time, accuracy, BatchNorm) ====================
+  [PASS] tensor preprocessing vs torchvision PIL pipeline: max diff 0.0174, mean 0.00116 (normalized units; uint8 rounding alone is ~0.009)
+  [INFO] training DESIGN variant: 1 epoch(s), batch 64, lr 0.001, backbone frozen, BatchNorm in eval
+    epoch 1: train loss 2.3330 acc 0.1165 | val loss 2.3322 acc 0.1580 | 2s + 1s
+  [PASS] trainable parameters: 10250 (expected 10250: the Linear head only)
+  [PASS] BatchNorm running statistics of the backbone unchanged after training (max drift 0.00e+00)
+  [WARN] validation accuracy at best epoch (1): 0.1580 vs MIN_VAL_ACCURACY 0.94 -> below threshold: the operator decides whether to try FREEZE_BACKBONE=False
+  [INFO] time per epoch: train 2s + validation 1s
+  [INFO] phase-0 head saved to checkpoints/phase0_densenet121_head_quick.pt (do not commit; used by checks 3,4,11,12)
+  [INFO] training COMPARISON variant: same, but plain model.train() (BatchNorm statistics drift, as in the exploratory notebook)
+    epoch 1: train loss 2.1522 acc 0.2370 | val loss 2.0583 acc 0.3100 | 2s + 1s
+  [INFO] BatchNorm-in-train variant: BN statistics drift 15.742 (design variant: 0) and best val acc 0.3100 (design variant: 0.1580)
+  [WARN] the drifting-BatchNorm variant is clearly more accurate: the 'frozen' features of the exploratory notebook were adapting to MNIST through BN statistics. Keeping BN in eval is the design choice; whether to accept the lower accuracy (and MIN_VAL_ACCURACY) is an operator decision.
+  -> check 6 status: WARN (6.4s)
+
+=== CHECK 3: LIME and SHAP backends ====================
+  [FAIL] lime/lime: TypeError: LimeImageExplainer.explain_instance() got an unexpected keyword argument 'progress_bar'
+  [PASS] lime/captum: shape (128, 128), finite=True, median 1.5s/img, deterministic=True
+  [WARN] lime/captum: constant map on a trained model (suspicious)
+  [PASS] shap/shap: shape (128, 128), finite=True, median 6.5s/img, deterministic=True
+  [PASS] shap/captum: shape (128, 128), finite=True, median 0.5s/img, deterministic=False
+  [WARN] shap/captum: same seed gave different maps (check seeding)
+  figure saved: outputs/phase0/phase0_03_backend_maps.png
+
+  [REVIEW] look at phase0_03_backend_maps.png: do the maps of both backends of each technique roughly highlight the digit? (meaningful only if check 6 ran first)
+  -> check 3 status: FAIL (34.8s)
+
+=== CHECK 4: Integrated Gradients (completeness, black baseline) ====================
+  [PASS] baseline is black in the original image (max |denormalized| = 3.0e-08); in normalized space it is [-2.118, -2.036, -1.804], NOT zero
+  [PASS] completeness holds: worst relative error 3.602% with 50 steps
+  [PASS] attribution is exactly zero wherever the image equals the baseline (background): True
+  [INFO] IG median 0.12s/img
+  -> check 4 status: PASS (0.5s)
+
+=== CHECK 7: LIME grid segmentation (visual) ====================
+  figure saved: outputs/phase0/phase0_07_lime_grid.png
+
+  [INFO] grid cells touching the digit (digits 1,4,7,9): [12, 27, 23, 23]
+  [REVIEW] look at phase0_07_lime_grid.png: does the 8x8 grid separate the digit into a useful number of pieces (not 1-2 cells, not the whole image)? and is the quickshift row clearly worse (design D11 says so)? Confirm or change LIME_GRID_CELLS.
+  -> check 7 status: REVIEW (1.1s)
+
+=== CHECK 8: Digit mask (visual) ====================
+  [INFO] thr=0.05,dil=0: mask covers 17.9% +/- 5.4% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.05,dil=1: mask covers 30.5% +/- 7.5% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.05,dil=2: mask covers 42.6% +/- 9.4% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.1,dil=0: mask covers 17.1% +/- 5.3% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.1,dil=1: mask covers 29.8% +/- 7.4% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.1,dil=2: mask covers 41.9% +/- 9.3% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.2,dil=0: mask covers 15.9% +/- 5.1% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.2,dil=1: mask covers 28.6% +/- 7.2% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.2,dil=2: mask covers 40.8% +/- 9.1% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.3,dil=0: mask covers 14.8% +/- 4.8% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.3,dil=1: mask covers 27.6% +/- 7.0% of the 784 pixels, empty masks: 0
+  [INFO] thr=0.3,dil=2: mask covers 39.8% +/- 8.9% of the 784 pixels, empty masks: 0
+  [PASS] configured mask is never empty over 200 images (empty: 0)
+  [PASS] configured mask covers between 12.4% and 45.0% of the pixels (0 images outside 5%-60%)
+  figure saved: outputs/phase0/phase0_08_mask.png
+
+  [REVIEW] look at phase0_08_mask.png: does the dilated mask cover the whole stroke and its immediate halo without swallowing the background? Confirm MASK_THRESHOLD and MASK_DILATION. NOTE: dilation uses a 3x3 square element (8-connected), a detail the design did not specify (errata E17).
+  -> check 8 status: REVIEW (1.4s)
+
+=== CHECK 11: Occlusion behaviour (overlap, channels, forwards) ====================
+  [INFO] overlapping windows are averaged (distinct values on the toy model: [768.0])
+  [PASS] forward images used: 226 (windows expected: 225, +1 for the original image)
+  [PASS] windows cover all 3 channels together: channel maps identical (max diff 0.0e+00) -> take the mean over channels
+  [PASS] output shape (1, 3, 128, 128), finite
+  [INFO] Occlusion 0.34s/img
+  -> check 11 status: PASS (0.5s)
+
+=== CHECK 12: Resampling rule to the 28x28 grid ====================
+  [PASS] 28 -> 128 -> 28 round trip keeps every test pixel in place: 100/100
+  [PASS] each 4x4 Grad-CAM cell peaks inside its own block of the 28x28 grid: 16/16
+  [INFO] distinct Grad-CAM values inside the digit mask (199 pixels): bilinear rule 187, nearest 11 (fewer values = more ties in Spearman/IoU)
+  figure saved: outputs/phase0/phase0_12_resampling.png
+
+  [REVIEW] look at phase0_12_resampling.png: is the rule's 28x28 map a faithful, smooth version of the native Grad-CAM (and clearly better than blocky nearest)? Confirm the rule (errata E03).
+  -> check 12 status: REVIEW (0.3s)
+
+=== CHECK 9: Timings and N_QUANT ====================
+  [INFO] seconds per image, all five techniques: 8.4 (LIME backend captum, SHAP backend shap)
+  [PASS] N_QUANT = 100: quantitative stage ~14.1 min (budget 20 min)
+  [PASS] 'Esegui tutto' with MODEL_MODE=load: ~21 min (limit 30 min)
+  [PASS] 'Esegui tutto' with MODEL_MODE=train: ~22 min (limit 45 min)
+  [INFO] breakdown: gallery 5.1 min, test inference 0.2 min, fixed overhead 2 min
+  [WARN] quick run: these timings come from random weights and tiny data, NOT valid for decisions
+  -> check 9 status: WARN (0.0s)
+
+=== CHECK 10: Backend decision and table of fixed values ====================
+
+| Parameter | Initial | Proposed | Basis | Confirmation |
+|---|---|---|---|---|
+| LIME_BACKEND | lime | captum | check 3 | criterion met (automatic) |
+| SHAP_BACKEND | shap | shap | check 3 | criterion met (automatic) |
+| N_QUANT | 100 | 100 | check 9 (time budget) | criterion met (automatic) |
+| NUM_EPOCHS | 5 | 5 | check 6: last-epoch val-loss drop nan% | criterion met (automatic) |
+| MIN_VAL_ACCURACY | 0.94 | 0.94 | check 6: best validation accuracy 0.1580 | operator confirmation required |
+| BATCH_SIZE | 64 | 64 | check 6 (best epoch 1, 2s/epoch) | criterion met (automatic) |
+| LEARNING_RATE_HEAD | 0.001 | 0.001 | check 6 (best epoch 1, 2s/epoch) | criterion met (automatic) |
+| EARLY_STOPPING_PATIENCE | 2 | 2 | check 6 (best epoch 1, 2s/epoch) | criterion met (automatic) |
+| LR_C | 1.0 | 1.0 | check 5: val acc 0.8600, maps to review | operator confirmation required |
+| LR_MAX_ITER | 1000 | 1000 | check 5: n_iter 104, ConvergenceWarning=False | criterion met (automatic) |
+| IG_STEPS | 50 | 50 | check 4: completeness error 3.60% | criterion met (automatic) |
+| OCCLUSION_WINDOW/STRIDE | 16/8 | 16/8 | check 11: 226 forwards, overlap averaged | criterion met (automatic) |
+| SHAP_NUM_SAMPLES | 200 | 200 | check 3 timing | criterion met (automatic) |
+| SHAP_NUM_BACKGROUND | 50 | 50 | check 3 timing | criterion met (automatic) |
+| LIME_NUM_SAMPLES | 1000 | 1000 | check 3 timing | criterion met (automatic) |
+| LIME_GRID_CELLS | 8 | 8 | check 7 (visual) | operator confirmation required |
+| MASK_THRESHOLD / MASK_DILATION | 0.1/1 | 0.1/1 | check 8 (visual) | operator confirmation required |
+| 28x28 resampling rule (E03) | bilinear->128->area | bilinear->128->area | check 12 (numeric + visual) | operator confirmation required |
+  [INFO] proposed edits to config.py (NOT applied automatically): {"LIME_BACKEND": "captum"}
+  [WARN] quick run: the table is NOT valid for decisions
+  [REVIEW] 5 rows need operator confirmation (figures of checks 5, 7, 8, 12 and flagged rows)
+  -> check 10 status: WARN (0.0s)
+
+======================================================================
+SUMMARY
+  check  1  PASS    Environment, versions, GPU, no-restart  (10.95s)
+  check  2  PASS    In-place ReLU patch and Grad-CAM  (3.26s)
+  check  5  WARN    Logistic regression (convergence, accuracy, exactness)  (6.28s)
+  check  6  WARN    Frozen DenseNet training (time, accuracy, BatchNorm)  (6.4s)
+  check  3  FAIL    LIME and SHAP backends  (34.8s)
+  check  4  PASS    Integrated Gradients (completeness, black baseline)  (0.52s)
+  check  7  REVIEW  LIME grid segmentation (visual)  (1.12s)
+  check  8  REVIEW  Digit mask (visual)  (1.39s)
+  check 11  PASS    Occlusion behaviour (overlap, channels, forwards)  (0.48s)
+  check 12  REVIEW  Resampling rule to the 28x28 grid  (0.33s)
+  check  9  WARN    Timings and N_QUANT  (0.0s)
+  check 10  WARN    Backend decision and table of fixed values  (0.0s)
+
+Figures to judge by eye (REVIEW): checks [5, 3, 7, 8, 12, 10]
+Results: outputs/phase0/phase0_results_quick.json  |  Table: outputs/phase0/phase0_summary.md
+<Figure size 640x480 with 0 Axes>
