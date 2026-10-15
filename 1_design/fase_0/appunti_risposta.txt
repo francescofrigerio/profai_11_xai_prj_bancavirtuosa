@@ -1,0 +1,31 @@
+COMPITO : Leggi i seguenti punti
+e analizza il nuovo sorgente allegato.
+
+1) Implementate tutte le modifiche indicate nel file errata a parte F7
+| F1 | CORRETTO OK. |
+| F2 | CORRETTO OK  |
+| F3 | CORRETTO OK |
+| F4 | CORRETTO OK |
+| F5 | CORRETTO OK |
+| F6 | CORRETTO OK |
+| F7 | Preprocessing con PIL nel `DataLoader` (nessun worker): lento. | Preprocessing su tensori, verificato equivalente (check 6a). |
+| F8 | CORRETTO OK. |
+
+2) Accuracy ottenuta con la nuova versione
+   stabile sopra il 95% grazie a BatchNorm eval
+
+3) Modifiche decise sulla configurazione
+   MIN ACCURACY VAL=0.95 CORREGGERE E01
+   
+   Eiminare EarlyStopping non necessario con 5 epoche e complica il codice
+   Togliere i riferimenti e nel CONFIG ad Earlytopping
+
+   Aggiuna flag 
+   FLAG_BATCHNORM_EVAL: bool = True
+   FLAG_RELU_INPLACE: bool = True
+   
+4) Creata directory fase_0 nella root repository su github 
+   in modo da contenere tutti i file usati in questo contesto
+    
+5) OUTPUT RICHIESTO SULLA CONSOLE
+L’output della console del --quick (o gli errori, se ce ne sono), per correggere lo script prima del run completo.

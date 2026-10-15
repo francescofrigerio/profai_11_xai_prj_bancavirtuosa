@@ -1,0 +1,192 @@
+10. Tra le specifiche del progetto XAI c'è anche quella di eseguire tutto il codice
+dall'inizio alla fine con "Esegui tutto" da Colab.
+Voglio procedere in questo modo
+Sviluppo Modulare (.py su GitHub/Drive): Creazione classi e moduli e test separatI in file .py 
+
+Testing (Unit Test & Integration Test): Testare le singole componenti (caricamento dati, modello, estrattore XAI/Grad-CAM)
+ Garantisce che quando arrivi alla fase finale non dovrai fare il debug di blocchi enormi di codice.
+
+Versione su GitHub: Avere una repository per il versionamento del codice è fondamentale 
+per il tracciamento delle modifiche e in modo che sia visibile anche il progetto
+nella sua interezza.
+
+Sul notebook colab
+mantengo la struttura in file .py su Drive / GitHub 
+e nel notebook eseguo semplicemente gli import dei  moduli!
+Per fare l'import dei moduli non prevedo di fare il mount
+per non bloccare l'esecizione con la richiesta di autorizzazione
+ma prevedo di scaricare il codice con il seguente codice nella prima cella.
+
+# 1. Clona il repository GitHub
+!git clone https://github.com/tuo-username/tuo-progetto-xai.git
+
+# 2. Entra nella cartella del progetto e aggiungila al percorso di sistema
+import sys
+import os
+
+project_dir = '/content/tuo-progetto-xai'
+os.chdir(project_dir)
+sys.path.append(project_dir)
+
+# 3. Installazione automatica delle dipendenze (se presenti)
+!pip install -r requirements.txt -q
+
+
+
+CONTESTO:PROGETTO XAI - COMPUTER VISION
+Sto lavorando un nuovo progetto XAI - COMPUTER VISION
+Aiutami a riflettere su come esplorare i requisiti e impostare il progetto
+Vorrei che , Prendendo spunto dallo skill code di superpowers
+a questo url github https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md
+e dal documento di specifiche iniziali allegato
+mi aiutassi a riflettere sul progetto , proseguire
+con l'esplorazione dei requisiti.
+Alla fine di questa prima fase di discussione e riflessione
+basata sulla skill di claude superpowers
+passerò alla fase 2 in cui dovrai generare un documento di design
+del progetto stesso sottoforma di notebook colab che darò
+in input ad una nuova chat. <br>
+
+12 PUNTI ANALISI PRELIMINARE MA ASPETTO TUE VALUTAZIONI NEL CORSO DEL BRAINSTORMING:
+1. Un punto importante del progetto è che è come vedi dalle specifiche che è di tipo dimostrativo quindi non serve fare Data Augmentation 
+e il tuning degli Hiper Parametri deve essere solo limitato ad ottenere dei risultati ad accettabilio perchè c'è poco da spiegare 
+in un modello che non funziona.
+2. Dataset Mnist e Modello Black Box di tipo DenseNet entrambi presi da torchvision  
+3. Modello di spiegazione scelgo una regressione logistica SkLearn
+che uso  per effettuare la spiegazione
+del comportamento del modello DenseNet 
+
+ Il criterio di scelta per il modello di spiegazione .
+ In sede di analisi ho valutato EBM Logistinc Regression Gradient Boosting Random Forest MLP
+Volgio scegliere un sistema spiegabile e interpretable-by-design ovvero un modello architettato 
+fin dall'inizio in modo che la sua struttura interna e la logica di calcolo siano direttamente comprensibili all'essere umano, 
+senza dover ricorrere a strumenti esterni di spiegazione a posteriori (post-hoc) :
+come SHAP LIME ecc cosa che succede per Random Forest Gradient Boosting Classifier e MLP.
+Scarto a priori Random Forest Gradient Boosting Classifier e MLP..
+
+La spiegazione deve coincidere con il funzionamento del modello e non esserne una stima a posteriori.
+I modelli sono stati valutati su questo criterio, non sulla loro accuratezza: 
+
+Per EBM il discorso è diverso 
+Su immagini la logistica multinomiale ha un vantaggio che l'EBM non ha, perché i coefficienti di ciascuna classe 
+si rimettono in forma 28x28 e si guardano come una mappa, 
+quindi ottieni una spiegazione visiva confrontabile direttamente con le Grad-CAM della DenseNet. 
+Non è un ripiego scegliere un modello più
+semplice ed è segno di Professionalità perchè ci permette di spiegare leggere e verificare, 
+
+4. Non serve aggiungere feature morfologiche (avrebbe senso se scegliessi EBM)
+come modello di spiegazione 
+
+5. Uso Logistic Regression anche come baseline di confronto per i risultati del modello perchè la rete neurale 
+sia gisutificata deve avere risultati migliori. 
+
+6. Metriche di valutazione del modello accuracy recall precision f1_score . 
+Valuito anche tempi di esecuzione e confusion matrix
+
+7. Voglio aggiungere XAi (solo GRAD CAM) debug nel loop di training sul validation set 
+solo alla prima e all'ultima epoca su un totale di 5 epoche comunque da parametrizzare .
+
+8. I parametri del progetto (numero di epoche seed learning rate optimizer ) dovranno
+essere specificati in una classe Constant definita all'inizio del progetto.
+@dataclass(frozen=True)
+class ConfigConstantsDefault:
+    """
+    Global Config. Const of Environment
+    Substiutes magic numbers with description names
+    """
+    # New field for seed so we can reproduce the results
+    SEED: int = 42
+
+    # Image Caption
+    NUM_EPOCHS = 5
+    LEARNING_RATE = 5e-5 # LR basso per non distruggere i pesi pre-trainati di GPT2
+
+# Init global config
+CONFIG = ConfigConstantsDefault()
+
+
+9. mettere sotto flag ,in modo che alla bisogna le disattivo,
+la chiamata a correlazione di Spearman e IoU sul 20% dei pixel più rilevanti
+sul quale devo indagare perchè in ogni caso non è previsto dalle specifiche
+e devo valutare se ha senso inserirle ugualmente.
+
+
+10. Bisogna adattare le immagini del Mnist 1x28x28 alle rete DenseNet che accetta
+in input le immagini come quelle del dataset di riferimento ImageNet quindi 3x224x224
+Ingrandire le immagini originali fino a 3x224x224 si può fare
+ma rischia di rallentare il processo di Train e sopratutto le tecniche XAI
+pertanto è una buona cosa aumentare le dimensioni dell'immagine
+originale non per aggiungere informazione ma per adattare le immagini alla rete.
+Si possono pertanto riddurre le immagini a 3x128x128 oppure 3x96x96
+Bisgna fare attenzione a non ridurre troppo le immagini rispetto all'originale
+ per non produrre sfuocature sopratutto con GRAD CAM che 
+è la tecnica XAI baseline .
+I modelli potrebbero perdere la capacità di evidenziare dettagli sottili (es. l'incrocio del "4" o il pallino di un "8").
+Sceglierei se sei d'accordo quindi di adattare l'immagine originale da 1x28x28 a 3x128x128
+per le considerazioni sopra esposte che se sei d'accordo aggiungerei al documento finale.
+
+11. Aggiungere le tecniche standard al train come Early Stopping e salvataggio del
+check point .
+Sara l'utente con un parametro in input a scegliere se partire col checkpoint
+oppure se partire dal transfer learning . In questo modo velocizzo anche lo 
+sviluppo che non dovrà passare tutte le volte dal dowload e train del modello.
+
+12. Tra le specifiche del progetto XAI c'è anche quella di eseguire tutto il codice
+dall'inizio alla fine con "Esegui tutto" da Colab.
+Voglio procedere in questo modo
+Sviluppo Modulare (.py su GitHub/Drive): Creazione classi e moduli e test separatI in file .py 
+su Colab nella prima cella effettuo il download di tutto
+il progetto da GitHub con il comando git clone e il pip install dei requirements
+e con la seconda cella posso fare esegui tutto
+e dovrà partire dall'import delle classi.
+
+
+Note Attezione
+sul train della rete CNN
+Un dettaglio tecnico: con backbone congelato le BatchNorm vanno tenute in modalità eval, altrimenti le loro statistiche si aggiornano comunque.
+
+Un dettaglio che si aggiunge a qualunque scelta: lo sfondo di MNIST è quasi tutto nero, e questo gonfierebbe Spearman con molti pari merito. Propongo di calcolarla solo sui pixel dove l'immagine ha un valore non nullo, oppure in una maschera leggermente dilatata attorno alla cifra. Il default lo discutiamo quando fisseremo le soglie.
+
+Ottava domanda: su quali pixel calcoliamo Spearman e IoU?
+
+Lo sfondo di MNIST è quasi tutto nero (la cifra occupa circa un quinto dei 784 pixel). 
+
+Se includiamo anche lo sfondo, molte mappe valgono zero in quelle zone: la correlazione di Spearman si riempie di pari merito, 
+e la soglia del 20% dell'IoU finisce per coincidere più o meno con "l'area della cifra", cioè misura quasi solo se i metodi trovano 
+la cifra, non dove dentro la cifra.
+
+
+
+Ci interessa vedere quali zone dell'immagine pesano di più sulla decisione 
+e quanto le diverse tecniche concordano tra loro.
+
+
+Ciao Samuele scusa ma ho un'altra domanda.
+Sto approfondendo l'analisi e la cosa
+s'infittisce molto.
+Nelle specifiche si trovano due indicazioni chiave:
+1) Ci interessa vedere quali zone dell'immagine pesano di più sulla decisione e 
+2) quanto le diverse tecniche concordano tra loro.
+
+Almeno a livello di analisi rispondere alla prima è facile:
+1) Il progetto XAI produrrà mappe di salienza con 5 tecniche XAI
+come GRAD-CAM(baseline x CNN) Integrated Gradience , Occlusion , LIME e SHAP
+
+Non è chiaro invece la seconda nel senso che 
+mi appare poco significativo limitarsi al controllo visivo
+dell'operatore.
+Controllando su GeminAI m ChatGpt Claude ecc. tutti consigliano
+di usare l'indice di correlazione/distanza sui pixel (Spearman/Pearson)
+e la tecnica IoU (intersection of union) come misura dell'intersezione dei pixel
++ importanti di due tecniche XAI.
+Spearman e pearson le ho incontrate in altri corsi o in master lecture
+ma non sono citate nel corso XAI. Mai sentito parlare di IoU.
+Va bene se lo uso ? non mi pare di uscire dalle specifiche
+Invece mi sembra di uscire dalle specifiche usare un'altra tecnica , deletion (non citata nel corso)
+che viene suggerita per decidere quale di due tecniche XAI ha ragione
+nel momento in cui non concordano(funziona un pò come Occlusion mi pare). 
+uso anche questo oppure lascio perdere ?
+
+Il resto del progetto comincia ad essere chiaro.
+Grazie Francesco
+

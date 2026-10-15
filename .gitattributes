@@ -1,0 +1,4 @@
+# Evita conflitti di merge su file binari generati dalla pipeline MLOps
+# Forza Git a trattarli come binari puri senza tentare l'auto-merge del testo
+*.db binary
+*.png binary

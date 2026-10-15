@@ -1,0 +1,206 @@
+CONTESTO:PROGETTO XAI - COMPUTER VISION
+Sto lavorando un nuovo progetto XAI - COMPUTER VISION
+Aiutami a riflettere su come esplorare i requisiti e impostare il progetto
+Vorrei che , Prendendo spunto dallo skill code di superpowers
+a questo url github https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md
+e dal documento di specifiche iniziali allegato
+mi aiutassi a riflettere sul progetto , proseguire
+con l'esplorazione dei requisiti.
+Alla fine di questa prima fase di discussione e riflessione
+basata sulla skill di claude superpowers
+passerò alla fase 2 in cui dovrai generare un documento di design
+del progetto stesso sottoforma di notebook colab che darò
+in input ad una nuova chat. <br>
+DETTAGLI PREVISTI DA ME MA ASPETTO TUE VALUTAZIONI NEL CORSO DEL BRAINSTORMING:
+1. Un punto importante del progetto è che è come vedi dalle specifiche che è di tipo dimostrativo quindi non serve fare Data Augmentation e il tuning degli Hiper Parametri deve essere solo limitato ad ottenere dei risultati ad accettabilio perchè c'è poco da spiegare in un modello che non funziona.
+2. Dataset Mnist e Modello Black Box di tipo DenseNet entrambi presi da torchvision 
+3. Modello additivo da scegliere tra EBM e Logistinc Regression
+4. Uso Logistic Regression come baseline di confronto per i risultati del modello perchè la rete neurale sia gisutificata deve avere risultati migliori. <br>
+5. Metriche di valutazione del modello accuracy recall precision f1_score . Valuito anche tempi di esecuzione e confusion matrix
+
+Spearman indice di correlazione di spearman tra le feature
+un valore assosluto alto (il segno non è significativo)
+indica un alta ,correlazione tra le feature
+Ma a livello di immagine per feature s'intende il singolo pixel ?
+
+IoU sulle zone top-k
+
+Ogni tecnica produce una mappa di "importanza" per pixel. 
+Per capire se due tecniche concordano, 
+si tiene solo il k% di pixel più importanti 
+per ciascuna (ad esempio il 20%). 
+Si ottengono così due zone: 
+quella che Grad-CAM considera 
+decisiva e quella che SHAP considera decisiva.
+L'IoU (Intersection over Union) 
+misura quanto queste due zone si sovrappongono: 
+l'area in comune divisa per l'area totale 
+coperta da entrambe. 
+Va da 0 (zone completamente diverse) a 1 (zone identiche).
+
+Un esempio: 
+se Grad-CAM e SHAP evidenziano 
+entrambi la curva superiore di un "9", l'IoU è alto. 
+Se uno guarda la curva e l'altro lo sfondo, 
+è basso. 
+Lo Spearman che ho citato risponde alla stessa domanda guardando l'ordine di importanza di tutti i pixel, 
+non solo di quelli in cima.
+
+Test di fedeltà (deletion/insertion)
+
+Una mappa di salienza dice "questi pixel contano". Il test verifica se è vero, perché chiede al modello stesso.
+
+Deletion: si cancellano progressivamente i pixel che la tecnica dice più importanti (li si porta a nero) e si guarda come scende la probabilità della classe prevista. Se la mappa è fedele, la probabilità deve crollare in fretta, perché abbiamo tolto proprio ciò su cui il modello si basa.
+Insertion: il percorso inverso. Si parte da un'immagine vuota e si aggiungono i pixel più importanti, uno dopo l'altro. Se la mappa è fedele, la probabilità deve salire in fretta.
+
+La velocità del crollo o della risalita diventa un punteggio per ciascuna tecnica, e si possono confrontare. È il test che distingue una mappa bella da vedere da una mappa che descrive davvero il comportamento del modello. Per questo lo avevo indicato come estensione: l'IoU dice se le tecniche concordano, la fedeltà dice se hanno ragione.
+
+
+
+Il tensore di input di DenseNet
+
+Sì, 128×128 si riferisce alle dimensioni spaziali del tensore. I canali sono 3, quindi 3×128×128 per immagine (con il batch davanti: N×3×128×128).
+
+MNIST è in grigio con 1 canale. Lo replichiamo 3 volte, così il primo strato di DenseNet, che si aspetta immagini RGB, mantiene i suoi pesi pre-addestrati senza modifiche. L'alternativa sarebbe modificare quel primo strato per accettare 1 canale (1×128×128). Funziona, ma altera proprio i pesi che vogliamo riutilizzare, e per un prototipo dimostrativo la replicazione è più semplice.
+
+Questo ha una conseguenza per la spiegabilità, che gestiremo nel design. Le tecniche attribuiscono importanza a 3 canali identici, quindi alla fine le mappe vanno ridotte a un'unica mappa 2D (ad esempio sommando i canali), prima del confronto con le altre.
+
+
+Al posto del test di fedelta(deletion/insertion( preferirei usare la tecnica Occlusion
+che non mi pare tu abbia citato.
+
+Perché non sono la stessa cosa
+Occlusion produce una mappa. Si fa scorrere una piccola patch nera sull'immagine e si guarda quanto cala la probabilità della classe quando quella zona è coperta. Più cala, più la zona è importante.
+Deletion/insertion è un esame che si applica a una mappa qualsiasi, anche a quella di Occlusion, per vedere se è fedele al modello.
+Dove la tua idea funziona
+
+Occlusion è la più diretta delle cinque. Non usa gradienti, non approssima il modello e non dipende da un modello locale intermedio come LIME: interroga la rete e basta. Possiamo quindi usarla come mappa di riferimento nel confronto: la matrice di accordo evidenzia quanto ciascuna delle altre quattro tecniche concorda con Occlusion. Risponde a una versione leggera della domanda "chi ha ragione?", senza costruire un test a parte.
+
+Va detto con onestà che Occlusion non è una verità assoluta. Dipende dalla dimensione della patch, e può sottostimare l'importanza di zone ridondanti, perché se due tratti dicono la stessa cosa, coprirne uno solo non cambia la risposta. Nel documento la presenteremmo quindi come "riferimento più diretto", non come "verità".
+
+Cosa propongo di cambiare
+Tolgo dal piano il blocco 11 (test di fedeltà). Se servirà, si potrà aggiungere in una fase successiva.
+Occlusion resta tra le cinque tecniche, e nel confronto (blocco 8) diventa la colonna di riferimento.
+Il resto della sezione 1 resta invariato.
+
+SEZIONE 3
+Cercare documentazione su
+Dopo il caricamento si disattivano gli inplace ReLU, 
+così gli hook di Grad-CAM e SHAP funzionano. 
+Il checkpoint viene salvato.
+
+
+inplace di ReLU
+
+In PyTorch la ReLU può lavorare in due modi. 
+Normalmente crea un nuovo tensore con il risultato. 
+Con inplace=True sovrascrive il tensore di ingresso, 
+risparmiando memoria. DenseNet usa questa modalità per default.
+
+Il problema nasce con gli strumenti di spiegabilità. 
+Se salvi l'attivazione di un layer e subito dopo la ReLU la modifica sul posto, 
+quello che hai salvato non è più quello che il layer aveva prodotto. 
+Per i gradienti la situazione è simile. 
+Una issue della libreria Captum segnala di non poter usare il pacchetto 
+con sotto-moduli non lineari in-place, e la soluzione adottata passa da hook diversi. 
+
+Il rimedio normale è mettere inplace=False su tutte le ReLU dopo aver caricato il modello. 
+Per quanto ricordo, nel forward di DenseNet in torchvision c'è anche una ReLU funzionale finale, 
+non modificabile dai moduli. Da verificare in implementazione: 
+se c'è, si gestisce catturando il gradiente dal tensore con un hook sul tensore stesso.
+
+In PyTorch, gli hook sui tensori (tensor hooks) sono funzioni di callback che consentono 
+di eseguire codice personalizzato durante la fase di backpropagation (passaggio all'indietro) per ispezionare o modificare i gradienti di uno specifico tensore.
+
+Si registrano tramite il metodo .register_hook() presente sui tensori per cui è attivo il tracciamento del gradiente (requires_grad=True).
+
+Come funzionano
+Quando PyTorch calcola i gradienti con loss.backward(),
+ ogni tensore intermedio calcola il proprio gradiente. 
+ Se un tensore ha un hook registrato, PyTorch esegue la funzione passata all'hook fornendole come input il gradiente appena calcolato (grad).
+
+La funzione dell'hook può:
+
+Leggere/stampare il gradiente (es. per fare debugging o logging).
+
+Restituire un nuovo gradiente per sostituire quello originale nelle operazioni successive di backpropagation.
+
+Non restituire nulla (None), lasciando il gradiente invariato.
+
+
+2) Hook e Grad-CAM
+
+Un hook è una funzione che si aggancia a un layer e viene chiamata automaticamente quando i dati 
+ci passano attraverso, senza modificare il codice del modello. In PyTorch ce ne sono di due tipi:
+
+Forward hook: viene chiamato ogni volta dopo che forward() ha calcolato un output. Serve a catturare le mappe di attivazione del layer. 
+velog
+Backward hook: scatta durante la retropropagazione e cattura i gradienti.
+
+Grad-CAM li usa entrambi sull'ultimo blocco convoluzionale. Le tecniche come Grad-CAM usano i gradienti che arrivano all'ultimo 
+strato convoluzionale per evidenziare le regioni importanti. In pratica: le attivazioni dicono cosa ha visto il layer, i gradienti dicono quanto ciascuna di esse ha pesato sulla classe, e la loro combinazione dà la mappa. 
+apxml
+
+Documenti utili:
+Hook
+https://towardsdatascience.com/grad-cam-in-pytorch-use-of-forward-and-backward-hooks-7eba5e38d569/?gi=19c3f68f116d&source=rss----7f60cf5620c9---4
+Doc Pytorch
+https://docs.pytorch.org/docs/2.14/generated/torch.nn.Module.html
+
+Spiegazione InPlace
+https://github.com/meta-pytorch/captum/issues/914
+
+
+SEZIONE 4
+
+Confronto visivo. Per ogni esempio una griglia con l'immagine originale e le cinque mappe affiancate. Occlusion è nella griglia come le altre e si legge come riferimento.
+
+Accordo quantitativo. Per ogni esempio una matrice 5×5 con due misure:
+
+Spearman, sull'ordine di importanza di tutti i pixel.
+IoU sul 20% di pixel più importanti, cioè la sovrapposizione delle zone decisive.
+
+Le matrici si riassumono con la media per gruppo (corretti ed errori). Per dare un senso ai numeri, accanto va un valore di riferimento per il caso: due zone scelte a caso sul 20% dei pixel hanno un IoU atteso di circa 0,11. Un IoU di 0,5 si legge allora come "molto sopra il caso" e non come "così così". Poiché lo stesso calcolo è a costo quasi nullo, riportiamo l'IoU anche con il 10% e il 30% per verificare che le conclusioni non dipendano dalla soglia scelta. In evidenza, la colonna delle quattro tecniche rispetto a Occlusion.
+
+Analisi di corretti ed errori.
+
+Per ogni errore si mostra una griglia con le cinque tecniche, per la classe prevista e per la classe vera (decisione appena presa), con predizione e confidenza.
+Il commento segue una lista di cause plausibili da verificare, non da dare per scontate: tratto ambiguo o interrotto, zona di sfondo o macchia che attira l'attenzione, scambio tra coppie tipiche (4?9, 3?5, 7?1), importanza concentrata su una parte sola della cifra.
+Si confronta poi l'accordo medio tra tecniche sui corretti e sugli errori. L'ipotesi "negli errori le tecniche concordano meno" è una domanda da verificare sui dati, non un risultato che diamo per acquisito.
+
+Un limite da dichiarare. Il campione è piccolo (circa 10 corretti e 8-10 errori), quindi non facciamo affermazioni statistiche. Il documento descrive i pattern osservati e li presenta come indicativi.
+
+Ti sembra giusta la sezione 4?
+
+Sperman Doc
+L'idea in breve: prendi i pixel e ordinali dal più importante 
+al meno importante secondo la tecnica A, poi secondo la tecnica B. 
+Lo Spearman misura quanto le due classifiche si assomigliano. Vale 1 se l'ordine è identico, 
+circa 0 se non c'è relazione, -1 se l'ordine è opposto. Guarda solo l'ordine e non i valori assoluti, 
+quindi non è influenzato dal fatto che due tecniche usino scale diverse.
+
+https://www.wallstreetmojo.com/spearman-rank-correlation-coefficient/
+
+Iou
+L'idea in breve: hai due zone e vuoi sapere quanto si sovrappongono. 
+Si divide l'area che hanno in comune per l'area totale coperta da almeno 
+una delle due. I valori vanno da 0, nessuna sovrapposizione, a 1, 
+sovrapposizione completa. Nel nostro caso le due zone 
+sono i pixel più importanti secondo due tecniche, 
+invece di due rettangoli. 
+st-hakky
+
+Link:
+https://www.baeldung.com/cs/object-detection-intersection-vs-union
+
+Baeldung, Intersection over Union: breve e con esempi numerici semplici.
+
+Lightly, IoU: From Theory to Practice: più completo, con il legame con il Jaccard index.
+
+Tutte le risorse sull'IoU 
+parlano di rilevamento di oggetti, cioè di riquadri 
+su un'immagine. Il concetto è identico per due insiemi di pixel, ma nel documento va 
+spiegato con il nostro caso, non con quello dei riquadri. 
+Non ho verificato le pagine in dettaglio, quindi leggile in anteprima prima di citarle nel documento.
+
+Ora che i due concetti ti sono più chiari, approvi la sezione 4?

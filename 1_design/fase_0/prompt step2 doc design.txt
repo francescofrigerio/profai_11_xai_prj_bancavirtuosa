@@ -1,0 +1,203 @@
+
+
+1) Togliere dal design l'opzione del modello SURROGATO
+USE_SURROGATE=False e tutti i riferimenti all'implementazione
+di un modello surrogato LR per valutazioni post-hoc.
+
+2) Sistemo qualche punto relativo alla fase 0 prevista nel documento di design
+con uno sviluppo di codice su Colab
+
+
+3) La risposta di Samuele come sempre di aiuto
+
+Ciao Francesco, Spearman e IoU vanno benissimo 
+e non escono dalle specifiche, perché non aggiungono un modello 
+ma misurano le mappe che già produci. Fra le due correlazioni 
+usa Spearman e lascia stare Pearson, 
+dato che le attribuzioni delle diverse tecniche 
+hanno scale non confrontabili e pochi pixel estremi ti dominerebbero 
+il coefficiente, mentre sui ranghi il confronto resta onesto. 
+Per l'IoU devi fissare e dichiarare la soglia, 
+per esempio il 10 per cento dei pixel 
+più importanti, perché il valore cambia 
+molto al variare di quella scelta. 
+Due accortezze tecniche che fanno la differenza 
+fra un numero sensato e uno privo di significato. 
+Integrated Gradients e SHAP sono firmate, quindi prendine il valore assoluto 
+prima di confrontarle con Grad-CAM che è non negativa, 
+altrimenti misuri il segno e non l'importanza. 
+E Grad-CAM nasce dall'ultimo blocco convoluzionale e viene ingrandita, 
+quindi è intrinsecamente sfocata rispetto alle mappe a livello di pixel, 
+e se le confronti così com'è ti risulterà in disaccordo con tutte 
+per un motivo di risoluzione e non di sostanza, 
+perciò porta tutte le mappe alla stessa granularità 
+con una sfocatura leggera prima di calcolare gli indici. 
+
+Come output ti basta una matrice 5x5 di Spearman medio 
+e una di IoU su un insieme di immagini fissato, commentate 
+separando predizioni corrette ed errate, 
+così la concordanza si lega al confronto 
+fra casi giusti e sbagliati che la traccia chiede. 
+Sul deletion hai capito bene che serve ad altro, 
+perché non misura la concordanza ma la fedeltà, 
+cioè quale mappa indica davvero i pixel su cui la rete 
+si appoggia, ed è in effetti l'unico modo serio di arbitrare 
+quando due tecniche dissentono. 
+Non esce dalle specifiche, però è l'ultima cosa che aggiungerei, 
+e solo se le due matrici sono già fatte e lette bene. 
+Se lo fai tienilo minimo, rimuovi progressivamente 
+i pixel più importanti secondo una tecnica, 
+misura quanto cala la probabilità della classe 
+predetta e confronta l'area sotto la curva 
+fra le tecniche, su venti o trenta immagini, 
+dichiarandolo come approfondimento
+
+
+3) Fase 0 come indicata nel documento di design
+ase zero – verifiche tecniche (phase0_checks.py)
+Da eseguire su Colab prima di implementare il resto. Produce i valori che fissano la tabella 
+"da fissare in fase zero" (sezione 5).
+
+Ambiente: versioni installate e import di Captum, lime, shap, scikit-learn; 
+compatibilità con la versione di torch/numpy di Colab.
+
+ReLU in-place: patch funzionante; 
+Grad-CAM su features.norm5 produce una mappa 4×4 senza errori.
+
+Backend: per ogni backend di LIME e SHAP, 
+una immagine ? forma della mappa, valori finiti, tempo per immagine.
+
+Integrated Gradients: controllo di completezza (somma delle attribuzioni ˜ f(x) - f(baseline)) e baseline davvero nera.
+
+LR: convergenza di lbfgs (assenza di ConvergenceWarning), accuracy ~92 %, tempo di fit, 
+forma della combinazione penalità/solver nella versione di sklearn installata 
+(il parametro penalty è in evoluzione nelle versioni recenti).
+
+Una epoca di DenseNet congelata: tempo per epoca e accuracy, per decidere NUM_EPOCHS, 
+learning rate, batch size e MIN_VAL_ACCURACY. 
+Verifica che le statistiche delle BatchNorm del backbone non cambino.
+
+LIME: controllo visivo della segmentazione a griglia su pochi esempi.
+
+Maschera: controllo visivo di soglia e dilatazione.
+
+Tempi complessivi: stima del tempo di un "Esegui tutto" in modalità train e load, e scelta di N_QUANT.
+
+Decisione sui backend: se i pacchetti originali lime e shap funzionano con tempo accettabile restano il default; 
+altrimenti captum.
+
+Esito atteso della fase zero: una tabella con tutti i valori fissati, 
+e le eventuali correzioni al design annotate in questo documento.
+
+4) Prompt suggerito da Claude per la seconda chat 
+ 
+Allego notebook e usa, se disponibile, la skill writing-plans di superpowers.
+al seguente url https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md
+
+Inizio
+CONTESTO:Il notebook allegato è il documento di design approvato del progetto XAI di Banca Virtuosa
+e generato con il brainstorming delle skill di superpowers al seguente url
+https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md
+
+Allego il sorgente sviluppato sinora con train 5 epoche su LR e CNN DENSE NET
+con i seguenti risultati
+LR accuracy = 0.9202
+CNN accuracy = 0.9402 su 5 epoche
+CNN accuracy = 0.9502 su 10 epoche
+
+COMPITO: 
+Crea un piano di implementazione 
+dettagliato, tappa per tappa (sezione 16), 
+con i file da creare, i test di fumo e i criteri di completamento 
+di ogni tappa.Le decisioni della sezione 3 sono chiuse."
+
+
+RICORDA I SEGUENTI PUNTI DI DETTAGLIO:
+1) Togliere dal design l'opzione del modello SURROGATO
+USE_SURROGATE=False e tutti i riferimenti all'implementazione
+di un modello surrogato LR per valutazioni post-hoc.
+Questa opzione non è nelle specifiche del progetto e lo rallenta.
+
+2) Parti dalla tappa 0 (fase zero) 
+e non scrivere codice di implementazione finché il piano non è approvato.
+
+3) Segnala eventuali incoerenze o punti ambigui del design prima di procedere.
+
+4) Prevedi una ragionevole ma non easagerata lista dei test sonsiderato
+che il progetto è solo dimostrativo. Senz'altro dovranno esserci
+i test sui dati di input e di output ai modelli lr e densenet.
+Cerchiamo di rendere il design più robusto
+in termini di falsicabilità. "
+
+5) Altri punti chiari sono i seguenti:
+Le decisioni aperte sono solo quelle della tabella 'da fissare in fase zero'.
+Nessun backend o strategia cambia automaticamente: sempre via config e con segnalazione.
+Codice in inglese, narrazione in italiano.
+Il notebook finale dovrà essere comprensibile ai non tecnici e girare con "Esegui tutto" su colab.
+
+Fine Prompt
+Elenco Punti Fase 0
+
+Da eseguire su Colab **prima** di implementare il resto.
+ Produce i valori che fissano la tabella "da fissare in fase zero" (sezione 5).
+
+1. **Ambiente:** versioni installate e import di Captum, `lime`, `shap`, scikit-learn; compatibilità con la versione di torch/numpy di Colab.
+
+2. **ReLU in-place:** patch funzionante; Grad-CAM su `features.norm5` produce una mappa 4×4 senza errori.
+
+3. **Backend:** per ogni backend di LIME e SHAP, una immagine ? forma della mappa, valori finiti, tempo per immagine.
+
+4. **Integrated Gradients:** controllo di completezza (somma delle attribuzioni ˜ `f(x) - f(baseline)`) e baseline davvero nera.
+
+5. **LR:** convergenza di `lbfgs` (assenza di `ConvergenceWarning`), accuracy ~92 %, tempo di fit,
+forma della combinazione penalità/solver nella versione di sklearn installata (il parametro `penalty` è in evoluzione nelle versioni recenti).
+
+6. **Una epoca di DenseNet congelata:** tempo per epoca e accuracy, per decidere `NUM_EPOCHS` (0.9475 con 5 epoche da vedere 10 epoche) , 
+learning rate 0.01 , batch size 32 e `MIN_VAL_ACCURACY` per ora 0.94.
+ Verifica che le statistiche delle BatchNorm del backbone non cambino.
+
+7. **LIME:** controllo visivo della segmentazione a griglia su pochi esempi.
+
+8. **Maschera:** controllo visivo di soglia e dilatazione.
+
+9. **Tempi complessivi:** stima del tempo di un "Esegui tutto" in modalità `train` e `load`, e scelta di `N_QUANT`.
+
+10. **Decisione sui backend:** se i pacchetti originali `lime` e `shap` funzionano con tempo accettabile restano il default; altrimenti `captum`.
+
+**Esito atteso della fase zero:** una tabella con tutti i valori fissati, e le eventuali correzioni al design annotate in questo documento.
+
+5) Appunti sulla master lecture di Samuele
+Fino a min 46 della master lecture di Samule Bolotta
+
+Nel secono step si vuole trasformare il documento di design
+in un elenco di tutti i possibili test
+ovvero tutte le cose che potrebbero andare storte
+e che va a gestire tutti i casi limite.
+Trasformare il documento di design in un piano
+1) Nuova chat post del documento e prompt della fase2
+Prompt:
+Sto lavorando a questo progetto. Ho utilizzato
+il brainstorming di superpowers 
+per creare un documento di designi seguendo la
+pagina delle skill su questo url di github  https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md
+
+Ora vorrei procedere alla seconda fare di modo
+da arrivare ad un piano in cui ogni step 
+è falsicabile e contiene un test
+ 
+ 
+2) leggere per primo la sezione che cosa manca
+3) Fai spezzare ogni passo che non sappiamo verificare
+4) Controllare che i casi limiti siano nella tabella
+5) Copia piano e lista dei test
+6) Non ci deve essere ancora codice
+7) Cerchiamo di rendere il design più robusto
+in termini di falsicabilità.
+
+
+
+
+
+
+
+

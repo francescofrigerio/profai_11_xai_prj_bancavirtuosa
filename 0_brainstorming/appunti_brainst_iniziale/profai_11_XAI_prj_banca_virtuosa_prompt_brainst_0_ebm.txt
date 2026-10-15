@@ -1,0 +1,67 @@
+CONTESTO:PROGETTO XAI - COMPUTER VISION
+Sto lavorando un nuovo progetto XAI - COMPUTER VISION
+Aiutami a riflettere su come esplorare i requisiti e impostare il progetto
+Vorrei che , Prendendo spunto dallo skill code di superpowers
+a questo url github https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md
+e dal documento di specifiche iniziali allegato
+mi aiutassi a riflettere sul progetto , proseguire
+con l'esplorazione dei requisiti.
+Alla fine di questa prima fase di discussione e riflessione
+basata sulla skill di claude superpowers
+passerò alla fase 2 in cui dovrai generare un documento di design
+del progetto stesso sottoforma di notebook colab che darò
+in input ad una nuova chat. <br>
+DETTAGLI PREVISTI DA ME MA ASPETTO TUE VALUTAZIONI NEL CORSO DEL BRAINSTORMING:
+1. Un punto importante del progetto è che è come vedi dalle specifiche che è di tipo dimostrativo quindi non serve fare Data Augmentation 
+e il tuning degli Hiper Parametri deve essere solo limitato ad ottenere dei risultati ad accettabilio perchè c'è poco da spiegare 
+in un modello che non funziona.
+2. Dataset Mnist e Modello Black Box di tipo DenseNet entrambi presi da torchvision  
+3. Modello additivo per effettuare la spiegazione
+del comportamento del modello DenseNet 
+da scegliere tra EBM e GradientBoostingClassifier. Per il momento valutiamo questi due.
+Ho già analizzato LogisticRegression mentre scartato a priori RandomForest e MLP.
+
+4  Aggiunta di feature morfologiche al dataset per il modello spiegabile EBM , serve
+anche per il GradientBoostingClassifier ?
+5. Uso Logistic Regression come baseline di confronto per i risultati del modello perchè la rete neurale 
+sia gisutificata deve avere risultati migliori. <br>
+6. Metriche di valutazione del modello accuracy recall precision f1_score . 
+Valuito anche tempi di esecuzione e confusion matrix
+7. Voglio aggiungere XAi debug nel loop di training sul validation set 
+solo alla prima e all'ultima epoca su un totale di 5 epoche.
+
+Una nota di terminologia: quello che descrivi, cioè backbone congelato e testa nuova, è transfer learning nella forma di feature extraction. Il fine-tuning è lo sbloccare i pesi. Nel report useremo i termini così
+
+Nel tuo XAI debug tra epoca 1 e 5 cambierà 
+solo la testa. 
+Le mappe varieranno meno, ma questo è un risultato leggibile in sé: mostra come il classificatore 
+impara a usare feature fisse. 
+Nel report va dichiarato per non far sembrare piatto il confronto.
+
+L'accuracy attesa è un po' più bassa. 97%/98% contro un 99% se dovessimo fare un fine tuning
+ma lo scopo del progetto non è migliorare le prestazioni.
+Lo documentiamo come trade-off consapevole di un prototipo dimostrativo.
+
+Sezxione2
+
+Perché Grad-CAM basta
+
+Scopo del debug: controllare che il modello stia imparando a guardare la cifra e non lo sfondo, e vedere come cambia questa attenzione tra inizio e fine. È un controllo di sanità, non un confronto tra tecniche, che spetta alla valutazione finale.
+Figure più leggibili: una riga per immagine con due sole mappe (epoca 1 e ultima) si legge a colpo d'occhio. Con tre tecniche per due epoche diventano sei colonne, che ripetono in piccolo la valutazione finale.
+Meno duplicazione: IG e Occlusion compaiono comunque nella suite finale sugli stessi tipi di esempi.
+
+Due limiti da dichiarare nel report
+
+Mappa 4×4 grossolana: con il backbone congelato i canali features.norm5 non cambiano, e cambiano solo i pesi della testa. Le mappe tra epoca 1 e 5 possono quindi differire poco. Non è un difetto: mostra che l'apprendimento riguarda quanto pesa ogni canale e non cosa il backbone vede. Va però scritto, per evitare di far sembrare "piatto" il confronto.
+Differenze difficili da giudicare a occhio: se vuoi renderle misurabili, la didascalia può riportare un solo numero per immagine, la correlazione di Spearman tra la mappa dell'epoca 1 e quella finale. Costa una riga di codice e non richiede altre tecniche. Lo lascio come opzione, non lo inserisco di default.
+
+Sezione 3
+
+YAGNI sta per "You Aren't Gonna Need It", cioè "non ti servirà". È un principio di progettazione che significa: non aggiungere funzionalità o complessità finché non c'è un motivo concreto per averle. Il rischio che evita è costruire cose "perché potrebbero servire", che allungano i tempi, aumentano gli errori e rendono il documento più difficile da spiegare.
+
+Come l'ho applicato in questo progetto
+
+GradientBoosting escluso: un secondo modello spiegabile avrebbe richiesto più codice e più confronti da giustificare, senza rispondere a una domanda in più del progetto.
+Niente test di deletion/insertion: misurare la fedeltà delle tecniche XAI è un progetto a sé, oltre lo scopo dimostrativo.
+Spiegazioni locali EBM solo su 6 esempi invece di 40: bastano a mostrare come si legge, e non c'è motivo di produrne di più.
+Nessuna ricerca di iperparametri e nessuna augmentation: l'avevi già deciso tu, ed è lo stesso principio.

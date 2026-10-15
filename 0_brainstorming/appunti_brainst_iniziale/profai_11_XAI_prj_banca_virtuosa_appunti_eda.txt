@@ -1,0 +1,1428 @@
+CONTESTO : DOMANDE GENERALI A LIVELLO EDA :
+
+1) Relativamente al concetto di Human in The Loop
+mi domando se inserirlo nel progetto.
+Il progetto è di tipo dimostrativo e non è volto
+al miglioramento delle prestazioni per cui
+lo Human in the loop ha senso eventualmente solo per interpretare il modello quindi
+perchè vengono prodotte determinate predizioni
+e Utilizzare le spiegazioni XAI
+per descrivere il comportamento in modo narrativo (requisito del progetto)
+in modo che sia più chiara  la parte dell'essere umano. Corretto ?
+
+Nella vecchia versione
+si parlava di miglioramento continuo quindi Human in the loop
+mentre nella nuova sulla mia dashboard non si dice nulla. 
+Io inserirei lo Human in the lopp secodno il flusso sotto.
+
+2) Chiedo qualche osservazione sui diversi punti a cui sono arrivato
+nella comprensione del progetto.
+
+1. Dataset MNIST
+Immagini, etichette e preprocessing.
+(addattare immagini Mnist e Modello DenseNet)
+
+2. Modello Black Box DenseNet
+Training e classificazione multiclasse 
+metriche recall precision f1_score accuracy loss confusion matrix tempi di esecuzione
+
+Salvataggio del modello(da verificare) e dei risultato al primo
+ciclo solo se si tratta del miglior modello nei successivi.
+
+Altro punto Da verificare:
+inserire qui una spiegazione GRAD CAM 
+per spiegare se il comportamento del modello cambia 
+durante l'apprendimento.(non modifica i gradienti del modello DenseNet
+e non ha impatto sulle predizioni)
+Non deve essere eseguito ad ogni epoca 
+(minimo ogni 5 epoche) e deve essere eseguito solo su un piccolo
+gruppo di immagini del validation set per non rallentare il training.
+Potrebbe essere introdotto su una sola classe per
+approfondire le classi in cui il modello fatica di più.
+
+3. Modulo XAI
+Grad-CAM, Integrated Gradients, SHAP, LIME , Occlusion , TracInCp
+Da approfondire 
+Iniziare con un piccolo set di immagini solo su GRAD-CAM Intregrated Gradience Lime
+e aggiungere solo in un secondo momento SHAP , Occlusion , TracInCp
+
+4. Modello Additivo (Opzionale EBM o Logistic Regression) 
+   costruire un  modello additivo e interpretabile per spiegare DenseNet. 
+   Faccio Test differenti Baseline Models nell'EDA e valuto
+   le prestazioni tra LogisticRegression EBM e RandomForest(solo confronto benchmarck) Mlp (solo confronto benchmarck)
+   Inserisco nel progetto solo il migliore tenendo conto che il modello
+   EBM offre una gamma di grafici più completa e comoda da usare. 
+   Evitare di mettere le valutazioni di tutti i BaseModels
+   nel progetto e li lascerei solo nel file notebook EDA. 
+
+5. Interfaccia Human-in-the-Loop
+Predizioni, errori, mappe di salienza e confidenza 
+Valutazione da parte dell'operatore 
+
+6. Scrittura della narrativa comprensibile a tutti
+Lo schema della risposta potrebbe essere basato
+sulle seguenti domande.
+
+Il modello si concentra sulle regioni corrette?
+Quali  feature/caratteristiche Utilizza ?
+Ci sono errori sistematici oppure diversificati ?
+Le etichette sono corrette se no quando ?
+Serve modificare il dataset(Occlusion Map) o il training(Hyperparametri) ?
+Se siamo al primo ciclo la narrativa si ferma prima altrimenti
+nella parte finale viene aggiunto un confronto con il 
+ciclo precedente o il miglior ciclo precedente salvato (da verificare)
+
+7. Nessun Intervento e miglioramento
+Nessuna Correzione dati, nessuna augmentation, 
+nessuna modifica all'architettura, loss, iperparametri
+
+8. Nuovo training / fine-tuning
+Il ciclo viene ripetuto su una nuova cella notebook con l'istanza
+di un nuovo modello sempre dello stesso tipo DenseNet
+e i risultati vengono confrontati con quelli precedenti.
+
+Saluti e grazie
+Francesco
+
+1) PREMESSA
+Distinguiamo i seguenti concetti.
+Interpretabilità: capire perché il modello produce una determinata predizione.
+
+Explainability:  SI
+generare spiegazioni del comportamento del modello attraverso tecniche specifiche.
+
+Saliency / Feature Attribution: SI
+attribuire importanza a pixel, regioni o feature.
+
+Model Debugging: SI
+utilizzare le spiegazioni per individuare comportamenti indesiderati.
+
+Human-in-the-Loop: Sentire il tutor
+coinvolgere una persona nel processo decisionale e di miglioramento.
+
+
+Model Improvement: NO
+intervenire sul dataset, sul preprocessing, sull'architettura, sui parametri o sulla strategia di training.
+
+2) SUPER PIXEL
+Nel contesto dell'Explainability (XAI) per modelli di Machine Learning e Deep Learning applicati alle immagini, 
+un superpixel è un gruppo coerente di pixel adiacenti che condividono 
+caratteristiche visive simili (come colore, intensità o texture).
+
+Anziché analizzare l'immagine pixel per pixel — un processo computazionalmente pesante e poco interpretevole 
+per gli esseri umani — il modello XAI suddivide l'immagine in queste regioni 
+"dotate di senso".
+
+
+I metodi di spiegazione (LIME,SHAP,GRAD CAM ecc.)
+ usano i superpixel per spiegare le decisioni delle reti neurali visive:
+ 
+ Riduzione della complessità: Un'immagine da $224 x 224$ contiene 
+ oltre 50.000 pixel, ma può essere riassunta in circa 50–100 
+ superpixel significativi.
+ 
+ Interpretabilità umana: Gli esseri umani non riconoscono un oggetto da un singolo pixel 
+ isolato, ma da forme e regioni (es. il muso di un cane, una ruota di un'auto).
+ 
+ Perturbazione delle regioni: Per capire quali parti dell'immagine influenzano la previsione, 
+ alcuni algoritmi di spiegazione (Occlusion e Lime) "nascondono" o disattiva (maschera) 
+ intere regioni/superpixel e osserva come cambia l'output della rete.
+ 
+ Esempio pratico con LIME
+ Se una rete neurale classifica un'immagine come "Cane":
+ L'algoritmo di segmentazione divide l'immagine in superpixel (es. muso, orecchie, sfondo erboso).
+ LIME genera varianti dell'immagine coprendo casualmente alcuni superpixel.
+ Calcola il punteggio di importanza per ciascun superpixel.
+ Risultato visivo: Evidenzia i superpixel che hanno contribuito positivamente alla decisione
+  (es. la regione con il muso del cane) e quelli neutri o negativi (es. l'erba dello sfondo).
+
+
+2) LE MAPPE DI SALIENZA
+le mappe di salienza nel contesto XAI sono tutti i grafici 
+prodotti dalle varie tecniche XAI come LIME SHAP GRAD CAM Integrated Gradience TraceInCp
+per comprendere dove sta guardanod il modello 
+
+Mappe di salienza: 
+cosa sono e quali tecniche le producono?
+La definizione iniziale è corretta, 
+ma occorre fare una distinzione.
+
+Una saliency map 
+è una rappresentazione visuale che associa a pixel o regioni dell'immagine 
+un valore di importanza rispetto a una determinata predizione.
+
+Per esempio, supponiamo che DenseNet 
+riceva un'immagine MNIST contenente il numero 8 e restituisca
+grafici che
+Evidenziano le regioni che contribuiscono alla predizione.
+Attenzione: una mappa di salienza non dimostra necessariamente dove il modello guarda in senso umano. 
+Evidenzia piuttosto quali input risultano rilevanti secondo uno specifico criterio di attribuzione.
+
+MAPPE DI SALIENZA DELLE DIVERSE TECNICHE XAI
+Le tecniche XAI possono produrre rappresentazioni differenti.
+
+Tecnica                 Output tipico                       Saliency map?
+Grad-CAM                Heatmap spaziale                    Sì
+Integrated Gradients    Attribuzione per pixel              Sì
+LIME                    Importanza delle superpixel         Può essere visualizzata come mappa
+SHAP                    Valori di attribuzione 
+                        per pixel o regione                 Può essere visualizzata come mappa
+Occlusion               Variazione della predizione 
+                        oscurando regioni                   Sì
+TracInCP                Influenza dei campioni di training  Non è una saliency map class
+                        Rileva gli esempi più influenti 
+                        sia di classe che counterfactual
+                        “Proponenti e opponent
+                        
+                        
+2.1) APPUNTI SULLO SHAP
+
+SHAP è locale e globale allo stesso tempo
+
+La spiegazione SHAP di un singolo campione è locale.
+DenseNet riceve un'immagine MNIST e predice 8.
+SHAP attribuisce un valore a ciascuna feature, indicando quanto questa contribuisce 
+alla predizione rispetto a un valore di riferimento.
+
+I valori SHAP possono essere positivi o negativi.
+Positivo: contribuisce ad aumentare l'output considerato.
+Negativo: contribuisce a diminuirlo.
+
+La spiegazione locale riguarda una specifica osservazione.
+La spiegazione globale si ottiene aggregando le spiegazioni locali su un insieme di osservazioni.
+
+La coalizione NON è il singolo sample
+
+bisogna distinguere tra 
+-Il singolo sample da spiegare.
+-Le coalizioni di feature.
+-Il background dataset.
+
+Supponiamo di avere un'immagine MNIST 28×28 quindi 784 pixel.
+
+SHAP vuole capire il contributo di ciascun pixel alla predizione.
+Considera differenti combinazioni di feature presenti o assenti e valuta il comportamento del modello.
+
+-Il sample da spiegare è l'osservazione sulla quale stai calcolando l'attribuzione.
+
+-Una coalizione è quindi la differente combinazione di feature presenti o assenti quindi
+ un sottoinsieme delle feature.
+
+-il background dataset serve a definire il riferimento rispetto al quale valutare il contributo delle feature.
+
+Per immagini, spesso si preferisce raggruppare i pixel in superpixel o regioni, 
+perché utilizzare direttamente 784 feature può essere computazionalmente 
+oneroso e rendere difficile l'interpretazione.
+
+ TreeSHAP vs KernelSHAP: cosa  utilizzare?
+La scelta dipende dal modello.
+
+Caratteristica          TreeSHAP                KernelSHAP          
+Modelli                 Modelli ad alberi       Model agnostic
+Random Forest           Sì                      Sì                  
+Gradient Boosting       Sì                      Sì
+Logistic Regression     Non appropriato         Sì
+DenseNet                Non appropriato         Sì
+Costo computazionale    Generalmente contenuto  Potenzialmente elevato
+Applicazione a immagini  Non è la scelta naturale Possibile, con opportuna rappresentazione
+
+3) HUMAN IN THE LOOPS
+
+Human-in-the-Loop non significa semplicemente osservare una mappa di salienza, modificare un iperparametro e ripetere il training.
+
+Significa costruire un processo nel quale l'essere umano interviene 
+attivamente in una o più fasi del ciclo di vita del modello.
+
+Io lo metterei seguendo questo flusso.
+
+3.1. Dataset MNIST
+Immagini, etichette e preprocessing.
+Devo capire se adattare le immagini al modello o al contario
+lasciare le immagini 1x28x28 e adattare il modello che dovrebbe 
+lavorare con immagini 3x224x224 . Punto importante da rivedere
+
+Adattamento dell'architettura
+MNIST contiene immagini grayscale 28×28, mentre le implementazioni standard di DenseNet sono generalmente configurate per immagini 
+RGB di dimensioni maggiori. 3x224x224
+
+modificare il primo strato convolutivo per accettare un solo canale;
+adattare il classificatore finale a 10 classi;
+eventualmente modificare la risoluzione di input. a 28x28 oppure ?
+
+Per MNIST non è obbligatorio utilizzare immagini a 224×224: puoi progettare una configurazione 
+più adatta alla dimensione originale.
+
+
+3.2. Modello Black Box DenseNet
+Training set per l'addestramento.
+Validation set per tuning e debug XAI eventuale.
+Test set per la valutazione finale.
+
+Training e classificazione multiclasse 
+metriche recall precision f1_score accuracy loss confusion matrix
+tempi di esucuzione
+
+Da Verificare Attenzione a Non usare o poco il test set per guidare il processo Human-in-the-Loop, altrimenti rischi di introdurre 
+una forma di overfitting sul test.
+
+Salvataggio del modello e dei risultato al primo
+ciclo solo se si tratta del miglior modello nei successivi.
+
+Potrebbe essere opzionale sotto parametro ON/OFF al main e non da sviluppare
+Puoi anche calcolare alcune spiegazioni XAI (solo GRAD CAM ad esempio) 
+periodicamente durante il training, 
+per esempio a ogni 5 epoche, utilizzando un insieme fisso di immagini di validazione di una sola classe ad esempio
+Questo permette di verificare se il comportamento del modello cambia 
+durante l'apprendimento.
+
+Non bisogna confondere il monitoraggio  XAI con una funzione di loss: 
+le mappe di salienza non modificano i gradienti di DenseNet.
+
+Non biosgna produrre una mappa di salienza a ogni epoca: 
+ma sotto certe condizioni 
+quando la validation loss si stabilizza;
+quando osservi un aumento degli errori;
+quando individui una classe particolarmente problematica.
+
+
+XAI non deve necessariamente essere incorporato nella funzione di loss di DenseNet.
+Nel tuo progetto puoi mantenere separati:
+Il processo di ottimizzazione dei pesi di DenseNet.
+Il processo di spiegazione delle predizioni.
+Il processo di revisione umana.
+
+Questa separazione rende più semplice anche la valutazione scientifica del progetto.
+
+Una volta implementato GRAD CAM
+se non basta aggiungere 
+Integrated Gradients e Occlusion.
+
+
+3.3. Modulo XAI
+Grad-CAM, Integrated Gradients, SHAP, LIME , Occlusion , TracInCp
+In MNIST, per esempio, puoi verificare se bordi, posizione della cifra o artefatti di acquisizione 
+influenzano eccessivamente le predizioni.
+
+Spiegazioni locali.
+Spiegazioni globali.
+Analisi delle feature.
+Analisi della fidelity.
+Confronto tra tecniche XAI.
+
+Procedere con lo sviluppo per gradi con poche immagini
+Selezionerei un insieme rappresentativo di immagini:
+
+immagini classificate correttamente;
+immagini classificate erroneamente;
+immagini appartenenti a classi frequentemente confuse;
+immagini con predizioni a bassa confidenza.
+
+SOLUZIONE A
+Sono sempre prodotte
+Grad-CAM. Subito 
+Integrated Gradients. Subito
+LIME. Subito
+
+Prevedere un parametro in input al main per ON/OFF della funzione
+SHAP. In un secondo momento non subito dopo i primi risultati
+Occlusion.  In un secondo momento non subito dopo i primi risultati
+TracInCp. In un secondo momento non subito dopo i primi risultati
+
+SOLUZIONE B
+Per ciascuna immagine produrrei:
+immagine originale;
+predizione e probabilità;
+classe reale;
+Grad-CAM;
+Integrated Gradients;
+Occlusion.
+
+Poi, come approfondimento, LIME e SHAP
+
+
+
+Schema Criteri di Scelta XAI :
+
+Tecnica                 ruolo nel progetto                      Utilizzo
+Grad-CAM                Baseline CNN                            Heatmap spaziale
+Integrated Gradients    Tecnica complementare                   Attribuzione per pixel
+Occlusion               Tecnica perturbativa                    Verifica dell'importanza delle regioni
+LIME                    Spiegazione locale model agnostic       Superpixel
+SHAP                    Attribuzione locale e globale           Campioni selezionati
+TracInCP                Analisi influenza training              Individuazione di campioni influenti
+
+
+
+Non è necessario implementare tutte queste tecniche: dipende dagli obiettivi e dai requisiti del progetto.
+Valutazione delle mappe XAI
+
+Non  valutare le mappe soltanto in base a quanto sono belle o intuitive.
+
+Un esperimento interessante sarebbe verificare se le regioni indicate da una tecnica XAI sono effettivamente importanti 
+per la predizione attraverso perturbazioni controllate.
+Per esempio, puoi oscurare le regioni più rilevanti e verificare la variazione dello score della classe target.
+Questo ti permette di valutare la faithfulness fedeltà della spiegazione.
+
+
+                                   
+3.4. Modello Additivo (Opzionale EBM TEAMS) 
+   costruire un altro modello additivo e interpretabile per spiegare DenseNet. 
+   Prevedere un parametro in input al main per ON/OFF della funzione
+   
+   Iniziare anche la EDA con i primi tre e fare un confronto con Dense Net
+   Logistic Regression.
+   Random Forest.
+   MLP.
+   EBM. solo nel progetto eventualmente
+   TEAMS solo nel progetto eventualmente 
+   
+   Faccio Test differenti Baseline Models nell'EDA e valuto
+   le prestazioni tra LogisticRegression RandomForest Mlp EBM
+   Inserisco nel progetto solo il migliore tenendo conto che il modello
+   EBM offre una gamma di grafici più completa e comoda da usare. 
+   Evitare di mettere le valutazion ìi di tutti i BaseModels
+   nel progetto e li lascerei solo nel file notebook EDA. 
+   
+   Obiettivo: confrontare il modello CNN con le baseline e applicare 
+   tecniche XAI specifiche per la Computer Vision.
+
+   Una cosa importante: non devi necessariamente scegliere il modello Glass Box con le prestazioni migliori 
+   e poi considerarlo il modello interpretativo di DenseNet.
+
+   Il modello Glass Box e il modello surrogate hanno due finalità differenti.
+
+   Se vuoi spiegare DenseNet attraverso un modello interpretabile, 
+   devi addestrare quest'ultimo a imitare le predizioni di DenseNet e misurare la fidelity.
+
+   Se invece vuoi semplicemente confrontare le prestazioni dei diversi modelli, 
+   stai realizzando un benchmark.
+   
+   Non tutti i modelli elencati sono Glass Box.
+
+Modello                 Tipologia                   Interpretabilità e/o benchmark
+Logistic Regression     Modello lineare             Interpretabilità Alta, con attenzione alla rappresentazione
+
+Random Forest           Ensemble di alberi          solo benchmark solo EDA
+MLP                     Rete neurale                solo benchmark solo EDA
+EBM                     Generalized Additive 
+                        Model interpretabile        Interpretabilità Alta benchmark
+
+   
+
+3.5. Interfaccia Human-in-the-Loop
+scheda tecnica operatore e descrizione narrativa dei risultati
+Vedere come realizzare DashBoard Human in The loop
+I Risultati devono essere commentati in modo narrativo 
+come da specifiche . Farsi aiutare dall'AI generativa.
+
+Predizioni, errori, mappe di salienza e confidenza 
+Valutazione da parte dell'operatore
+
+3.6. Scrittura della narrativa comprensibile a tutti
+Il modello si concentra sulle regioni corrette?
+Quali  feature/caratteristiche Utilizza ?
+Ci sono errori sistematici oppure diversificati ?
+Le etichette sono corrette se no quando ?
+Serve modificare il dataset(Occlusion Map) o il training(Hyperparametri) ?
+Se siamo al primo ciclo la narrativa si ferma prima altrimenti
+nella parte finale viene aggiunto un confronto con il 
+ciclo precedente o il miglior ciclo precedente salvato (da verificare)
+
+3.7. Nessun Intervento e miglioramento
+Nessuna Correzione dati, nessuna augmentation, 
+nessuna modifica all'architettura, loss, iperparametri
+
+3.8. Nuovo training / fine-tuning
+Il ciclo viene ripetuto su una nuova cella notebook con l'istanza
+di un nuovo modello sempre dello stesso tipo DenseNet
+e i risultati vengono confrontati con quelli precedenti.
+
+Esempio
+DenseNet confonde frequentemente il numero 4 con il numero 9.
+Il tuo sistema XAI potrebbe evidenziare che:
+Il modello attribuisce importanza a una regione poco significativa.
+Il modello utilizza prevalentemente una porzione dell'immagine.
+Alcuni campioni sono classificati correttamente ma attraverso caratteristiche inattese.
+Alcuni errori derivano da immagini ambigue o etichette errate.
+
+Esempio di analisi dell'operatore
+
+Problema individuato                
+Immagini etichettate male           
+Poche varianti di scrittura         
+Modello sovradimensionato           
+Overfitting                        
+Classi confuse (serve Analisi degli errori e dei campioni difficili )
+
+
+Il punto importante è che la mappa di salienza non corregge automaticamente il modello.
+È uno strumento diagnostico che fornisce informazioni all'operatore.
+
+4) CONTESTO : MODELLO BLACK E GLASS BOX
+
+Approccio – XAI direttamente sul modello Black Box senza creare un EBM ad hoc (complica il progetto)
+
+Questo secondo approccio è quello che ti suggerisco di considerare come asse centrale del progetto.
+Non devi necessariamente costruire un altro modello interpretabile per spiegare DenseNet.
+Puoi utilizzare direttamente:
+
+Grad-CAM. Si 
+Integrated Gradients. Si
+LIME. Si
+
+SHAP. In un secondo momento non subito
+Occlusion.  In un secondo momento non subito
+
+Queste tecniche producono spiegazioni del modello DenseNet senza richiedere l'addestramento di un secondo modello globale.
+
+Non è necessario inserire XAI nel processo di backpropagation per realizzare un Human-in-the-Loop.
+
+Puoi distinguere tre modalità:
+
+Modalita                    Quando interviene XAI                       Obiettivo
+Post-hoc                    Dopo il training                            Spiegare le predizioni
+
+Training-time monitoring    Durante il training                         Monitorare l'evoluzione del comportamento
+Human-in-the-Loop iterative Tra un ciclo di training e il successivo    Utilizzare le spiegazioni per descrivere il comportamento in modo narrativo
+
+Ad esempio Training ? XAI ? Human Review ? Decisione Intervento ? Fine-tuning ? Nuova valutazione.
+
+Puoi anche calcolare alcune spiegazioni periodicamente durante il training, 
+per esempio a ogni 5 epoche, utilizzando un insieme fisso di immagini di validazione.
+
+Questo permette di verificare se il comportamento del modello cambia 
+durante l'apprendimento.
+
+Non devi però confondere il monitoraggio 
+XAI con una funzione di loss: 
+le mappe di salienza non modificano automaticamente i gradienti di DenseNet.
+
+Non devi necessariamente aspettare la fine del training.
+
+Puoi progettare un processo del genere:
+
+Training epoch 1–5
+
+Addestramento iniziale di DenseNet.
+
+Checkpoint e validazione
+
+Valutazione su validation set e generazione di spiegazioni per campioni selezionati.
+
+Analisi XAI
+
+Confronto delle predizioni corrette, errate e delle relative mappe di attribuzione.
+
+Intervento umano
+
+Valutazione delle anomalie e decisione sull'eventuale modifica della pipeline.
+
+Training successivo
+
+Nuovo esperimento e confronto con il modello precedente.
+
+
+5) CONTESTO : ML pipeline per una classificazione multiclasse
+   • Load dataset ed esplorazione dei dati (EDA)
+   • (preprocessing) conversione delle immagini in forma tabulare
+   • Train-test split
+   • Creazione modello e train
+   • (search iperparametri)
+   • Valutazione prestazioni modello
+   • Spiegazione modello
+ 
+  
+non inserire Occlusion come tecnica XAI nel preprocessing. 
+Inseriscila SOLO nella fase di Explainability. 
+Non usare DataAugmentation per migliorare le prestazioni non è richiesto
+
+Un altro utilizzo interessante di XAI durante l'EDA consiste nell'analizzare eventuali correlazioni spurie già presenti nel dataset. 
+In MNIST, per esempio, puoi verificare se bordi, posizione della cifra o artefatti di acquisizione influenzano eccessivamente le predizioni.
+
+Qui c'è tutto il flusso ma per il momento aspetto troppo presto.
+aggiumgere la struttura dei sorgenti ecc.
+
+Lo XAI va inserito nella pipeline tradizionale 
+nel seguente modo
+
+
+FASE 1 – Data Understanding ed EDA
+
+Distribuzione delle classi.
+
+Visualizzazione delle immagini.
+
+Analisi delle immagini anomale.
+
+Verifica di qualità e bilanciamento.
+
+Analisi delle caratteristiche morfologiche.
+
+FASE 2 – Preprocessing e Data Representation
+
+Normalizzazione dei pixel.
+
+Reshape delle immagini in tensori.
+
+Eventuale estrazione di feature morfologiche.
+
+Nessuna data augmentation non richiesto migliorare le performance
+ma spiegare il comportamento.
+
+FASE 3 – Train / Validation / Test Split
+
+Separazione dei dati per evitare data leakage.
+
+FASE 4 – Baseline Models a livello EDA
+
+Logistic Regression.
+Random Forest.
+MLP.
+EBM.
+TEAMS
+
+FASE 5 – Deep Learning
+
+Definizione DenseNet.
+
+Training.
+
+Hyperparameter tuning.
+
+Checkpoint e validazione.
+
+FASE 6 – XAI durante il training e il debugging
+
+Grad-CAM.
+
+Integrated Gradients.
+
+Occlusion.
+Occlusion non è Data Augmentation.
+La Data Augmentation genera immagini modificate da utilizzare per addestrare il modello.
+L'Occlusion XAI genera perturbazioni per misurare la sensibilità della predizione.
+Puoi utilizzare le informazioni ricavate dall'Occlusion per decidere di introdurre una determinata strategia di augmentation, ma sono due operazioni differenti.
+
+Analisi degli errori.
+
+Human-in-the-Loop.
+
+FASE 7 – XAI finale
+
+Spiegazioni locali.
+
+Spiegazioni globali.
+
+Analisi delle feature.
+
+Analisi della fidelity.
+
+Confronto tra tecniche XAI.
+
+FASE 8 – Human-in-the-Loop e miglioramento
+
+Decisione dell'operatore.
+
+Modifiche al modello o ai dati.
+
+Nuovo training.
+
+Confronto tra esperimenti.
+
+Valutazione delle prestazioni e interpretabilità dei modelli.
+
+
+6) CONTESTO: SHAP VALUES 
+ 
+Qui hai già intuito un aspetto fondamentale: 
+SHAP nasce per spiegare una singola predizione, ma può essere utilizzato anche per ottenere una spiegazione globale.
+
+6.1 SHAP è locale o globale?
+
+La risposta è: entrambi.
+
+La spiegazione SHAP di un singolo campione è locale.
+
+ADenseNet riceve un'immagine MNIST e predice 8.
+SHAP attribuisce un valore a ciascuna feature, indicando quanto questa contribuisce 
+alla predizione rispetto a un valore di riferimento.
+
+Formalmente:
+
+f(x)=E[f(X)]+i=1?M?i
+	?
+
+Dove:
+
+f(x): predizione del modello.
+E[f(X)]: valore di riferimento.
+?i: contributo SHAP della feature i.
+
+M: numero di feature considerate.
+
+I valori SHAP possono essere positivi o negativi.
+
+Positivo: contribuisce ad aumentare l'output considerato.
+
+Negativo: contribuisce a diminuirlo.
+
+La spiegazione locale riguarda una specifica osservazione.
+La spiegazione globale si ottiene aggregando le spiegazioni locali su un insieme di osservazioni.
+
+
+GlobalImportancei = N 1 j=1 ? N |? ij
+	?
+Questa formula rappresenta l'importanza globale media assoluta della feature i su N campioni.
+
+6.2 La coalizione è il singolo sample?
+
+Non esattamente.
+
+Qui bisogna distinguere:
+
+Il sample che vuoi spiegare.
+
+Le feature del sample.
+
+Le coalizioni di feature.
+
+Il background dataset.
+
+Supponiamo di avere un'immagine MNIST 28×28.
+
+Abbiamo 784 pixel.
+
+SHAP vuole capire il contributo di ciascun pixel alla predizione.
+Considera differenti combinazioni di feature presenti o assenti e valuta il comportamento del modello.
+Una coalizione è quindi un sottoinsieme delle feature.
+Il sample da spiegare è invece l'osservazione sulla quale stai calcolando l'attribuzione.
+Inoltre, il background dataset serve a definire il riferimento rispetto al quale valutare il contributo delle feature.
+Per immagini, spesso si preferisce raggruppare i pixel in superpixel o regioni, 
+perché utilizzare direttamente 784 feature può essere computazionalmente 
+oneroso e rendere difficile l'interpretazione.
+
+6.3 TreeSHAP vs KernelSHAP: cosa conviene utilizzare?
+
+La scelta dipende dal modello.
+
+Caratteristica          TreeSHAP                KernelSHAP          
+Modelli                 Modelli ad alberi       Model agnostic
+Random Forest           Sì                      Sì                  
+Gradient Boosting       Sì                      Sì
+Logistic Regression     Non appropriato         Sì
+DenseNet                Non appropriato         Sì
+Costo computazionale    Generalmente contenuto  Potenzialmente elevato
+Applicazione a immagini  Non è la scelta naturale Possibile, con opportuna rappresentazione
+
+Per il tuo progetto:
+
+Random Forest: TreeSHAP.
+DenseNet: KernelSHAP, eventualmente con superpixel e un masker appropriato.
+Logistic Regression: puoi utilizzare KernelSHAP oppure direttamente i coefficienti del modello, 
+                     con le dovute attenzioni sulla rappresentazione delle feature.
+
+EBM: puoi utilizzare le sue funzioni additive intrinseche, oltre a tecniche SHAP compatibili.
+
+Non utilizzerei KernelSHAP su tutti i 784 pixel e su tutto MNIST.
+Il costo potrebbe diventare elevato.
+
+Se vuoi sperimentare SHAP su DenseNet, inizierei da un campione selezionato, 
+con una segmentazione dell'immagine in regioni.
+Inoltre, ricorda che per un classificatore multiclasse puoi spiegare l'output di una classe specifica, 
+ad esempio il contributo dei pixel 
+alla predizione della classe 8.
+
+7) CONTESTO:ATTRIBUZIONE
+   valuta come a pixel diversi compete
+        influenza diversa su diverse classi di
+        classificazione. (locale o globale)
+   
+Attribuzione: come valutare l'influenza dei pixel sulle diverse classi?
+
+E' corretto dire che Valuta come a pixel diversi compete influenza diversa su diverse classi di classificazione.
+
+Puoi calcolare una mappa di attribuzione rispetto alla classe 8.
+
+Ma puoi anche calcolare una mappa rispetto alla classe 3.
+
+Questo ti permette di verificare:
+quali pixel contribuiscono alla predizione 8;
+quali pixel contribuiscono alla predizione 3;
+quali regioni hanno influenza differente sulle due classi.
+
+Questa è una forma di analisi delle attribuzioni class-specific.
+
+non sia necessario complicare eccessivamente questa parte.
+
+Se le specifiche del progetto richiedono mappe di salienza, puoi concentrarti 
+sulle seguenti visualizzazioni:
+
+Immagine originale.
+Grad-CAM per la classe predetta.
+Integrated Gradients per la classe predetta.
+Eventualmente Occlusion per la classe predetta.
+Eventualmente TracInCp per la classe predetta.
+
+Per un campione classificato erroneamente, 
+puoi anche confrontare la mappa relativa alla classe predetta con quella relativa alla classe reale.
+
+Questo sarebbe interessante perché ti permette di analizzare il comportamento 
+del modello quando confonde, ad esempio, un 8 con un 3.
+
+Non sei obbligato a calcolare e visualizzare le attribuzioni per tutte e dieci le classi.
+
+Un esperimento mirato su alcune classi e alcuni errori 
+rappresentativi può essere sufficiente.
+
+8) GRAD CAM
+   BASELINE XAI Lavora a livello di sample 
+       Robusto con scarsa base teorica ma Usato 
+       come baseline XAI solo su reti CNN .
+    
+    Non Addestra modello lineare ma ne trova i coefficienti
+       attraverso una backpropagation dagli strati fully connected OK
+    
+Non addestra un classificatore aggiuntivo
+
+Grad-CAM non addestra un modello lineare dopo l'ultimo strato convolutivo.
+
+Utilizza i gradienti della classe target rispetto alle feature map 
+di uno specifico strato convolutivo.
+
+
+Supponiamo che DenseNet abbia una sequenza di strati convolutivi seguita da una parte di classificazione.
+
+Input image
+
+Immagine MNIST 28×28
+
+Convolutional layers
+
+Estrazione delle feature map
+
+Ultimo layer convolutivo selezionato
+
+Attivazioni delle feature map
+
+Classification head
+
+Pooling, eventuali layer e classificatore
+
+Class scores
+
+Output delle 10 classi
+
+Grad-CAM utilizza il gradiente dello score della classe target 
+rispetto alle feature map del layer convolutivo scelto.
+
+Per ogni canale k, calcola un peso:
+
+akc=Z1i?j??Aijk?yc
+	?
+Dove:
+yc: score della classe target.
+
+Ak: feature map del canale k.
+
+Z: numero di elementi spaziali della feature map.
+
+Successivamente costruisce la mappa:
+
+LGrad-CAM
+c=ReLU(k?akcAk)
+
+Quindi:
+Calcola i gradienti.
+
+Ricava i pesi delle feature map.
+
+Combina le feature map usando questi pesi.
+
+Applica ReLU.
+
+Ridimensiona la heatmap alla dimensione dell'immagine originale.
+
+Non viene addestrato alcun modello lineare aggiuntivo.
+
+I pesi akc? vengono calcolati tramite backpropagation, non appresi attraverso un nuovo training.
+
+8.2 Perché Grad-CAM viene utilizzato come baseline?
+
+Grad-CAM è una tecnica molto diffusa per spiegare le CNN perché permette di ottenere una visualizzazione 
+spaziale delle regioni rilevanti per una classe.
+
+Ha però dei limiti:
+
+Dipende dallo strato convolutivo scelto.
+
+Ha una risoluzione spaziale limitata.
+
+La heatmap è generalmente più grossolana rispetto a una mappa a livello di pixel.
+Non rappresenta una prova causale del motivo della predizione.
+Per il tuo progetto è una buona tecnica di riferimento per la spiegazione spaziale di DenseNet.
+
+9). CONTESTO : SCEGLIERE XAI 
+   Come scegliere la tecnica XAI più adatta a DenseNet?
+
+Questa è una delle domande più importanti.
+
+Non esiste una tecnica XAI ideale per ogni architettura.
+
+La scelta dipende da diversi criteri.
+
+9.1 I criteri per scegliere una tecnica XAI
+
+Criterio 1 – Architettura del modello
+
+Alcune tecniche sono specifiche per determinate famiglie di modelli.
+
+Ad esempio:
+
+Grad-CAM: particolarmente adatto alle CNN.
+
+TreeSHAP: adatto ai modelli ad alberi.
+
+Integrated Gradients: utilizzabile su reti differenziabili.
+
+LIME: model agnostic.
+
+KernelSHAP: model agnostic.
+
+Criterio 2 – Tipo di spiegazione desiderata
+
+Vuoi capire:
+Quali pixel influenzano una predizione?
+Quali feature sono importanti?
+Perché il modello ha sbagliato?
+Quali campioni di training hanno influenzato una predizione?
+Qual è il comportamento generale del modello?
+
+Criterio 3 – Complessità computazionale
+
+Alcune tecniche possono essere molto costose.
+
+Per esempio KernelSHAP, soprattutto se applicato a immagini e modelli complessi.
+
+Criterio 4 – Granularità della spiegazione
+
+Vuoi una spiegazione:
+
+A livello di pixel?
+A livello di superpixel?
+A livello di feature?
+A livello di campione?
+A livello globale?
+
+Criterio 5 – Affidabilità della spiegazione
+
+Una tecnica XAI non va valutata soltanto in base alla qualità visiva della mappa.
+
+È opportuno considerare:
+
+Faithfulness. fedeltà
+Robustezza.
+Sensibilità alle perturbazioni.
+Stabilità.
+Coerenza con il comportamento del modello.
+Questo è particolarmente importante perché due tecniche possono produrre mappe molto differenti sulla stessa immagine.
+
+ESEMPIO PER MNIST E DENSENET
+
+Ti propongo questa organizzazione:
+
+Tecnica                 ruolo nel progetto                      Utilizzo
+Grad-CAM                Baseline CNN                            Heatmap spaziale
+Integrated Gradients    Tecnica complementare                   Attribuzione per pixel
+Occlusion               Tecnica perturbativa                    Verifica dell'importanza delle regioni
+LIME                    Spiegazione locale model agnostic       Superpixel
+SHAP                    Attribuzione locale e globale           Campioni selezionati
+TracInCP                Analisi influenza training              Individuazione di campioni influenti
+
+Una precisazione su TracInCP: non è un'alternativa a Grad-CAM. Risponde a una domanda completamente differente.
+
+Mentre Grad-CAM cerca di spiegare quali regioni dell'immagine contribuiscono a una predizione, 
+TracInCP cerca di capire quali esempi di training hanno influenzato una determinata predizione o il comportamento del modello.
+
+Non è necessario implementare tutte queste tecniche: dipende dagli obiettivi e dai requisiti del progetto.
+
+10) 
+       Hai proposto di iniziare con alcuni modelli alternativi prima di passare a DenseNet.
+
+È una buona impostazione sperimentale, ma farei una distinzione.
+
+Non tutti i modelli che hai elencato sono Glass Box.
+
+Modello                 Tipologia                   Interpretabilità intrinseca
+Logistic Regression     Modello lineare             Alta, con attenzione alla rappresentazione
+
+Random Forest           Ensemble di alberi          Limitata
+MLP                     Rete neurale                Bassa
+EBM                     Generalized Additive 
+                        Model interpretabile        Alta
+
+L'EBM è particolarmente interessante perché utilizza funzioni additive per descrivere il contributo delle feature alla predizione.
+
+In forma semplificata:
+
+g(E[Y])=ß0 + i=1 ?Mfi(xi)
+
+Dove:
+
+g è la funzione di collegamento;
+
+ß0 è il termine di bias;
+
+fi è la funzione appresa per la feature i-esima.
+
+Questo ti permette di visualizzare il contributo delle singole feature alla predizione.
+
+Come imposterei il confronto?
+
+Realizzerei due esperimenti distinti.
+
+Esperimento A – Baseline con modelli tabulari
+
+Input: 784 pixel 28x28
+
+Logistic Regression.
+Random Forest.
+MLP.
+EBM.
+
+Obiettivo: confrontare prestazioni e interpretabilità dei modelli.
+
+Esperimento B – Deep Learning
+
+Input: immagini MNIST.
+
+- DenseNet.
+
+Obiettivo: confrontare il modello CNN con le baseline e applicare 
+tecniche XAI specifiche per la Computer Vision.
+
+Una cosa importante: non devi necessariamente scegliere il modello Glass Box con le prestazioni migliori 
+e poi considerarlo il modello interpretativo di DenseNet.
+
+Il modello Glass Box e il modello surrogate hanno due finalità differenti.
+
+Se vuoi spiegare DenseNet attraverso un modello interpretabile, 
+devi addestrare quest'ultimo a imitare le predizioni di DenseNet e misurare la fidelity.
+
+Se invece vuoi semplicemente confrontare le prestazioni dei diversi modelli, 
+stai realizzando un benchmark.
+
+
+
+
+11) Nella nuova versione della dashboard è scritto
+    che il codice deve essere eseguibile in un unica cella.
+       
+l progetto deve essere riproducibile e deve permetterti di modificare una fase senza dover eseguire tutto ogni volta.
+
+Io utilizzerei una struttura modulare.
+
+11.1 Organizzazione del notebook
+
+Se utilizzi Jupyter Notebook o Google Colab:
+
+Sezione
+Contenuto
+1. Configuration
+    Parametri, seed, device
+
+2. Imports Librerie
+
+3. Data Loading
+   Caricamento MNIST
+
+4. EDA
+   Analisi e visualizzazione dati
+
+5. Preprocessing
+   Normalizzazione e trasformazioni
+
+6. Data Splitting
+   Train, validation, test
+
+7. Baseline Models
+   LR, RF, MLP, EBM
+
+8. DenseNet
+   Definizione architettura
+
+9. Training
+   Addestramento
+
+10. Hyperparameter Tuning
+    Ricerca iperparametri
+
+11. Evaluation
+    Metriche e confusion matrix
+
+12. XAI
+    Grad-CAM, IG, LIME, SHAP, Occlusion
+
+13. Human-in-the-Loop
+    Analisi, decisioni e interventi
+
+14. Experiments Comparison
+    Confronto tra versioni del modello
+
+    Ogni fase può essere composta da più celle.
+
+11.2 Organizzazione attraverso funzioni
+
+Ti suggerisco di sviluppare funzioni riutilizzabili.
+
+Per esempio:
+
+def load_dataset():
+    pass
+
+def explore_dataset(dataset):
+    pass
+
+def preprocess_data(dataset):
+    pass
+
+def create_densenet(config):
+    pass
+
+def train_model(model, train_loader, config):
+    pass
+
+def evaluate_model(model, test_loader):
+    pass
+
+def explain_with_gradcam(model, image, target_class):
+    pass
+
+def explain_with_integrated_gradients(
+    model, image, target_class
+):
+    pass
+
+def human_in_the_loop(model, explanations):
+    pass
+
+Poi puoi utilizzare una funzione main() per orchestrare il progetto.
+
+def main():
+
+    # 1. Load data
+    dataset = load_dataset()
+
+    # 2. EDA
+    explore_dataset(dataset)
+
+    # 3. Preprocessing
+    train_loader, val_loader, test_loader = (
+        preprocess_data(dataset)
+    )
+
+    # 4. Create model
+    model = create_densenet(config)
+
+    # 5. Training
+    model = train_model(model, train_loader, config)
+
+    # 6. Evaluation
+    evaluate_model(model, test_loader)
+
+    # 7. XAI
+    # Grad-CAM, Integrated Gradients, etc.
+
+    # 8. Human-in-the-Loop
+    # Analisi e decisioni dell'operatore
+
+
+if __name__ == "__main__":
+    main()
+
+Il codice è naturalmente uno scheletro da completare.
+
+Il vantaggio principale: puoi eseguire separatamente le funzioni XAI senza dover riaddestrare DenseNet ogni volta.
+
+Inoltre, salverei sempre:
+
+configurazione dell'esperimento;
+
+pesi del modello;
+
+metriche;
+
+seed;
+
+risultati XAI;
+
+decisioni e modifiche effettuate dall'operatore.
+
+Questo ti permette di documentare il processo Human-in-the-Loop e confrontare le diverse iterazioni.
+
+12 Grad-CAM, Integrated Gradients, LIME e SHAP: quali utilizzare come baseline?
+    
+     
+Non implementerei necessariamente tutte le tecniche con lo stesso livello di approfondimento.
+Imposterei una sperimentazione con tre livelli.  
+Livello 1 Grad-CAM
+Utilizza i gradienti delle feature map convolutive per costruire una heatmap spaziale.
+La tecnica di riferimento per spiegare le CNN.
+
+Risponde alla domanda: quali regioni spaziali contribuiscono alla predizione?
+
+Livello2
+Integrated Gradients e Occlusion
+Calcola le attribuzioni integrando i gradienti lungo un percorso tra un baseline e l'immagine originale.
+Occlusion
+Oscura progressivamente le regioni dell'immagine e misura la variazione dell'output.
+
+Due approcci complementari per verificare l'attribuzione a livello di pixel o regione.
+
+Permettono di confrontare spiegazioni basate sui gradienti(Integrated Gradients) e spiegazioni basate sulla perturbazione dell'input.(Occlusion)
+
+Livello3
+LIME
+Perturba le regioni dell'immagine e costruisce un modello interpretabile locale che approssima il comportamento del modello originale.
+SHAP
+Calcola attribuzioni basate sui valori di Shapley per misurare il contributo delle feature alla predizione.
+
+Li utilizzerei per studiare l'interpretazione locale attraverso superpixel e attribuzioni delle feature.
+Sono particolarmente interessanti se vuoi confrontare approcci model agnostic con approcci specifici per CNN.
+
+Per il tuo obiettivo di debugging di DenseNet, quindi, non considererei LIME, SHAP e Grad-CAM 
+come tre versioni equivalenti della stessa tecnica.
+Le utilizzerei per rispondere a domande differenti.
+
+13) Proposta di progetto su 4 obiettivi:
+A questo punto vorrei proporti un'architettura sperimentale che riunisce tutti i concetti che abbiamo affrontato.
+
+La organizzerei intorno a quattro obiettivi.
+
+13.1 – Obiettivo 1 Confronto tra modelli Black Box e Glass Box
+Da verificare con il tutor solo in fase di EDA ? 
+Modello                         Scopo
+Logistic Regression             Baseline lineare
+Random Forest                   Baseline ensemble
+EBM                             Modello additivo interpretabile
+MLP                             Baseline neurale
+DenseNet                        Modello Deep Learning principale
+
+Valuterai Accuracy, Precision, Recall, F1-score, confusion matrix e tempi di esecuzione.
+
+13.2 OBIETTIVO 2 Explainability di DenseNet
+
+Selezionerei un insieme rappresentativo di immagini:
+
+immagini classificate correttamente;
+
+immagini classificate erroneamente;
+
+immagini appartenenti a classi frequentemente confuse;
+
+immagini con predizioni a bassa confidenza.
+
+Per ciascuna immagine produrrei:
+immagine originale;
+predizione e probabilità;
+classe reale;
+Grad-CAM;
+Integrated Gradients;
+Occlusion.
+
+Poi, come approfondimento, LIME e SHAP
+I Risultati devono essere commentati in modo narrativo 
+come da specifiche . Farsi aiutare dall'AI generativa.
+
+13.3  Obiettivo 3 – Human-in-the-Loop
+
+Qui costruirei un'interfaccia uomo-macchina.
+Questa dashboard è un esempio concettuale di interfaccia.
+
+Il suo scopo è rendere esplicito il contributo dell'essere umano: non basta mostrare una heatmap, bisogna consentire 
+all'operatore di interpretarla, annotare un problema e documentare una decisione.
+
+Naturalmente, una decisione non deve modificare automaticamente il modello senza una successiva verifica.
+
+Dashboard Human In the loop:
+DenseNet – XAI Debugging Dashboard
+Sample ID: 125
+Griglia con Immagine reale Immagima reale Immagine Integrated Gradients
+
+
+Risultat0 classificazione metterlo insieme grafico possibilmente
+Classe reale 8
+Classe predetta 3
+Confidenza della predizione 0,82
+
+Esempio Scheda tecnica dell'operatore
+
+
+14) 
+come propossta di Human in The loop
+Analisi dell'operatore 
+
+Esempio di possibili annotazioni, non risultato di un modello reale.
+
+Problema individuato
+Attenzione a regioni non pertinenti
+Sensibilità allo spessore dei tratti
+Forma ambigua della cifra
+Possibile errore di etichettatura
+
+
+Note dell'operatore
+
+
+
+15) 
+Alcuni aspetti tecnici specifici di DenseNet su MNIST
+
+Prima di iniziare, ti segnalo quattro dettagli che potrebbero evitarti problemi.
+
+1. Adattamento dell'architettura
+
+MNIST contiene immagini grayscale 28×28, mentre le implementazioni standard di DenseNet sono generalmente configurate per immagini 
+RGB di dimensioni maggiori.
+
+Dovrai quindi decidere se:
+
+modificare il primo strato convolutivo per accettare un solo canale;
+
+adattare il classificatore finale a 10 classi;
+
+eventualmente modificare la risoluzione di input.
+
+Per MNIST non è obbligatorio utilizzare immagini a 224×224: puoi progettare una configurazione più adatta alla dimensione originale.
+
+2. Separazione dei dati
+
+Utilizza:
+
+Training set per l'addestramento.
+
+Validation set per tuning e decisioni sperimentali.
+
+Test set per la valutazione finale.
+
+Evita di utilizzare ripetutamente il test set per guidare il processo Human-in-the-Loop, altrimenti rischi di introdurre una forma di overfitting sul test.
+
+4. Valutazione delle mappe XAI
+
+Non devi valutare le mappe soltanto in base a quanto sono belle o intuitive.
+
+Un esperimento interessante sarebbe verificare se le regioni indicate da una tecnica XAI sono effettivamente importanti 
+per la predizione attraverso perturbazioni controllate.
+
+Per esempio, puoi oscurare le regioni più rilevanti e verificare la variazione dello score della classe target.
+
+Questo ti permette di valutare la faithfulness fedeltà della spiegazione.
+
+
+16 
+Ti lascio una sintesi delle decisioni progettuali che emergono dalle tue domande.
+
+Argomento
+
+
+Decisione progettuale
+
+Mappe di salienza
+
+Considerarle come visualizzazioni di attribuzione, non come una tecnica unica
+
+Human-in-the-Loop
+
+Creare un ciclo di analisi, decisione umana, intervento e nuova valutazione
+
+
+
+Glass Box
+Utilizzare Logistic Regression ed EBM come modelli interpretabili; RF e MLP come ulteriori baseline
+Surrogte
+
+Valutare un Decision Tree o EBM addestrato sulle predizioni di DenseNet
+
+Pipeline
+Inserire XAI sia durante il debugging del training sia nella valutazione finale
+
+
+SHAP
+Distinguere spiegazioni locali e aggregazioni globali
+
+Grad-CAM
+Utilizzarlo come riferimento per le CNN
+
+
+Integrated Gradients
+Utilizzarlo come approccio complementare
+
+Occlusion
+Utilizzarlo per analizzare la sensibilità alle regioni dell'immagine
+
+LIME
+Utilizzarlo per spiegazioni locali basate su superpixel
+
+TracInCP
+Considerarlo un approfondimento separato per l'influenza dei campioni di training
+
+
+Human feedback
+
+Registrare ogni intervento e confrontare le versioni del modello
+
+La mia raccomandazione sulla sequenza di sviluppo
+
+Non partirei implementando immediatamente tutte le tecniche XAI.
+
+Procederei in questo ordine:
+Costruisci la baseline
+Carica MNIST, 
+esegui EDA, 
+preprocessing,
+ split e addestra DenseNet.
+
+Implementa le metriche
+
+Accuracy, Precision, Recall, F1-score, confusion matrix e analisi degli errori.
+Implementa Grad-CAM
+Inizia spiegando alcune predizioni corrette ed errate.
+Aggiungi Integrated Gradients e Occlusion
+Confronta le spiegazioni prodotte dalle tre tecniche.
+
+Implementa LIME e SHAP
+Inizia su un numero limitato di immagini per contenere il costo computazionale.
+
+Costruisci la dashboard Human-in-the-Loop
+Consenti all'operatore di analizzare gli errori 
+Documenta i risultati
+
+Confronta DenseNet ia dal punto di vista predittivo sia dal punto di vista XAI.
+
+Un'ultima considerazione: qual è il vero obiettivo scientifico del tuo progetto?
+
+Vorrei suggerirti di non impostare il progetto semplicemente come:
+
+Applico Grad-CAM, LIME e SHAP a DenseNet e visualizzo le mappe di salienza.
+
+Sarebbe un progetto principalmente dimostrativo.
+
+Proverei invece a formulare l'obiettivo così:
+
+Studiare come le tecniche di Explainable AI possano supportare un processo di debugging e miglioramento 
+iterativo di un modello Deep Learning per la classificazione di immagini, 
+attraverso un approccio Human-in-the-Loop.
+
+In questo modo hai tre dimensioni da studiare:
+
+Performance: DenseNet classifica correttamente le immagini?
+
+Explainability: le tecniche XAI consentono di comprendere e verificare il comportamento del modello?
+
+Human-in-the-Loop: le spiegazioni permettono all'operatore di individuare problemi, formulare ipotesi  sul modello? per il momento non fare modifiche
+La domanda di ricerca potrebbe essere:
+In che misura l'integrazione di tecniche XAI in un processo Human-in-the-Loop 
+consente di individuare comportamenti indesiderati di una CNN , la robustezza e l'affidabilità delle predizioni?
+
+Questa formulazione dà una direzione precisa a tutto il progetto, dalla progettazione della pipeline fino alla valutazione  finale.
+
+

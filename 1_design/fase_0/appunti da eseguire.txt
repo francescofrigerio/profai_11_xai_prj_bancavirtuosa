@@ -1,0 +1,46 @@
+Come eseguirlo
+
+Su Colab con runtime GPU, copia i file nel repository (o fai il commit e poi il clone). Poi:
+
+!git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
+%cd profai_11_xai_prj_bancavirtuosa\fase_0
+!pip -q install captum lime shap scikit-image
+%run phase0_checks.py --quick
+%run phase0_checks.py
+
+Usa %run e non !python: solo nello stesso kernel il controllo 1 può rilevare se pip ha cambiato pacchetti già caricati e serve riavviare il runtime.
+
+Prima --quick: pesi casuali, dati minuscoli, pochi minuti. Serve a scovare errori nello script. 
+I risultati non sono validi per le decisioni, e il file prodotto è separato (_quick).
+
+Poi il run completo: l’ordine è 1, 2, 5, 6, 3, 4, 7, 8, 11, 12, 9, 10. Il controllo 6 viene prima di 3, 4, 11 e 12 
+perché salva la testa addestrata che quei controlli usano. Il controllo 6 con le due varianti è il più lungo.
+
+Cosa mi serve da te
+L’output della console del --quick (o gli errori, se ce ne sono), così correggo lo script prima del run completo.
+
+Poi phase0_results.json, phase0_summary.md e le 5 figure phase0_*.png. 
+Quattro controlli (5, 7, 8, 12) hanno un esito che va giudicato a occhio: sono contrassegnati REVIEW e il riepilogo li elenca.
+
+L’ok sulle correzioni dell’errata ancora in stato P. Quelle che incidono di più sul resto sono E03 
+(regola di ricampionamento), E07 e E08 (campione e galleria).
+
+Alla chiusura della tappa 0 dimostrerò i criteri concordati: 
+ogni controllo PASS, oppure FAIL 
+con una decisione documentata.
+ A quel punto parte la tappa 1.
+
+
+
+
+Da capire
+
+| F2 | L'accuracy citata è misurata sul test, mentre la soglia è sulla validation. 
+| Il check 6 misura sulla validation. |
+
+| F5 | `torch.hub.load('pytorch/vision:v0.10.0', ..., pretrained=True)` 
+scarica il codice da GitHub. | Si usa `torchvision.models.densenet121` con l'enum dei pesi. |
+
+Con setbatch norm eval l'accuracy è sempre sopra il 95%
+per cui rimetto questo valore come soglia.
+

@@ -1,0 +1,182 @@
+name: Machine Innovation Pipeline CI CD TRAIN
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches: 
+      - "main"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Seleziona la modalità di esecuzione (demo o prod)"
+        default: "demo"
+        type: choice
+        options:
+          - "demo"
+          - "prod"
+
+permissions:
+  contents: write
+
+jobs:
+  # JOB DI TEST (Eseguito ad ogni Push e PR)
+  test:
+    # if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+        
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Test with pytest 
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        working-directory: "."
+        run: |
+          chmod +x ./run_test_ci.sh
+          ./run_test_ci.sh
+
+          chmod +x ./model_serving/test_predict_from_app.sh 
+          ./model_serving/test_predict_from_app.sh  
+
+          chmod +x ./model_serving/test_predict_from_web.sh
+          ./model_serving/test_predict_from_web.sh
+
+
+  # JOB DI TEST (Eseguito ad ogni Push e PR senza train)
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      # Aggiorna l'applicazione FastAPI sullo Space se cambia il codice
+      - name: Deploy to Hugging Face Spaces
+        env:
+          HF_TOKEN_WRITE: ${{ secrets.HF_TOKEN_WRITE }}
+          GIT_LFS_SKIP_SMUDGE: 1 
+        run: |
+          git config --global user.email "francescofrigerio529@gmail.com"
+          git config --global user.name "francescofrigerio"
+          
+          git clone https://x:$HF_TOKEN_WRITE@huggingface.co/spaces/francescofrigerio/spacemachineinnovatorsmlops hf_space
+          
+          chmod +x model_serving/deploy_space.sh
+          ./model_serving/deploy_space.sh
+
+          find hf_space -maxdepth 1 -not -name 'hf_space' -not -name '.git' -exec rm -rf {} +
+          # cp -r model_serving/* hf_space/
+          cp -r model_serving/dist_space/* hf_space/
+          
+          echo "Contenuto dello Space:"
+          ls -lah hf_space
+
+          cd hf_space
+          git add .
+          git diff-index --quiet HEAD || git commit -m "Deploy automatico codice da GitHub Actions"
+          git push origin main
+          
+      - name: Build model_serving with Dockerfile
+        run: |
+          docker build -f model_serving/Dockerfile -t machine-innovation-serving:latest ./model_serving
+
+  # JOB DI TRAIN (Eseguito SOLO via Airflow o Manuale)
+  train:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest huggingface_hub
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run train
+        env:
+          HF_TOKEN_WRITE: ${{ secrets.HF_TOKEN_WRITE }}
+        run: |
+          chmod +x ./run_train_prod.sh
+          
+          if [ "${{ github.event.inputs.mode }}" = "prod" ]; then
+            echo "Avvio training in modalità PRODUCTION..."
+            ./run_train_prod.sh
+            echo "MODEL_OUT_DIR=src/outputs-baseline-prod" >> $GITHUB_ENV
+          else
+            echo "Avvio training in modalità DEMO..."
+            ./run_train_prod.sh --demo
+            echo "MODEL_OUT_DIR=src/outputs-baseline-prod" >> $GITHUB_ENV
+          fi    
+
+      # Carica i nuovi pesi nel Model Repository "MachineInnovation/twitter-sentiment-model"
+      - name: Upload Model to Hugging Face Model Hub
+        env:
+          HF_TOKEN_WRITE: ${{ secrets.HF_TOKEN_WRITE }}
+        run: |
+          python ci_cd/CD/hf_deploy.py
+
+      # Forza il riavvio dello Space così risveglia FastAPI e scarica l'ultimo modello caricato sopra
+      - name: Restart Hugging Face Space to load new model
+        env:
+          HF_TOKEN_WRITE: ${{ secrets.HF_TOKEN_WRITE }}
+        run: |
+          python -c "
+          from huggingface_hub import HfApi
+          api = HfApi(token='${{ secrets.HF_TOKEN_WRITE }}')
+          api.restart_space(repo_id='francescofrigerio/spacemachineinnovatorsmlops')
+          print('Space restart triggered successfully!')
+          "
+
+      - name: Commit and Push Results to GitHub (Trigger Monitor)
+        run: |
+          echo "start Commit and Push Results to GitHub" 
+          echo "MODEL_OUT_DIR ${{ env.MODEL_OUT_DIR }}" 
+          
+          ls -lrt ./src/outputs-baseline-prod || true
+
+          git config --global user.name "francescofrigerio"
+          git config --global user.email "francesco.frigerio@greencore.it"
+          
+          # Aggiunge i file in base alla modalità rilevata dall'env
+          git add ${{ env.MODEL_OUT_DIR }}/metrics.db || true
+          git add ${{ env.MODEL_OUT_DIR }}/roc_curve.png || true
+          git add ${{ env.MODEL_OUT_DIR }}/confusion_matrix.png || true
+          
+          if git diff --staged --quiet; then
+            echo "Nessuna modifica rilevata nelle metriche. Monitoraggio non invocato."
+          else
+            # NOTA: Qui NON bisogna usare [skip ci], altrimenti 
+            # il workflow di monitoraggio non si attiverà!
+            git commit -m "data: aggiornato database metriche training"
+          
+            # Aggiunta al rebase:
+            # -X theirs Forza il rebase a far vincere le modifiche correnti 
+            # del workflow sui file binari
+            git pull origin main --rebase -X theirs
+            git push origin HEAD:${{ github.ref }}
+          fi
+      
