@@ -3,7 +3,7 @@ Come eseguirlo
 Su Colab con runtime GPU, copia i file nel repository (o fai il commit e poi il clone). Poi:
 
 !git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
-%cd profai_11_xai_prj_bancavirtuosa\fase_0
+%cd profai_11_xai_prj_bancavirtuosa-main/1_design/fase_0/
 !pip -q install captum lime shap scikit-image
 %run phase0_checks.py --quick
 %run phase0_checks.py
