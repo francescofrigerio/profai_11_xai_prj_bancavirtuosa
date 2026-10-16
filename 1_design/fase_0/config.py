@@ -5,7 +5,10 @@ Modules receive the config as an argument; only the notebook / scripts import CO
 
 Changes with respect to the design document v1 (see docs/design_errata.md):
   - USE_SURROGATE removed (D03-bis): no surrogate model in this project.
-  - MIN_VAL_ACCURACY = 0.94 (E01).
+  - MIN_VAL_ACCURACY = 0.95 (E01).
+  - IMAGE_SIZE is now the MNIST side (28); the DenseNet input side is DENSENET_SIZE (E19).
+  - Early stopping removed (E20): the number of epochs is fixed, final weights are kept.
+  - FLAG_BATCHNORM_EVAL and FLAG_RELU_INPLACE added (E21).
   - SHAP_NUM_SAMPLES added: the number of gradient samples of Gradient SHAP was an
     unnamed magic number in the design (E18).
   - Validation extended to backend names, ranges and grid/window consistency (E16).
@@ -25,7 +28,8 @@ class ConfigConstantsDefault:
     DEVICE: str = "auto"                 # "auto" -> cuda if available, else cpu (warn on cpu)
 
     # --- Data
-    IMAGE_SIZE: int = 128                # MNIST 1x28x28 -> 3x128x128 for DenseNet
+    IMAGE_SIZE: int = 28                 # MNIST side (1x28x28): input of the LR baseline
+    DENSENET_SIZE: int = 128             # DenseNet input side (3x128x128)
     NUM_CLASSES: int = 10
     VAL_SIZE: int = 6000                 # stratified split of the 60k train set
     NUM_DEBUG_IMAGES: int = 10           # fixed validation images (one per class)
@@ -33,15 +37,20 @@ class ConfigConstantsDefault:
     # --- Model and training
     BACKBONE_WEIGHTS: str = "IMAGENET1K_V1"
     FREEZE_BACKBONE: bool = True         # True -> head only, BatchNorm of backbone in eval
-    MIN_VAL_ACCURACY: float = 0.94       # warning (not stop) if validation accuracy is below
+    MIN_VAL_ACCURACY: float = 0.95       # warning (not stop) if final validation accuracy is below
     NUM_EPOCHS: int = 5
     BATCH_SIZE: int = 64                 # to confirm in phase zero
     OPTIMIZER: str = "adam"
     LEARNING_RATE_HEAD: float = 1e-3     # used when FREEZE_BACKBONE=True
     LEARNING_RATE_FULL: float = 5e-5     # used when FREEZE_BACKBONE=False
-    EARLY_STOPPING_PATIENCE: int = 2
     MODEL_MODE: str = "auto"             # "auto" | "train" | "load"
     CHECKPOINT_PATH: str = "checkpoints/densenet121_mnist.pt"
+    # BatchNorm of the backbone in eval during training. Effective only when FREEZE_BACKBONE=True
+    # (otherwise the backbone trains normally). False reproduces plain model.train().
+    FLAG_BATCHNORM_EVAL: bool = True
+    # True: keep torchvision's in-place ReLU (less VRAM). False: patch them (non in-place).
+    # Nothing switches automatically: if an explanation technique needs False, say so via config.
+    FLAG_RELU_INPLACE: bool = True
 
     # --- Grad-CAM
     GRADCAM_LAYER: str = "features.norm5"
@@ -116,7 +125,6 @@ class ConfigConstantsDefault:
                      "LIME_NUM_SAMPLES", "LIME_GRID_CELLS", "SHAP_NUM_BACKGROUND",
                      "SHAP_NUM_SAMPLES", "GALLERY_SIZE", "N_QUANT", "DELETION_STEPS"):
             require(getattr(self, name) > 0, f"{name} must be > 0")
-        require(self.EARLY_STOPPING_PATIENCE >= 0, "EARLY_STOPPING_PATIENCE must be >= 0")
         require(self.MASK_DILATION >= 0, "MASK_DILATION must be >= 0")
 
         # Positive floats and ranges
@@ -127,11 +135,16 @@ class ConfigConstantsDefault:
         require(0.0 <= self.MASK_THRESHOLD < 1.0, "MASK_THRESHOLD must be in [0, 1)")
 
         # Geometry: DenseNet downsamples by 32, so smaller images collapse the last layer
-        require(self.IMAGE_SIZE >= 32, "IMAGE_SIZE must be >= 32 (DenseNet stride is 32)")
-        require(self.OCCLUSION_WINDOW <= self.IMAGE_SIZE,
-                "OCCLUSION_WINDOW cannot exceed IMAGE_SIZE")
-        require(self.IMAGE_SIZE % self.LIME_GRID_CELLS == 0,
-                "IMAGE_SIZE must be a multiple of LIME_GRID_CELLS (equal grid cells)")
+        require(self.IMAGE_SIZE == 28, "IMAGE_SIZE is the MNIST side and must be 28")
+        require(self.DENSENET_SIZE >= 32, "DENSENET_SIZE must be >= 32 (DenseNet stride is 32)")
+        require(self.OCCLUSION_WINDOW <= self.DENSENET_SIZE,
+                "OCCLUSION_WINDOW cannot exceed DENSENET_SIZE")
+        require(self.DENSENET_SIZE % self.LIME_GRID_CELLS == 0,
+                "DENSENET_SIZE must be a multiple of LIME_GRID_CELLS (equal grid cells)")
+
+        # Flags
+        for name in ("FREEZE_BACKBONE", "FLAG_BATCHNORM_EVAL", "FLAG_RELU_INPLACE"):
+            require(isinstance(getattr(self, name), bool), f"{name} must be a bool")
 
         # Data split and sampling
         require(0 < self.VAL_SIZE < 60000, "VAL_SIZE must be in (0, 60000)")

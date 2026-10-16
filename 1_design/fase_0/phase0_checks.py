@@ -5,8 +5,9 @@ never imported by the project). What works here is re-implemented, with tests, i
 
 HOW TO RUN (Google Colab, GPU runtime)
 --------------------------------------
+    %cd /content                       # avoid cloning inside an already-cloned folder
     !git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
-    %cd profai_11_xai_prj_bancavirtuosa
+    %cd profai_11_xai_prj_bancavirtuosa/1_design/fase_0   # wherever config.py and this file live
     !pip -q install captum lime shap scikit-image
     %run phase0_checks.py --quick      # ~minutes, random weights, tiny data: catches script bugs
     %run phase0_checks.py              # the real run (all checks, in the recommended order)
@@ -20,7 +21,7 @@ Other options:
     --epochs N              epochs for check 6 (default: CONFIG.NUM_EPOCHS)
     --batch-size N          override CONFIG.BATCH_SIZE for check 6
     --lr-c-sweep 0.1,1.0    extra values of LR_C to evaluate in check 5
-    --no-bn-comparison      skip the "BatchNorm in train mode" variant of check 6
+    --no-bn-comparison      skip the opposite-FLAG_BATCHNORM_EVAL variant of check 6
     --out-dir PATH          default: <OUTPUT_DIR>/phase0
 
 NOTHING CHANGES BY ITSELF: the script never edits config.py. It prints "proposed values"
@@ -89,7 +90,7 @@ ERROR_EXPLAIN_EXTRA_FRACTION = 0.5   # gallery: errors are explained twice (pred
 FIXED_OVERHEAD_SECONDS = 120.0       # data download, setup, plotting (rough)
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
-MNIST_SIDE = 28
+MNIST_SIDE = CONFIG.IMAGE_SIZE
 
 CHECK_NAMES = {
     1: "Environment, versions, GPU, no-restart",
@@ -242,7 +243,8 @@ def lr_fit_and_diagnose(Xtr, ytr, Xva, yva, cfg) -> tuple:
         "fit_seconds": fit_seconds,
         "n_iter": int(np.max(model.n_iter_)),
         "convergence_warning": "ConvergenceWarning" in categories,
-        "other_warnings": [c for c in categories if c != "ConvergenceWarning"],
+        "other_warnings": sorted({f"{w.category.__name__}: {str(w.message)[:140]}"
+                                  for w in caught if w.category.__name__ != "ConvergenceWarning"}),
         "val_accuracy": float(model.score(Xva, yva)),
         "coef_colsum_max": float(np.abs(model.coef_.sum(axis=0)).max()),
         "decision_exact_max_err": float(np.abs(manual - model.decision_function(Xva)).max()),
@@ -386,6 +388,12 @@ else:
     SafeDenseNet = None
 
 
+def wrap_for_flag(base, cfg):
+    """FLAG_RELU_INPLACE=True keeps torchvision's in-place ReLUs, False patches them.
+    Never switched automatically: only the config decides."""
+    return base if cfg.FLAG_RELU_INPLACE else SafeDenseNet(base)
+
+
 def set_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
@@ -446,7 +454,7 @@ def load_data(ctx):
 
 
 def get_model(ctx):
-    """Eval-mode SafeDenseNet. Uses the check-6 head if it exists, else a random head
+    """Eval-mode model (in-place or patched ReLU, per FLAG_RELU_INPLACE). Uses the check-6 head if it exists, else a random head
     (then maps are meaningless: only shapes, finiteness and timings are valid)."""
     if hasattr(ctx.cache, "model"):
         return ctx.cache.model
@@ -457,7 +465,7 @@ def get_model(ctx):
     else:
         print("  NOTE: no phase-0 checkpoint found (run check 6 first): random head, "
               "attribution maps are not meaningful.")
-    model = SafeDenseNet(base).to(ctx.device).eval()
+    model = wrap_for_flag(base, ctx.cfg).to(ctx.device).eval()
     for p in model.parameters():
         p.requires_grad_(False)
     ctx.cache.model, ctx.cache.model_trained = model, trained
@@ -466,7 +474,7 @@ def get_model(ctx):
 
 def sample_inputs(ctx, classes=(7, 4, 1)):
     """First test image of each requested class: model, normalized batch, predictions, raw."""
-    D, model, S = load_data(ctx), get_model(ctx), ctx.cfg.IMAGE_SIZE
+    D, model, S = load_data(ctx), get_model(ctx), ctx.cfg.DENSENET_SIZE
     y = D.y_test.numpy()
     idx = [int(np.where(y == c)[0][0]) for c in classes]
     x28 = D.X_test[idx]
@@ -477,7 +485,7 @@ def sample_inputs(ctx, classes=(7, 4, 1)):
 
 
 def get_background(ctx):
-    D, S = load_data(ctx), ctx.cfg.IMAGE_SIZE
+    D, S = load_data(ctx), ctx.cfg.DENSENET_SIZE
     rng = np.random.RandomState(ctx.cfg.SEED)
     pick = rng.choice(D.idx_train, ctx.cfg.SHAP_NUM_BACKGROUND, replace=False)
     return to_densenet_input(D.X_trainval[torch.as_tensor(pick)], S).to(ctx.device)
@@ -515,10 +523,14 @@ def explain_lime_pkg(model, x1, target, cfg, device):
                 probs.append(F.softmax(model(t[i:i + 64]), dim=1).cpu())
         return torch.cat(probs).numpy()
 
-    expl = lime_image.LimeImageExplainer(random_state=cfg.SEED).explain_instance(
-        img, classifier_fn, labels=(int(target),), top_labels=None, hide_color=0,
-        num_samples=cfg.LIME_NUM_SAMPLES, batch_size=64,
-        segmentation_fn=lambda im: segments, random_seed=cfg.SEED, progress_bar=False)
+    import inspect
+    explainer = lime_image.LimeImageExplainer(random_state=cfg.SEED)
+    kwargs = dict(labels=(int(target),), top_labels=None, hide_color=0,
+                  num_samples=cfg.LIME_NUM_SAMPLES, batch_size=64,
+                  segmentation_fn=lambda im: segments, random_seed=cfg.SEED)
+    if "progress_bar" in inspect.signature(explainer.explain_instance).parameters:
+        kwargs["progress_bar"] = False            # absent in lime 0.2.0.1
+    expl = explainer.explain_instance(img, classifier_fn, **kwargs)
     out = np.zeros((S, S))
     for seg, weight in dict(expl.local_exp[int(target)]).items():
         out[segments == seg] = weight
@@ -655,35 +667,97 @@ def _safe_version(dist: str):
 # ----------------------------------------------------------------------------------------
 # CHECK 2 - in-place ReLU and Grad-CAM
 # ----------------------------------------------------------------------------------------
+def _rel_diff(a, b) -> float:
+    a, b = np.asarray(a, dtype=np.float64), np.asarray(b, dtype=np.float64)
+    return float(np.abs(a - b).max() / max(np.abs(b).max(), 1e-12))
+
+
+def _relu_probes(x, bg, cfg):
+    """Technique -> function(model) -> 2D numpy map. Same seeds for both models, so any
+    difference between the in-place and the patched model comes from the ReLU, not the dice."""
+    from captum.attr import GradientShap
+
+    def gradshap(m):
+        torch.manual_seed(cfg.SEED)
+        att = GradientShap(m).attribute(x, baselines=bg, n_samples=4, stdevs=0.0, target=3)
+        return att[0].sum(0).detach().cpu().numpy()
+
+    def shap_pkg(m):
+        import shap
+        np.random.seed(cfg.SEED)
+        torch.manual_seed(cfg.SEED)
+        sv = shap.GradientExplainer(m, bg).shap_values(x, nsamples=4)
+        return _pick_shap_target(sv, 3, cfg.NUM_CLASSES)
+
+    return {
+        "gradcam on norm5 (signed)": lambda m: explain_gradcam(m, x, 3, cfg.GRADCAM_LAYER, relu=False),
+        "integrated gradients": lambda m: explain_ig(m, x, 3, cfg, steps=10)[0].sum(0).detach().cpu().numpy(),
+        "gradient shap (captum)": gradshap,
+        "gradient shap (shap)": shap_pkg,
+    }
+
+
 def check_2(ctx):
     with ctx.rec.check(2) as r:
         from captum.attr import LayerGradCam
-        cfg, S, dev = ctx.cfg, ctx.cfg.IMAGE_SIZE, ctx.device
-        torch.manual_seed(cfg.SEED)
+        cfg, S, dev = ctx.cfg, ctx.cfg.DENSENET_SIZE, ctx.device
+        set_seed(cfg.SEED)
         x = torch.randn(1, 3, S, S, device=dev)
-        base = build_densenet(cfg, pretrained=not ctx.quick).to(dev).eval()
-        r.values["inplace_relu_before"] = count_inplace_relu(base)
-        r.info(f"in-place ReLU modules in torchvision DenseNet121: {r.values['inplace_relu_before']} "
+        bg = torch.randn(4, 3, S, S, device=dev)
+        base_a = build_densenet(cfg, pretrained=not ctx.quick)
+        base_b = copy.deepcopy(base_a)                 # identical weights, separate modules
+        inplace = base_a.to(dev).eval()                 # torchvision as shipped
+        safe = SafeDenseNet(base_b).to(dev).eval()      # patched
+        r.values["inplace_relu_modules"] = count_inplace_relu(inplace)
+        r.values["inplace_relu_after_patch"] = count_inplace_relu(safe)
+        r.info(f"in-place ReLU modules in torchvision DenseNet121: {r.values['inplace_relu_modules']} "
                "(plus the functional F.relu(inplace=True) in forward)")
-        try:
-            LayerGradCam(base, base.features.norm5).attribute(x, target=3)
-            r.values["unpatched_gradcam"] = "ran"
-            r.info("unpatched model: Grad-CAM ran without error (the patch is still applied: "
-                   "Captum/SHAP backward is the real risk)")
-        except Exception as exc:
-            r.values["unpatched_gradcam"] = f"{type(exc).__name__}: {str(exc)[:160]}"
-            r.info(f"unpatched model: Grad-CAM FAILS ({r.values['unpatched_gradcam']}) -> patch needed")
+        r.info(f"FLAG_RELU_INPLACE={cfg.FLAG_RELU_INPLACE}: the models of the other checks use "
+               + ("torchvision's in-place ReLUs" if cfg.FLAG_RELU_INPLACE else "the patched model"))
         with torch.no_grad():
-            logits_before = base(x)
-        safe = SafeDenseNet(base).to(dev).eval()
-        r.values["inplace_relu_after"] = count_inplace_relu(safe)
-        with torch.no_grad():
-            diff = (logits_before - safe(x)).abs().max().item()
+            diff = (inplace(x) - safe(x)).abs().max().item()
         r.values["logits_max_diff"] = diff
-        if r.values["inplace_relu_after"] == 0 and diff <= THRESHOLDS["logits_patch_atol"]:
+        if r.values["inplace_relu_after_patch"] == 0 and diff <= THRESHOLDS["logits_patch_atol"]:
             r.ok(f"patch removes every in-place ReLU and leaves logits unchanged (max diff {diff:.2e})")
         else:
-            r.fail(f"patch problem: in-place left={r.values['inplace_relu_after']}, logits diff={diff:.2e}")
+            r.fail(f"patch problem: in-place left={r.values['inplace_relu_after_patch']}, "
+                   f"logits diff={diff:.2e}")
+        # Does the in-place model give the SAME explanations? "Runs without error" proves nothing:
+        # an in-place ReLU can silently change what a hook sees.
+        probe_results, trouble = {}, []
+        for name, fn in _relu_probes(x, bg, cfg).items():
+            out = {}
+            for tag, model in (("inplace", inplace), ("patched", safe)):
+                try:
+                    out[tag] = fn(model)
+                except Exception as exc:
+                    out[tag] = f"{type(exc).__name__}: {str(exc)[:160]}"
+            entry = {}
+            if isinstance(out["patched"], str):
+                entry["patched_error"] = out["patched"]
+                r.fail(f"{name}: fails even on the PATCHED model: {out['patched']}")
+            elif isinstance(out["inplace"], str):
+                entry["inplace_error"] = out["inplace"]
+                trouble.append(name)
+                (r.fail if cfg.FLAG_RELU_INPLACE else r.info)(
+                    f"{name}: FAILS on the in-place model ({out['inplace']}) -> the patch is needed")
+            else:
+                rel = _rel_diff(out["inplace"], out["patched"])
+                entry["rel_diff_vs_patched"] = rel
+                if rel <= 1e-3:
+                    r.ok(f"{name}: in-place model gives the same map (relative diff {rel:.1e})")
+                else:
+                    trouble.append(name)
+                    (r.fail if cfg.FLAG_RELU_INPLACE else r.warn)(
+                        f"{name}: in-place model gives a DIFFERENT map (relative diff {rel:.2f}) "
+                        "-> silently wrong explanations")
+            probe_results[name] = entry
+        r.values["relu_probes"] = probe_results
+        r.values["inplace_safe_for_all"] = not trouble
+        if trouble and cfg.FLAG_RELU_INPLACE:
+            r.fail("FLAG_RELU_INPLACE=True is NOT safe for: " + ", ".join(trouble)
+                   + ". Set FLAG_RELU_INPLACE=False in config (nothing switches by itself).")
+        # Grad-CAM shapes and timing on the patched model (design D10)
         for name, divisor in ((cfg.GRADCAM_LAYER, 32), (cfg.GRADCAM_ALT_LAYER, 16)):
             expected = S // divisor
             times = []
@@ -706,7 +780,7 @@ def check_2(ctx):
 # ----------------------------------------------------------------------------------------
 def check_3(ctx):
     with ctx.rec.check(3) as r:
-        cfg, dev, S = ctx.cfg, ctx.device, ctx.cfg.IMAGE_SIZE
+        cfg, dev, S = ctx.cfg, ctx.device, ctx.cfg.DENSENET_SIZE
         model, x, pred, x28 = sample_inputs(ctx)
         bg = get_background(ctx)
         trained = getattr(ctx.cache, "model_trained", False)
@@ -732,20 +806,25 @@ def check_3(ctx):
                 median = float(np.median(secs))
                 again = np.asarray(fn(0), dtype=np.float64)
                 scale = max(np.abs(maps[0]).max(), 1e-12)
+                max_rel = float(np.abs(maps[0] - again).max() / scale)
                 deterministic = bool(np.allclose(maps[0], again, rtol=THRESHOLDS["determinism_rtol"],
                                                  atol=1e-4 * scale))
                 constant = bool(all(np.ptp(m) == 0 for m in maps))
                 entry.update(shape=list(maps[0].shape), finite=finite, seconds_median=median,
-                             deterministic=deterministic, constant_map=constant)
+                             deterministic=deterministic, repeat_max_rel_diff=max_rel,
+                             constant_map=constant)
                 fast = median <= THRESHOLDS["backend_max_seconds_per_image"]
                 entry["ok"] = bool(shapes_ok and finite and fast)
                 line = (f"{key}: shape {maps[0].shape}, finite={finite}, "
                         f"median {median:.1f}s/img, deterministic={deterministic}")
                 (r.ok if entry["ok"] else r.fail)(line + ("" if fast else "  [TOO SLOW]"))
                 if not deterministic:
-                    r.warn(f"{key}: same seed gave different maps (check seeding)")
-                if constant and trained:
-                    r.warn(f"{key}: constant map on a trained model (suspicious)")
+                    r.warn(f"{key}: same seed gave different maps (max relative diff {max_rel:.1e}; "
+                           "GPU atomics or unseeded randomness)")
+                if constant:
+                    (r.info if (ctx.quick or not trained) else r.warn)(
+                        f"{key}: constant map (expected with a barely trained quick-run model; "
+                        "suspicious on the real checkpoint)")
             except Exception as exc:
                 entry["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
                 r.fail(f"{key}: {entry['error']}")
@@ -770,7 +849,7 @@ def check_3(ctx):
 # ----------------------------------------------------------------------------------------
 def check_4(ctx):
     with ctx.rec.check(4) as r:
-        cfg, dev, S = ctx.cfg, ctx.device, ctx.cfg.IMAGE_SIZE
+        cfg, dev, S = ctx.cfg, ctx.device, ctx.cfg.DENSENET_SIZE
         model, x, pred, _ = sample_inputs(ctx)
         baseline = black_normalized(S, dev)
         back_to_pixels = denormalize(baseline).abs().max().item()
@@ -840,7 +919,8 @@ def check_5(ctx):
                 f"{tag}: per-pixel sum of coefficients over classes max {d['coef_colsum_max']:.1e} "
                 "(~0 with l2: relative and absolute coefficients coincide)")
             if d["other_warnings"]:
-                r.info(f"{tag}: other warnings raised: {d['other_warnings']}")
+                for w in d["other_warnings"]:
+                    r.info(f"{tag}: warning raised -> {w}")
         import matplotlib.pyplot as plt
         for c, model in models.items():
             rel = model.coef_ - model.coef_.mean(axis=0, keepdims=True)
@@ -873,9 +953,10 @@ def evaluate(model, X, y, idx, size, bs=256):
 
 
 def train_variant(ctx, bn_eval: bool, epochs: int):
-    cfg, D, dev, S = ctx.cfg, load_data(ctx), ctx.device, ctx.cfg.IMAGE_SIZE
+    """Head-only training. Fixed number of epochs, FINAL weights are kept (no early stopping)."""
+    cfg, D, dev, S = ctx.cfg, load_data(ctx), ctx.device, ctx.cfg.DENSENET_SIZE
     set_seed(cfg.SEED)
-    model = SafeDenseNet(build_densenet(cfg, pretrained=not ctx.quick)).to(dev)
+    model = wrap_for_flag(build_densenet(cfg, pretrained=not ctx.quick), cfg).to(dev)
     for p in model.features.parameters():
         p.requires_grad_(False)
     trainable = [p for p in model.parameters() if p.requires_grad]
@@ -885,7 +966,7 @@ def train_variant(ctx, bn_eval: bool, epochs: int):
     idx_va = torch.as_tensor(D.idx_val, device=dev)
     bn0 = bn_buffers(model.features)
     gen = torch.Generator().manual_seed(cfg.SEED)
-    history, best_loss, best_state, best_epoch, drift1 = [], float("inf"), None, 0, None
+    history, drift1 = [], None
     for epoch in range(1, epochs + 1):
         enter_train_mode(model, bn_eval)              # re-applied at EVERY epoch start
         sync(dev)
@@ -915,18 +996,17 @@ def train_variant(ctx, bn_eval: bool, epochs: int):
         print(f"    epoch {epoch}: train loss {history[-1]['train_loss']:.4f} acc "
               f"{history[-1]['train_acc']:.4f} | val loss {val_loss:.4f} acc {val_acc:.4f} | "
               f"{train_seconds:.0f}s + {val_seconds:.0f}s")
-        if val_loss < best_loss:
-            best_loss, best_epoch = val_loss, epoch
-            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
-    return dict(history=history, best_epoch=best_epoch, best_state=best_state,
-                n_trainable=sum(p.numel() for p in trainable), bn_drift_epoch1=drift1,
-                bn_drift_final=bn_drift(bn0, bn_buffers(model.features)))
+    return dict(history=history, n_trainable=sum(p.numel() for p in trainable),
+                final_state={k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
+                bn_drift_epoch1=drift1, bn_drift_final=bn_drift(bn0, bn_buffers(model.features)))
 
 
 def check_6(ctx):
     with ctx.rec.check(6) as r:
-        cfg, D, S = ctx.cfg, load_data(ctx), ctx.cfg.IMAGE_SIZE
+        cfg, D, S = ctx.cfg, load_data(ctx), ctx.cfg.DENSENET_SIZE
         epochs = 1 if ctx.quick else (ctx.args.epochs or cfg.NUM_EPOCHS)
+        if not cfg.FREEZE_BACKBONE:
+            r.warn("FREEZE_BACKBONE=False: this check measures the frozen-head setup only")
         # 6a: the tensor (GPU-friendly) preprocessing equals the torchvision PIL pipeline
         from PIL import Image
         from torchvision import transforms
@@ -940,63 +1020,74 @@ def check_6(ctx):
         (r.ok if diff.max().item() <= THRESHOLDS["preproc_max_abs_diff"] else r.warn)(
             f"tensor preprocessing vs torchvision PIL pipeline: max diff {diff.max():.4f}, "
             f"mean {diff.mean():.5f} (normalized units; uint8 rounding alone is ~0.009)")
-        # 6b: design variant (BatchNorm of the backbone in eval)
-        r.info(f"training DESIGN variant: {epochs} epoch(s), batch {cfg.BATCH_SIZE}, "
-               f"lr {cfg.LEARNING_RATE_HEAD}, backbone frozen, BatchNorm in eval")
-        A = train_variant(ctx, bn_eval=True, epochs=epochs)
+        # 6b: the configured setting
+        flag = cfg.FLAG_BATCHNORM_EVAL
+        r.info(f"training CONFIGURED setting: {epochs} epoch(s), batch {cfg.BATCH_SIZE}, "
+               f"lr {cfg.LEARNING_RATE_HEAD}, backbone frozen, FLAG_BATCHNORM_EVAL={flag}, "
+               f"FLAG_RELU_INPLACE={cfg.FLAG_RELU_INPLACE}")
+        A = train_variant(ctx, bn_eval=flag, epochs=epochs)
         hist = A["history"]
-        r.values["design"] = {k: v for k, v in A.items() if k != "best_state"}
+        r.values["configured"] = {k: v for k, v in A.items() if k != "final_state"}
         expected_params = 1024 * cfg.NUM_CLASSES + cfg.NUM_CLASSES
         (r.ok if A["n_trainable"] == expected_params else r.fail)(
             f"trainable parameters: {A['n_trainable']} (expected {expected_params}: the Linear head only)")
-        (r.ok if A["bn_drift_final"] == 0.0 else r.fail)(
-            f"BatchNorm running statistics of the backbone unchanged after training "
-            f"(max drift {A['bn_drift_final']:.2e})")
-        best = hist[A["best_epoch"] - 1]
-        r.values.update(best_epoch=A["best_epoch"], best_val_acc=best["val_acc"],
-                        best_val_loss=best["val_loss"],
+        if flag:
+            (r.ok if A["bn_drift_final"] == 0.0 else r.fail)(
+                f"BatchNorm running statistics of the backbone unchanged after training "
+                f"(max drift {A['bn_drift_final']:.2e})")
+        else:
+            r.info(f"BatchNorm statistics drifted by {A['bn_drift_final']:.3f} (FLAG_BATCHNORM_EVAL=False)")
+        final = hist[-1]
+        accs = [h["val_acc"] for h in hist]
+        r.values.update(final_val_acc=final["val_acc"], final_val_loss=final["val_loss"],
+                        val_acc_per_epoch=accs,
                         epoch_train_seconds=float(np.mean([h["train_seconds"] for h in hist[1:] or hist])),
                         epoch_val_seconds=float(np.mean([h["val_seconds"] for h in hist[1:] or hist])),
                         val_seconds_per_image=float(np.mean([h["val_seconds"] for h in hist]) / len(D.idx_val)))
-        (r.ok if best["val_acc"] >= cfg.MIN_VAL_ACCURACY else r.warn)(
-            f"validation accuracy at best epoch ({A['best_epoch']}): {best['val_acc']:.4f} vs "
-            f"MIN_VAL_ACCURACY {cfg.MIN_VAL_ACCURACY}"
-            + ("" if best["val_acc"] >= cfg.MIN_VAL_ACCURACY
-               else " -> below threshold: the operator decides whether to try FREEZE_BACKBONE=False"))
+        (r.ok if final["val_acc"] >= cfg.MIN_VAL_ACCURACY else r.warn)(
+            f"validation accuracy of the FINAL epoch: {final['val_acc']:.4f} vs MIN_VAL_ACCURACY "
+            f"{cfg.MIN_VAL_ACCURACY}" + ("" if final["val_acc"] >= cfg.MIN_VAL_ACCURACY
+                                          else " -> below threshold (warning only)"))
+        if len(accs) > 1:
+            below = [i + 1 for i, a in enumerate(accs) if i >= 1 and a < cfg.MIN_VAL_ACCURACY]
+            (r.ok if not below else r.info)(
+                "validation accuracy from epoch 2 on: " + ", ".join(f"{a:.4f}" for a in accs[1:])
+                + ("" if not below else f"  (below threshold at epochs {below})"))
         r.info(f"time per epoch: train {r.values['epoch_train_seconds']:.0f}s + validation "
-               f"{r.values['epoch_val_seconds']:.0f}s")
+               f"{r.values['epoch_val_seconds']:.0f}s (tensor preprocessing on the GPU)")
         if len(hist) >= 2:
             drop = (hist[-2]["val_loss"] - hist[-1]["val_loss"]) / hist[-2]["val_loss"]
             r.values["last_epoch_val_loss_drop"] = drop
             if drop > THRESHOLDS["loss_still_dropping_rel"]:
-                r.info(f"validation loss still dropping clearly ({drop:.1%} last epoch): the design "
-                       "allows NUM_EPOCHS 8-10 (operator decision)")
+                r.info(f"validation loss still dropping clearly ({drop:.1%} last epoch): "
+                       "NUM_EPOCHS could be raised (operator decision)")
             else:
-                r.info(f"validation loss has flattened ({drop:.1%} last epoch): NUM_EPOCHS={cfg.NUM_EPOCHS} is enough")
+                r.info(f"validation loss has flattened ({drop:.1%} last epoch): "
+                       f"NUM_EPOCHS={cfg.NUM_EPOCHS} is enough")
         ctx.ckpt_path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save({"state_dict": A["best_state"], "best_epoch": A["best_epoch"],
+        torch.save({"state_dict": A["final_state"],
                     "snapshot": {k: getattr(cfg, k) for k in (
-                        "FREEZE_BACKBONE", "IMAGE_SIZE", "NUM_CLASSES", "BACKBONE_WEIGHTS", "SEED",
-                        "VAL_SIZE", "BATCH_SIZE", "OPTIMIZER", "LEARNING_RATE_HEAD")}},
+                        "FREEZE_BACKBONE", "DENSENET_SIZE", "NUM_CLASSES", "BACKBONE_WEIGHTS", "SEED",
+                        "VAL_SIZE", "BATCH_SIZE", "NUM_EPOCHS", "OPTIMIZER", "LEARNING_RATE_HEAD",
+                        "FLAG_BATCHNORM_EVAL")}},
                    ctx.ckpt_path)
         ctx.cache.__dict__.pop("model", None)         # later checks reload the trained head
-        r.info(f"phase-0 head saved to {ctx.ckpt_path} (do not commit; used by checks 3,4,11,12)")
-        # 6c: the exploratory-script variant (BatchNorm left in train mode)
+        r.info(f"phase-0 head (final epoch) saved to {ctx.ckpt_path} "
+               "(do not commit; used by checks 3,4,11,12)")
+        # 6c: the opposite BatchNorm setting, for comparison
         if not ctx.args.no_bn_comparison:
-            r.info("training COMPARISON variant: same, but plain model.train() "
-                   "(BatchNorm statistics drift, as in the exploratory notebook)")
-            B = train_variant(ctx, bn_eval=False, epochs=epochs)
-            bb = B["history"][B["best_epoch"] - 1]
-            r.values["bn_train_variant"] = {"best_val_acc": bb["val_acc"], "best_epoch": B["best_epoch"],
-                                            "bn_drift_final": B["bn_drift_final"]}
-            r.info(f"BatchNorm-in-train variant: BN statistics drift {B['bn_drift_final']:.3f} "
-                   f"(design variant: 0) and best val acc {bb['val_acc']:.4f} "
-                   f"(design variant: {best['val_acc']:.4f})")
-            if bb["val_acc"] - best["val_acc"] > 0.005:
-                r.warn("the drifting-BatchNorm variant is clearly more accurate: the 'frozen' "
-                       "features of the exploratory notebook were adapting to MNIST through BN "
-                       "statistics. Keeping BN in eval is the design choice; whether to accept the "
-                       "lower accuracy (and MIN_VAL_ACCURACY) is an operator decision.")
+            r.info(f"training OPPOSITE setting for comparison: FLAG_BATCHNORM_EVAL={not flag}")
+            B = train_variant(ctx, bn_eval=not flag, epochs=epochs)
+            bf = B["history"][-1]
+            r.values["opposite_bn_setting"] = {"flag": not flag, "final_val_acc": bf["val_acc"],
+                                               "bn_drift_final": B["bn_drift_final"]}
+            r.info(f"opposite setting: final val acc {bf['val_acc']:.4f} (configured: "
+                   f"{final['val_acc']:.4f}), BatchNorm drift {B['bn_drift_final']:.3f}")
+            if bf["val_acc"] - final["val_acc"] > 0.005:
+                r.warn(f"the OPPOSITE setting (FLAG_BATCHNORM_EVAL={not flag}) is clearly more "
+                       "accurate: whether to change the config is an operator decision")
+            else:
+                r.ok(f"the configured setting (FLAG_BATCHNORM_EVAL={flag}) is at least as accurate")
 
 
 # ----------------------------------------------------------------------------------------
@@ -1006,7 +1097,7 @@ def check_7(ctx):
     with ctx.rec.check(7) as r:
         import matplotlib.pyplot as plt
         from skimage.segmentation import mark_boundaries, quickshift
-        cfg, D, S = ctx.cfg, load_data(ctx), ctx.cfg.IMAGE_SIZE
+        cfg, D, S = ctx.cfg, load_data(ctx), ctx.cfg.DENSENET_SIZE
         y = D.y_test.numpy()
         picks = [int(np.where(y == c)[0][0]) for c in (1, 4, 7, 9)]
         seg = grid_segments(S, cfg.LIME_GRID_CELLS)
@@ -1088,7 +1179,7 @@ def check_8(ctx):
 def check_11(ctx):
     with ctx.rec.check(11) as r:
         from captum.attr import Occlusion
-        cfg, dev, S = ctx.cfg, ctx.device, ctx.cfg.IMAGE_SIZE
+        cfg, dev, S = ctx.cfg, ctx.device, ctx.cfg.DENSENET_SIZE
         w, s = cfg.OCCLUSION_WINDOW, cfg.OCCLUSION_STRIDE
         # a) overlap semantics on a model whose answer is known: f(x) = sum of pixels
         ones, zeros = torch.ones(1, 3, S, S, device=dev), torch.zeros(1, 3, S, S, device=dev)
@@ -1131,7 +1222,7 @@ def check_11(ctx):
 def check_12(ctx):
     with ctx.rec.check(12) as r:
         import matplotlib.pyplot as plt
-        cfg, S = ctx.cfg, ctx.cfg.IMAGE_SIZE
+        cfg, S = ctx.cfg, ctx.cfg.DENSENET_SIZE
         rng = np.random.RandomState(cfg.SEED)
         # a) 28 -> S (bilinear) -> 28 (area): a single bright pixel must come back in place
         positions = [(0, 0), (0, 27), (27, 0), (27, 27)] + [tuple(rng.randint(0, 28, 2)) for _ in range(96)]
@@ -1266,18 +1357,30 @@ def check_10(ctx):
         row("N_QUANT", cfg.N_QUANT, n_quant, "check 9 (time budget)",
             auto if n_quant else "run checks 3,4,2,11,5,6 first")
         if c6:
-            hist_ok = c6.get("best_val_acc") is not None
+            hist_ok = c6.get("final_val_acc") is not None
+            drop = c6.get("last_epoch_val_loss_drop")
             row("NUM_EPOCHS", cfg.NUM_EPOCHS, cfg.NUM_EPOCHS,
-                f"check 6: last-epoch val-loss drop {c6.get('last_epoch_val_loss_drop', float('nan')):.1%}",
-                manual if (c6.get("last_epoch_val_loss_drop") or 0) > THRESHOLDS["loss_still_dropping_rel"]
-                else auto)
+                "check 6: last-epoch val-loss drop " + (f"{drop:.1%}" if drop is not None else "n/a (1 epoch)"),
+                manual if (drop or 0) > THRESHOLDS["loss_still_dropping_rel"] else auto)
             row("MIN_VAL_ACCURACY", cfg.MIN_VAL_ACCURACY, cfg.MIN_VAL_ACCURACY,
-                f"check 6: best validation accuracy {c6['best_val_acc']:.4f}" if hist_ok else "check 6 missing",
-                auto if hist_ok and c6["best_val_acc"] >= cfg.MIN_VAL_ACCURACY else manual)
-            for name, val in (("BATCH_SIZE", cfg.BATCH_SIZE), ("LEARNING_RATE_HEAD", cfg.LEARNING_RATE_HEAD),
-                              ("EARLY_STOPPING_PATIENCE", cfg.EARLY_STOPPING_PATIENCE)):
-                row(name, val, val, f"check 6 (best epoch {c6.get('best_epoch')}, "
-                    f"{c6.get('epoch_train_seconds', 0):.0f}s/epoch)", auto)
+                f"check 6: final-epoch validation accuracy {c6['final_val_acc']:.4f}" if hist_ok
+                else "check 6 missing",
+                auto if hist_ok and c6["final_val_acc"] >= cfg.MIN_VAL_ACCURACY else manual)
+            for name, val in (("BATCH_SIZE", cfg.BATCH_SIZE), ("LEARNING_RATE_HEAD", cfg.LEARNING_RATE_HEAD)):
+                row(name, val, val, f"check 6 ({c6.get('epoch_train_seconds', 0):.0f}s/epoch)", auto)
+            opp = c6.get("opposite_bn_setting")
+            if opp and hist_ok:
+                better = opp["final_val_acc"] - c6["final_val_acc"] > 0.005
+                row("FLAG_BATCHNORM_EVAL", cfg.FLAG_BATCHNORM_EVAL, cfg.FLAG_BATCHNORM_EVAL,
+                    f"check 6: configured {c6['final_val_acc']:.4f} vs opposite {opp['final_val_acc']:.4f}",
+                    manual if better else auto)
+        c2 = rec.values(2)
+        if c2.get("relu_probes") is not None:
+            safe_all = c2.get("inplace_safe_for_all")
+            row("FLAG_RELU_INPLACE", cfg.FLAG_RELU_INPLACE, cfg.FLAG_RELU_INPLACE,
+                "check 2: in-place model gives the same maps as the patched one"
+                if safe_all else "check 2: in-place model fails or gives different maps (see check 2)",
+                auto if (safe_all or not cfg.FLAG_RELU_INPLACE) else "FAIL: set FLAG_RELU_INPLACE=False")
         if c5.get("runs"):
             d = c5["runs"][str(cfg.LR_C)]
             row("LR_C", cfg.LR_C, cfg.LR_C, f"check 5: val acc {d['val_accuracy']:.4f}, maps to review",
@@ -1378,6 +1481,11 @@ def main(argv=None):
     review = [c for c in ORDER if ctx.rec.data["checks"].get(str(c), {}).get("status") == "REVIEW"
               or any(s == "REVIEW" for s, _ in ctx.rec.data["checks"].get(str(c), {}).get("lines", []))]
     print(f"\nFigures to judge by eye (REVIEW): checks {review}")
+    try:
+        import matplotlib.pyplot as plt
+        plt.close("all")                         # no stray empty figure after the run
+    except Exception:
+        pass
     summary = ctx.out_dir / "phase0_summary.md"
     print(f"Results: {ctx.rec.path}" + (f"  |  Table: {summary}" if summary.exists() else ""))
     return ctx.rec.data
