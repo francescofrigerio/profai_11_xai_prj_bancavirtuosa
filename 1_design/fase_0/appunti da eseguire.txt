@@ -33,14 +33,7 @@ con una decisione documentata.
 
 
 
-Da capire
 
-| F2 | L'accuracy citata è misurata sul test, mentre la soglia è sulla validation. 
-| Il check 6 misura sulla validation. |
 
-| F5 | `torch.hub.load('pytorch/vision:v0.10.0', ..., pretrained=True)` 
-scarica il codice da GitHub. | Si usa `torchvision.models.densenet121` con l'enum dei pesi. |
 
-Con setbatch norm eval l'accuracy è sempre sopra il 95%
-per cui rimetto questo valore come soglia.
 
