@@ -106,8 +106,9 @@ CHECK_NAMES = {
     11: "Occlusion behaviour (overlap, channels, forwards)",
     12: "Resampling rule to the 28x28 grid",
     13: "Saliency (candidate sixth technique)",
+    14: "Checkpoint round trip",
 }
-ORDER = [1, 2, 5, 6, 3, 4, 13, 7, 8, 11, 12, 9, 10]
+ORDER = [1, 2, 5, 6, 14, 3, 4, 13, 7, 8, 11, 12, 9, 10]
 SEVERITY = {"FAIL": 4, "WARN": 3, "REVIEW": 2, "PASS": 1, "INFO": 0}
 
 
@@ -818,14 +819,20 @@ def check_3(ctx):
                 deterministic = bool(np.allclose(maps[0], again, rtol=THRESHOLDS["determinism_rtol"],
                                                  atol=1e-4 * scale))
                 constant = bool(all(np.ptp(m) == 0 for m in maps))
+                empty_maps = int(sum(np.abs(m).max() <= 1e-12 for m in maps))
                 entry.update(shape=list(maps[0].shape), finite=finite, seconds_median=median,
                              deterministic=deterministic, repeat_max_rel_diff=max_rel,
-                             constant_map=constant)
+                             constant_map=constant, empty_maps=empty_maps)
                 fast = median <= THRESHOLDS["backend_max_seconds_per_image"]
-                entry["ok"] = bool(shapes_ok and finite and fast)
+                collapsed = bool(empty_maps and trained and not ctx.quick)
+                entry["ok"] = bool(shapes_ok and finite and fast and not collapsed)
                 line = (f"{key}: shape {maps[0].shape}, finite={finite}, "
                         f"median {median:.1f}s/img, deterministic={deterministic}")
                 (r.ok if entry["ok"] else r.fail)(line + ("" if fast else "  [TOO SLOW]"))
+                if collapsed:
+                    r.warn(f"{key}: the map is all zeros for {empty_maps} of {len(maps)} images (the "
+                           "explanation collapsed, e.g. a Lasso that over-regularizes): backend NOT "
+                           "selectable as it is")
                 if not deterministic:
                     r.warn(f"{key}: same seed gave different maps (max relative diff {max_rel:.1e}; "
                            "GPU atomics or unseeded randomness)")
@@ -840,7 +847,7 @@ def check_3(ctx):
             import matplotlib.pyplot as plt
             fig, axes = plt.subplots(1, 1 + len(first_maps), figsize=(3 * (1 + len(first_maps)), 3.2))
             axes[0].imshow(x28[0, 0], cmap="gray")
-            axes[0].set_title(f"digit 7 / predicted {pred[0]}")
+            axes[0].set_title(f"true 7 / predicted {pred[0]}")
             for ax, (k, m) in zip(axes[1:], first_maps.items()):
                 a = max(np.abs(m).max(), 1e-12)
                 ax.imshow(m, cmap="seismic", vmin=-a, vmax=a)
@@ -1159,6 +1166,39 @@ def check_6(ctx):
 
 
 # ----------------------------------------------------------------------------------------
+# CHECK 14 - checkpoint round trip (does the reloaded model behave like the trained one?)
+# ----------------------------------------------------------------------------------------
+def check_14(ctx):
+    with ctx.rec.check(14) as r:
+        cfg, D, S, dev = ctx.cfg, load_data(ctx), ctx.cfg.DENSENET_SIZE, ctx.device
+        model = get_model(ctx)
+        if not getattr(ctx.cache, "model_trained", False):
+            r.warn("no phase-0 checkpoint found: run check 6 first")
+            return
+        X, y = D.X_trainval.to(dev), D.y_trainval.to(dev)
+        _, acc = evaluate(model, X, y, torch.as_tensor(D.idx_val, device=dev), S)
+        ref = ctx.rec.values(6).get("final_val_acc")
+        r.values.update(reloaded_val_acc=acc, training_run_val_acc=ref)
+        if ref is None:
+            r.info(f"reloaded checkpoint: validation accuracy {acc:.4f} (no check-6 reference to compare)")
+        else:
+            (r.ok if abs(acc - ref) <= 1e-3 else r.fail)(
+                f"reloaded checkpoint reproduces the validation accuracy of the training run: "
+                f"{acc:.4f} vs {ref:.4f}")
+        _, x, pred, _ = sample_inputs(ctx)
+        with torch.no_grad():
+            probs = F.softmax(model(x), dim=1).cpu().numpy()
+        samples = []
+        for c, p, pr in zip((7, 4, 1), pred, probs):
+            samples.append({"true": c, "predicted": int(p), "confidence": float(pr[p])})
+            (r.ok if int(p) == c else r.warn)(
+                f"sample test image of class {c}: predicted {int(p)} with confidence {pr[p]:.1%}"
+                + ("" if int(p) == c else "  (WRONG: a ~3% event at 97% accuracy; the explanation "
+                   "will be about the predicted class)"))
+        r.values["samples"] = samples
+
+
+# ----------------------------------------------------------------------------------------
 # CHECK 7 - LIME grid (visual)
 # ----------------------------------------------------------------------------------------
 def check_7(ctx):
@@ -1179,11 +1219,11 @@ def check_7(ctx):
             cells_with_ink = len({int(s) for s in np.unique(seg[ink])})
             stats.append(cells_with_ink)
             axes[0, col].imshow(mark_boundaries(rgb, seg, color=(1, 0.2, 0.2)))
-            axes[0, col].set_title(f"grid {cfg.LIME_GRID_CELLS}x{cfg.LIME_GRID_CELLS}: "
-                                   f"{cells_with_ink}/{seg.max() + 1} cells touch ink")
+            axes[0, col].set_title(f"grid {cfg.LIME_GRID_CELLS}x{cfg.LIME_GRID_CELLS}\n"
+                                   f"{cells_with_ink}/{seg.max() + 1} cells touch ink", fontsize=9)
             qs = quickshift(rgb, kernel_size=3, max_dist=6, ratio=0.5, convert2lab=False)
             axes[1, col].imshow(mark_boundaries(rgb, qs, color=(0.2, 0.6, 1)))
-            axes[1, col].set_title(f"quickshift: {qs.max() + 1} segments")
+            axes[1, col].set_title(f"quickshift\n{qs.max() + 1} segments", fontsize=9)
         for ax in axes.ravel():
             ax.axis("off")
         save_fig(fig, ctx.out_dir / "phase0_07_lime_grid.png")
@@ -1513,7 +1553,7 @@ def check_10(ctx):
 
 
 CHECKS = {1: check_1, 2: check_2, 3: check_3, 4: check_4, 5: check_5, 6: check_6, 7: check_7,
-          8: check_8, 9: check_9, 10: check_10, 11: check_11, 12: check_12, 13: check_13}
+          8: check_8, 9: check_9, 10: check_10, 11: check_11, 12: check_12, 13: check_13, 14: check_14}
 
 
 # ----------------------------------------------------------------------------------------

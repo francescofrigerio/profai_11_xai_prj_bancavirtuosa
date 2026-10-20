@@ -1,0 +1,29 @@
+PROMPT: Confermo Saliency poi eventualmente se vedo che complica le spiegazioni sono sempre in tempo a toglierlo .
+Confermo NUM_EPOCHS=5 .
+Confermo FLAG_RELU_INPLACE=True significa “tenere le ReLU in-place” . 
+Decisione A questo punto avrei deciso di tenere sia BatchNorm con eval sia “tenere le ReLU in-place” 
+quindi entrambe le flag TRUE nel CONFIG.
+
+OUTPUT DEL COMANDO : %run phase0_checks.py --checks 2,3,4,13
+
+Sembra che ho passato l'output precedente
+risponde cosi rispetto ai file png postati
+
+Cosa dicono le quattro figure
+Griglia LIME (07): confermerei LIME_GRID_CELLS=8. La griglia spezza ogni cifra in 12–27 celle su 64, con celle larghe quanto il tratto. Quickshift fa 100–130 segmenti minuscoli che frammentano anche lo sfondo: è chiaramente peggiore, come dice il design (D11).
+Maschera (08): confermerei soglia 0,1 e dilatazione 1. Con dilatazione 0 la maschera segue il tratto con il suo alone (17% dei pixel). Con dilatazione 1 sale al 30%: i tratti ingrassano e i piccoli anelli di 8, 6 e 9 si riducono. L’alone aiuta con mappe grossolane come Grad-CAM e LIME. Se vuoi più stretto, tieni 0 come alternativa. Le soglie 0,05–0,3 cambiano l’area di soli 1–3 punti.
+Ricampionamento (12): confermerei la regola. Grad-CAM nativo è a blocchi 4×4, la regola bilineare?128?area dà una mappa liscia e fedele, molto meglio del nearest. Ci sono piccole ondulazioni sui bordi sinistro e inferiore, innocue.
+Backend (03):
+lime/lime dà una mappa a celle plausibile.
+lime/captum ha una mappa vuota per questa immagine: il Lasso predefinito azzera tutto. Se resta l’impostazione preferita (lime), non è un problema, ma ora un backend che restituisce mappe vuote viene escluso dalla selezione.
+shap/shap e shap/captum sono quasi identici, a pixel, con picchi sugli estremi del tratto. 
+Due implementazioni indipendenti che concordano sono un buon segnale. La differenza tra due run di Captum, che prima sembrava un problema, 
+ha la spiegazione del seed NumPy.
+Una cosa da verificare: il 7 viene classificato 8
+
+Nella figura 03 il primo 7 del test è predetto 8. Con il 97% di accuracy è un evento da circa il 3%, plausibile, ma può nascondere un problema nel caricamento del checkpoint (tra le righe del training e quelle delle spiegazioni). Per escluderlo ho aggiunto il check 14: ricarica il checkpoint e deve riprodurre l’accuracy di validation del training (0,9700, tolleranza 0,001). Stampa anche classe predetta e confidenza dei tre campioni. Se non coincide, il problema è nello script e non nel modello.
+
+Cosa ho cambiato nello script
+Check 14 nuovo; un backend con mappe vuote su un modello addestrato non è più selezionabile.
+Titoli della figura 07 non più sovrapposti; titolo della figura 03 corretto (“true 7 / predicted ...”).
+L’errata ha ora le tue conferme (E21, E22) e una tabella con le osservazioni sulle figure, in attesa del tuo ok.

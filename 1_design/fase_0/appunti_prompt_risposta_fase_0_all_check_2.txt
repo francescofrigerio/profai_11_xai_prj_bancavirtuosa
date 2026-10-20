@@ -1,0 +1,54 @@
+
+PROMPT1: Passo l'output sulla console e chiedo quali file grafici servono
+e cosa ne pensa Claude se aggiungi captum.attr.Saliecy alle tecniche XAI.
+
+
+
+Risposta di Claude
+
+OUTPUT DEL COMANDO  run phase0_checks.py:
+
+
+Il run completo è andato bene nel complesso. I due FAIL (check 2 e check 4) hanno cause chiare: uno è un mio errore nello script, l’altro un dato reale su IG. Su Saliency la mia opinione è favorevole, con qualche condizione.
+
+Cosa dice il run
+
+Funziona e conferma il design:
+
+Check 6: con BatchNorm in eval la validation finale è 0,9700, contro 0,9493 con BatchNorm in train (deriva delle statistiche 31,5). L’ipotesi F1 è confermata anche in fase zero.
+Check 5: la LR arriva a 0,9222 sulla validation (attesa ~0,92). Converge in 248 iterazioni e il logit è esatto. La somma dei coefficienti sulle classi è ˜ 1e-13, quindi mappa locale e globale coincidono.
+Check 3: tutti e quattro i backend LIME/SHAP funzionano. I tempi per immagine sono: lime/lime 3,0 s, lime/captum 1,6 s, shap/shap 6,9 s, shap/captum 0,5 s.
+Check 9: N_QUANT=100 costa circa 17 minuti. “Esegui tutto” dura circa 27 minuti in load e 32 in train. Il limite di 30 minuti in load è vicino: SHAP (pacchetto shap) pesa da solo 6,9 secondi su 10,4 per immagine.
+
+Le due cose da correggere:
+
+Check 2 (FAIL): il verdetto non è attendibile ed è colpa mia. Dice che Gradient SHAP di Captum dà mappe diverse con le ReLU in-place (differenza 0,56). Ma lo stesso confronto senza differenze di modello, nel check 3, dà 0,64. Quindi la differenza non viene dalle ReLU. Captum estrae i coefficienti di interpolazione con il generatore NumPy, e io seminavo solo torch. Ora semino entrambi. Gli altri tre confronti (Grad-CAM, IG, SHAP con shap) mostrano mappe identiche con ReLU in-place, quindi FLAG_RELU_INPLACE=True regge per ora. Il quarto va rieseguito prima di dirlo.
+Check 4 (FAIL): è un risultato reale. La completezza di IG ha un errore relativo del 20,3% a 50 passi (soglia 5%). Ora il check fa uno sweep (50/100/200/400 passi) e propone il minimo che rientra. Il tempo cresce poco: IG costa 0,13 s a 50 passi. Ho aggiunto internal_batch_size=50 per non saturare la VRAM con tanti passi.
+
+Da decidere: NUM_EPOCHS. La loss di validation cala ancora dell’11,6% all’ultima epoca, ma l’accuracy è già 0,97 e ogni epoca costa circa 68 secondi. Per un progetto dimostrativo terrei 5.
+
+Saliency (Captum)
+
+Sono favorevole. Lo vedo come un’aggiunta utile, e questi sono i motivi:
+
+Costo quasi nullo. Un solo backward, circa 0,03 s per immagine e nessun parametro nuovo (abs=True, somma dei canali).
+Valore didattico. È la tecnica “storica” e la più intuitiva per un pubblico non tecnico. Accanto a Integrated Gradients mostra perché servono tecniche più raffinate.
+Completa la famiglia: gradiente semplice, gradiente integrato, mappe di attivazione.
+
+Cosa comporta:
+
+Tocca una decisione chiusa (§3, l’insieme delle tecniche). Se la confermi la registro come D-bis (nell’errata è E22).
+Le matrici di accordo passano da 6×6 a 7×7. Ogni figura della galleria guadagna una colonna.
+C’è un file in più (xai/saliency.py) e un caso in più nei test. L’effetto sui tempi è trascurabile.
+Il rischio vero è di lettura: la mappa di Saliency è la più rumorosa. Può comparire “sparsa” sul foglio e dare accordi bassi con le altre tecniche. È un risultato onesto da spiegare, non un bug. Per questo il nuovo check 13 misura quanta attribuzione cade sulla cifra rispetto a una mappa casuale: se Saliency non fa meglio del caso, lo sappiamo prima di costruire il report.
+Cosa fare ora
+Rilancia %run phase0_checks.py --checks 2,3,4,13: sono pochi minuti, e senza il training. Il check 2 deve ora dare le stesse mappe per le quattro tecniche, il check 3 deve rendere shap/captum deterministico. Il check 13 è nuovo. Il training (check 6) non va ripetuto: il checkpoint di fase zero è già salvato.
+Figure: sì, mandami le figure, ma solo quelle che servono a una decisione:
+3 (mappe dei backend) e 5 (mappe globali LR): ora hanno senso perché il modello è addestrato;
+7 (griglia LIME) e 8 (maschera): le richieste di conferma visiva;
+12 (ricampionamento).
+Le cinque insieme, se puoi. Non servono invece le figure del --quick.
+Conferma se vuoi Saliency (E22) e se tenere NUM_EPOCHS=5.
+Rimane aperta la domanda sul significato di FLAG_RELU_INPLACE=True (“tenere le ReLU in-place”), per assicurarmi che lo abbia implementato come intendi.
+
+
