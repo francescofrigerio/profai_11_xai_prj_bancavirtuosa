@@ -105,8 +105,9 @@ CHECK_NAMES = {
     10: "Backend decision and table of fixed values",
     11: "Occlusion behaviour (overlap, channels, forwards)",
     12: "Resampling rule to the 28x28 grid",
+    13: "Saliency (candidate sixth technique)",
 }
-ORDER = [1, 2, 5, 6, 3, 4, 7, 8, 11, 12, 9, 10]
+ORDER = [1, 2, 5, 6, 3, 4, 13, 7, 8, 11, 12, 9, 10]
 SEVERITY = {"FAIL": 4, "WARN": 3, "REVIEW": 2, "PASS": 1, "INFO": 0}
 
 
@@ -272,7 +273,7 @@ def choose_backend(check3_values: dict, technique: str, preferred: str, alternat
 
 def estimate_run_all(t: dict, cfg, n_quant: int) -> dict:
     """Rough 'Esegui tutto' time (seconds). `t` holds measured per-image / per-epoch seconds."""
-    per_image = t["gradcam"] + t["ig"] + t["occlusion"] + t["lime"] + t["shap"]
+    per_image = t["gradcam"] + t["ig"] + t["occlusion"] + t["lime"] + t["shap"] + t.get("saliency", 0.0)
     gallery = cfg.GALLERY_SIZE * (1.0 + ERROR_EXPLAIN_EXTRA_FRACTION) * per_image
     quant = n_quant * per_image
     test_inference = t["val_seconds_per_image"] * 10000
@@ -505,8 +506,14 @@ def explain_ig(model, x1, target, cfg, steps=None):
     from captum.attr import IntegratedGradients
     att = IntegratedGradients(model).attribute(
         x1, baselines=black_normalized(x1.shape[-1], x1.device), target=int(target),
-        n_steps=steps or cfg.IG_STEPS)
+        n_steps=steps or cfg.IG_STEPS, internal_batch_size=50)
     return att
+
+
+def explain_saliency(model, x1, target):
+    from captum.attr import Saliency
+    att = Saliency(model).attribute(x1, target=int(target), abs=True)
+    return att[0].sum(0).detach().cpu().numpy()       # sum over channels, >= 0
 
 
 def explain_lime_pkg(model, x1, target, cfg, device):
@@ -577,7 +584,7 @@ def explain_shap_captum(model, x1, target, background, cfg, chunk=50):
     gs, total, done, k = GradientShap(model), None, 0, 0
     while done < cfg.SHAP_NUM_SAMPLES:          # chunked: bounded GPU memory
         m = min(chunk, cfg.SHAP_NUM_SAMPLES - done)
-        torch.manual_seed(cfg.SEED + k)
+        set_seed(cfg.SEED + k)                      # Captum draws alphas with the NUMPY RNG too
         a = gs.attribute(x1, baselines=background, n_samples=m, stdevs=0.0, target=int(target))
         total = a * m if total is None else total + a * m
         done, k = done + m, k + 1
@@ -678,7 +685,7 @@ def _relu_probes(x, bg, cfg):
     from captum.attr import GradientShap
 
     def gradshap(m):
-        torch.manual_seed(cfg.SEED)
+        set_seed(cfg.SEED)                      # numpy + torch: Captum uses both
         att = GradientShap(m).attribute(x, baselines=bg, n_samples=4, stdevs=0.0, target=3)
         return att[0].sum(0).detach().cpu().numpy()
 
@@ -692,6 +699,7 @@ def _relu_probes(x, bg, cfg):
     return {
         "gradcam on norm5 (signed)": lambda m: explain_gradcam(m, x, 3, cfg.GRADCAM_LAYER, relu=False),
         "integrated gradients": lambda m: explain_ig(m, x, 3, cfg, steps=10)[0].sum(0).detach().cpu().numpy(),
+        "saliency": lambda m: explain_saliency(m, x, 3),
         "gradient shap (captum)": gradshap,
         "gradient shap (shap)": shap_pkg,
     }
@@ -858,29 +866,89 @@ def check_4(ctx):
             f"baseline is black in the original image (max |denormalized| = {back_to_pixels:.1e}); "
             f"in normalized space it is {np.round(r.values['normalized_black_per_channel'], 3).tolist()}, "
             "NOT zero")
-        rels, secs, zero_ok = [], [], []
+
+        def measure(steps):
+            rels, secs, zero_ok = [], [], []
+            for i in range(len(x)):
+                xi = x[i:i + 1]
+                att, sec = timed(lambda: explain_ig(model, xi, pred[i], cfg, steps=steps), dev)
+                secs.append(sec)
+                with torch.no_grad():
+                    f_x, f_b = model(xi)[0, pred[i]].item(), model(baseline)[0, pred[i]].item()
+                gap = abs(att.sum().item() - (f_x - f_b))
+                rels.append(gap / max(abs(f_x - f_b), 1e-6))
+                same = ((xi - baseline).abs().amax(dim=1, keepdim=True) < 1e-9).expand_as(att)
+                zero_ok.append(bool((att[same].abs() <= 1e-12).all()) if same.any() else True)
+            return rels, secs, zero_ok
+
+        # completeness as a function of the number of integration steps
+        sweep = {}
+        for steps in sorted({cfg.IG_STEPS, 100, 200, 400}):
+            rels, secs, zero_ok = measure(steps)
+            sweep[str(steps)] = {"worst_rel_error": float(max(rels)), "per_image_rel_error": rels,
+                                 "seconds_median": float(np.median(secs)), "zero_on_background": all(zero_ok)}
+            r.info(f"IG_STEPS={steps}: worst completeness error {max(rels):.2%}, "
+                   f"{np.median(secs):.2f}s/img")
+        r.values["ig_sweep"] = sweep
+        entry = sweep[str(cfg.IG_STEPS)]
+        worst = entry["worst_rel_error"]
+        r.values.update(ig_rel_error=[worst], ig_seconds_per_image=entry["seconds_median"])
+        if worst <= THRESHOLDS["ig_completeness_pass_rel"]:
+            r.ok(f"completeness holds at the configured IG_STEPS={cfg.IG_STEPS}: worst error {worst:.2%}")
+        elif worst <= THRESHOLDS["ig_completeness_warn_rel"]:
+            r.warn(f"completeness only approximate at IG_STEPS={cfg.IG_STEPS}: worst error {worst:.2%}")
+        else:
+            r.fail(f"completeness violated at IG_STEPS={cfg.IG_STEPS}: worst error {worst:.2%}")
+        passing = [int(k) for k, v in sweep.items()
+                   if v["worst_rel_error"] <= THRESHOLDS["ig_completeness_pass_rel"]]
+        r.values["ig_steps_proposed"] = min(passing) if passing else None
+        if passing:
+            r.info(f"smallest tested IG_STEPS meeting {THRESHOLDS['ig_completeness_pass_rel']:.0%}: {min(passing)}")
+        else:
+            r.warn("no tested number of steps reaches the completeness threshold: look at the per-image errors")
+        (r.ok if all(v["zero_on_background"] for v in sweep.values()) else r.fail)(
+            "attribution is exactly zero wherever the image equals the baseline (background)")
+
+
+# ----------------------------------------------------------------------------------------
+# CHECK 13 - Saliency (candidate sixth technique)
+# ----------------------------------------------------------------------------------------
+def check_13(ctx):
+    with ctx.rec.check(13) as r:
+        cfg, dev, S = ctx.cfg, ctx.device, ctx.cfg.DENSENET_SIZE
+        model, x, pred, x28 = sample_inputs(ctx)
+        secs, sal_share, ig_share, area = [], [], [], []
+        valid, deterministic = True, True
         for i in range(len(x)):
             xi = x[i:i + 1]
-            att, sec = timed(lambda: explain_ig(model, xi, pred[i], cfg), dev)
+            m, sec = timed(lambda: explain_saliency(model, xi, pred[i]), dev)
             secs.append(sec)
-            with torch.no_grad():
-                f_x, f_b = model(xi)[0, pred[i]].item(), model(baseline)[0, pred[i]].item()
-            gap = abs(att.sum().item() - (f_x - f_b))
-            rels.append(gap / max(abs(f_x - f_b), 1e-6))
-            same = ((xi - baseline).abs().amax(dim=1, keepdim=True) < 1e-9).expand_as(att)
-            zero_ok.append(bool((att[same].abs() <= 1e-12).all()) if same.any() else True)
-        worst = float(max(rels))
-        r.values.update(ig_rel_error=rels, ig_seconds_per_image=float(np.median(secs)))
-        if worst <= THRESHOLDS["ig_completeness_pass_rel"]:
-            r.ok(f"completeness holds: worst relative error {worst:.3%} with {cfg.IG_STEPS} steps")
-        elif worst <= THRESHOLDS["ig_completeness_warn_rel"]:
-            r.warn(f"completeness only approximate: worst relative error {worst:.3%} (raise IG_STEPS?)")
-        else:
-            r.fail(f"completeness violated: worst relative error {worst:.3%}")
-        (r.ok if all(zero_ok) else r.fail)(
-            "attribution is exactly zero wherever the image equals the baseline (background): "
-            f"{all(zero_ok)}")
-        r.info(f"IG median {np.median(secs):.2f}s/img")
+            again = explain_saliency(model, xi, pred[i])
+            valid &= bool(m.shape == (S, S) and np.isfinite(m).all() and (m >= 0).all() and m.max() > 0)
+            deterministic &= bool(np.allclose(m, again, rtol=THRESHOLDS["determinism_rtol"],
+                                              atol=1e-4 * max(m.max(), 1e-12)))
+            ig = explain_ig(model, xi, pred[i], cfg)[0].sum(0).detach().cpu().numpy()
+            mask = digit_mask(x28[i, 0].numpy(), cfg.MASK_THRESHOLD, cfg.MASK_DILATION)
+
+            def share(a):
+                g = to_grid28(np.abs(a), S)
+                return float(g[mask].sum() / max(g.sum(), 1e-12))
+            sal_share.append(share(m))
+            ig_share.append(share(ig))
+            area.append(float(mask.mean()))
+        r.values.update(saliency_seconds_per_image=float(np.median(secs)), mass_in_mask_saliency=sal_share,
+                        mass_in_mask_ig=ig_share, mask_area_fraction=area)
+        (r.ok if valid else r.fail)("saliency map: shape (S,S), finite, non-negative (abs=True), not all zero")
+        (r.ok if deterministic else r.warn)(f"saliency is deterministic: {deterministic}")
+        r.info(f"saliency {np.median(secs):.3f}s/img (one backward pass)")
+        r.info("share of the attribution falling inside the digit mask (a random map would give the "
+               f"mask area, {np.mean(area):.1%}): saliency {np.mean(sal_share):.1%}, "
+               f"integrated gradients {np.mean(ig_share):.1%}")
+        if np.mean(sal_share) <= np.mean(area) + 0.05:
+            r.warn("saliency concentrates on the digit no more than a random map would "
+                   "(expected to be noisy: a result to explain, not a bug)")
+        r.review("saliency is the noisiest gradient technique: the 7x7 agreement matrices and the gallery "
+                 "would gain a column/row. Operator decision (errata E22).")
 
 
 # ----------------------------------------------------------------------------------------
@@ -1301,6 +1369,7 @@ def collect_timings(ctx):
         "occlusion": get(rec.values(11).get("occlusion_seconds_per_image"), "check 11 (Occlusion)"),
         "lime": get(lime_t, "check 3 (LIME backend)"),
         "shap": get(shap_t, "check 3 (SHAP backend)"),
+        "saliency": float(rec.values(13).get("saliency_seconds_per_image") or 0.0),
         "lr_fit": get(rec.values(5).get("fit_seconds"), "check 5 (LR fit)"),
         "epoch_train": get(rec.values(6).get("epoch_train_seconds"), "check 6 (epoch time)"),
         "epoch_val": get(rec.values(6).get("epoch_val_seconds"), "check 6 (validation time)"),
@@ -1315,7 +1384,8 @@ def check_9(ctx):
         t, lime_b, shap_b, missing = collect_timings(ctx)
         if missing:
             r.warn("estimate incomplete, run first: " + ", ".join(missing))
-        n_quant, fits = pick_n_quant(t["gradcam"] + t["ig"] + t["occlusion"] + t["lime"] + t["shap"],
+        n_quant, fits = pick_n_quant(t["gradcam"] + t["ig"] + t["occlusion"] + t["lime"] + t["shap"]
+                                     + t.get("saliency", 0.0),
                                      THRESHOLDS["quant_stage_max_minutes"])
         est = estimate_run_all(t, cfg, n_quant)
         r.values.update(timings=t, estimate_seconds=est, proposed_n_quant=n_quant,
@@ -1391,8 +1461,16 @@ def check_10(ctx):
         c4 = rec.values(4)
         if c4.get("ig_rel_error"):
             worst = max(c4["ig_rel_error"])
-            row("IG_STEPS", cfg.IG_STEPS, cfg.IG_STEPS, f"check 4: completeness error {worst:.2%}",
+            prop = c4.get("ig_steps_proposed") or cfg.IG_STEPS
+            row("IG_STEPS", cfg.IG_STEPS, prop,
+                f"check 4: completeness error {worst:.2%} at {cfg.IG_STEPS} steps (sweep in check 4)",
                 auto if worst <= THRESHOLDS["ig_completeness_pass_rel"] else manual)
+        c13 = rec.values(13)
+        if c13.get("saliency_seconds_per_image") is not None:
+            row("Saliency as 6th technique (E22)", "not in design", "operator decision",
+                f"check 13: {c13['saliency_seconds_per_image']:.3f}s/img, share inside the digit "
+                f"{np.mean(c13['mass_in_mask_saliency']):.0%} vs mask area {np.mean(c13['mask_area_fraction']):.0%}",
+                manual)
         c11 = rec.values(11)
         if c11:
             row("OCCLUSION_WINDOW/STRIDE", f"{cfg.OCCLUSION_WINDOW}/{cfg.OCCLUSION_STRIDE}",
@@ -1435,7 +1513,7 @@ def check_10(ctx):
 
 
 CHECKS = {1: check_1, 2: check_2, 3: check_3, 4: check_4, 5: check_5, 6: check_6, 7: check_7,
-          8: check_8, 9: check_9, 10: check_10, 11: check_11, 12: check_12}
+          8: check_8, 9: check_9, 10: check_10, 11: check_11, 12: check_12, 13: check_13}
 
 
 # ----------------------------------------------------------------------------------------

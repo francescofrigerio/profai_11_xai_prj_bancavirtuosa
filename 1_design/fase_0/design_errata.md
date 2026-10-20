@@ -34,7 +34,9 @@ precisazioni approvate dall'operatore e quelle ancora da confermare. Stato: **A*
 | E18 | `SHAP_NUM_SAMPLES` mancava: i campioni di gradiente erano un numero magico | Aggiunto alla config (default 200, come shap). | P |
 | E19 | `IMAGE_SIZE` indicava due cose (MNIST 28×28 e input DenseNet 128×128) | Due parametri: `IMAGE_SIZE = 28` (MNIST, input della LR) e `DENSENET_SIZE = 128`. Le validazioni su griglia LIME, finestra Occlusion e stride 32 usano `DENSENET_SIZE`. Preso dal config dello script esplorativo dell'operatore. | A |
 | E20 | Early stopping (D07) | **Eliminato** (con 5 epoche complica il codice senza vantaggio). Via `EARLY_STOPPING_PATIENCE`, via il relativo test e la sua menzione in §7. Numero di epoche fisso; si salvano i pesi dell'**ultima** epoca. | A |
-| E21 | Due nuovi flag in config | `FLAG_BATCHNORM_EVAL = True`: BatchNorm del backbone in `eval` durante il training; ha effetto solo con `FREEZE_BACKBONE=True`. `FLAG_RELU_INPLACE = True`: si tengono le ReLU in-place di torchvision (meno VRAM); `False` applica la patch. Nessun cambio automatico: se una tecnica richiede `False`, lo si dice in config. **Verificato in fase zero (check 2)** che con `True` tutte le tecniche a gradiente diano le stesse mappe del modello patchato. Con 5 epoche l'operatore ha misurato la stessa accuracy (0,9732) con ReLU in-place. | A · V (check 2) |
+| E21 | Due nuovi flag in config | `FLAG_BATCHNORM_EVAL = True`: BatchNorm del backbone in `eval` durante il training; ha effetto solo con `FREEZE_BACKBONE=True`. `FLAG_RELU_INPLACE = True`: si tengono le ReLU in-place di torchvision (meno VRAM); `False` applica la patch. Nessun cambio automatico: se una tecnica richiede `False`, lo si dice in config. **Da verificare in fase zero (check 2):** nel primo run Grad-CAM, IG e SHAP (shap) danno le stesse mappe con ReLU in-place e patchate; Gradient SHAP (captum) risultava diverso, ma l'esito era inquinato da un errore dello script (generatore NumPy non seminato), da rieseguire. Con 5 epoche l'operatore ha misurato la stessa accuracy (0,9732) con ReLU in-place. | A · V (check 2, da rieseguire) |
+| E22 | Saliency (Captum) come sesta tecnica XAI, richiesta dall'operatore | **Proposta, non ancora approvata.** Modifica la decisione chiusa sull'insieme delle tecniche (§3): se approvata diventa D-bis. Effetti: nuovo `xai/saliency.py`; matrici di accordo 7×7 invece di 6×6; una colonna in più nella galleria; un caso in più nei test del contratto e nel test del segnale piantato. Costo a runtime trascurabile (un solo backward). `abs=True` e somma dei canali, per coerenza con IG e SHAP. Il check 13 misura tempo e quanto dell'attribuzione cade sulla cifra. | P · V (check 13) |
+| E23 | `IG_STEPS = 50` non basta | Nel run completo la completezza di IG ha errore relativo massimo 20,3 % a 50 passi (soglia 5 %). Il check 4 ora fa uno sweep (50/100/200/400) e propone il più piccolo che rispetta la soglia. IG usa `internal_batch_size=50` per non saturare la VRAM. | V (check 4) |
 
 ## Osservazioni sullo script esplorativo
 
@@ -46,7 +48,7 @@ precisazioni approvate dall'operatore e quelle ancora da confermare. Stato: **A*
 | F4 | LR con `max_iter` 100 e avvisi soppressi. | Corretto (`LR_MAX_ITER`); restano filtrati i `FutureWarning`: vedi F9. |
 | F5 | `torch.hub.load('pytorch/vision:v0.10.0', ...)` scarica codice da GitHub. | Corretto nella funzione di training (`models.densenet121(weights=...)`). Resta una cella con `torch.hub` più sotto (cella di esplorazione). |
 | F6 | `random_split` non stratificato. | Corretto (`train_test_split` stratificato). Vedi F8 per l'uso dello split nella LR. |
-| F7 | Preprocessing con PIL nel `DataLoader` (nessun worker): lento. | **Non adottato nello script esplorativo; decisione aperta.** Il check 6a verifica che il preprocessing su tensori sia equivalente (differenza massima misurata in `--quick`: 0,017 in unità normalizzate, soglia 0,05). Il check 6 misura il tempo per epoca con il preprocessing su GPU: da confrontare con quello del percorso PIL per decidere in tappa 1. |
+| F7 | Preprocessing con PIL nel `DataLoader` (nessun worker): lento. | **Non adottato nello script esplorativo; decisione aperta.** Il check 6a verifica che il preprocessing su tensori sia equivalente (differenza massima misurata in `--quick`: 0,017 in unità normalizzate, soglia 0,05). Misurato nel run completo: 60 s di training + 8 s di validation per epoca con il preprocessing su GPU (65 s con BatchNorm in train). Da confrontare con il tempo del percorso PIL per decidere in tappa 1. |
 | F8 (nuova) | In `run_train_lr` il `DataLoader` usa `trainval_dataset_lr` (60.000 immagini, validation inclusa), non `train_dataset_lr`: lo split viene calcolato e non usato. Inoltre `C`, solver e penalità della config non sono passati alla `LogisticRegression`. | Da correggere in tappa 1: la LR si addestra sui soli 54.000 del train; i parametri vengono dalla config. |
 | F9 (nuova) | `warnings.filterwarnings('ignore', category=FutureWarning)` nasconde anche gli avvisi di sklearn sui parametri deprecati. | Il check 5 stampa il testo di ogni avviso non di convergenza. |
 | F10 (nuova) | `set_batchnorm_eval(model)` applicato al modello intero è un no-op (non scende nei moduli); l'`enter_train_mode` successivo fa il lavoro giusto. Il learning rate è fisso a `1e-3` nel codice, non da `LEARNING_RATE_HEAD`. | Innocuo; si sistema in tappa 1. |
@@ -56,3 +58,15 @@ precisazioni approvate dall'operatore e quelle ancora da confermare. Stato: **A*
 
 - Con `penalty='l2'` esplicito sklearn 1.8 emette un `FutureWarning`: per L2 il parametro non viene passato (è il default in tutte le versioni).
 - La somma dei coefficienti sulle classi è ≈ 1e-14 (conferma E02) e `decision_function == X·Wᵀ + b` esattamente. Da riconfermare su MNIST nel check 5.
+
+## Esiti del run completo di fase zero (Colab, T4, torch 2.11, sklearn 1.6.1)
+
+| Check | Esito | Nota |
+|---|---|---|
+| 1 Ambiente | PASS | Nessun riavvio necessario. Avviso `scipy.optimize ... iprint` deprecato (rimosso in SciPy 1.18): rischio futuro per sklearn 1.6.1. |
+| 2 ReLU in-place | FAIL (da rieseguire) | Grad-CAM, IG e SHAP (shap) identici in-place e patchati. Gradient SHAP (captum) diverso (0,56), ma lo stesso confronto con modello identico dava 0,64 nel check 3: causa NumPy non seminato. |
+| 3 Backend | WARN | lime/lime 3,0 s, lime/captum 1,6 s, shap/shap 6,9 s, shap/captum 0,5 s. `shap/captum` non deterministico (stessa causa). |
+| 4 IG | FAIL | Completezza 20,3 % a 50 passi: sweep nel check 4. |
+| 5 LR | REVIEW | Accuracy validation 0,9222 (attesa ~0,92); convergenza in 248 iterazioni; somma coefficienti ≈ 1e-13; logit esatto; 62,6 s di fit. |
+| 6 Addestramento | PASS | Ultima epoca 0,9700 con BatchNorm in `eval` (0,9493 con BatchNorm in train, deriva delle statistiche 31,5). Loss di validation ancora in calo dell'11,6 % all'ultima epoca. |
+| 9 Tempi | PASS | `N_QUANT=100` ≈ 17,3 min; "Esegui tutto" ≈ 27 min (load) / 32 min (train). SHAP (shap) è 6,9 s su 10,4 s per immagine. |
