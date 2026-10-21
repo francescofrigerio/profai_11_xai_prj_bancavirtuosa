@@ -1,0 +1,48 @@
+
+checks_6_14_3_4_13_nocomparison
+
+
+Ora il run è valido, e racconta una storia molto diversa dalla precedente. Prima di commentare, aggiungo un controllo che i numeri richiedono (stabilità di LIME e SHAP da un seed all’altro) e aggiorno config ed errata.
+
+Questo run è valido, e gli START/END STEP hanno fatto il loro lavoro: il checkpoint viene creato nella stessa sessione, il check 14 lo ricarica e riproduce l’accuracy del training (0,9700 contro 0,9700), e i tre campioni sono classificati bene con confidenza ~100%. Il 7 che sembrava un 8 era la testa casuale.
+
+Cosa conferma il run
+Training riproducibile. Le accuracy per epoca coincidono con il run di una sessione precedente (0,9497 ? 0,9700). Ogni epoca costa 60 s + 7 s.
+LIME e SHAP funzionano. lime 3,3 s e shap 6,9 s per immagine, entrambi deterministici.
+La figura 03 ora ha senso. Nell’immagine che hai mandato:
+LIME evidenzia lo stelo del 7 (celle rosse lungo la diagonale) e l’estremo destro della barra.
+SHAP è a grana fine, con rumore diffuso e un picco alla base dello stelo.
+Due risultati che cambiano le scelte
+
+1. Integrated Gradients: IG_STEPS=200. Con il modello addestrato l’errore di completezza cala in modo regolare: 20,3% a 50 passi, 5,1% a 100, 3,0% a 200, 1,6% a 400. Quindi converge (il plateau di prima era un artefatto della testa casuale). 200 passi costano 0,53 s per immagine. Ho impostato 200 nel config.py: è il tuo parametro da fissare in fase zero, quindi puoi mettere il veto.
+
+2. Saliency non si concentra sulla cifra. Solo il 23% dell’attribuzione cade dentro la cifra, contro il 22% di area: per immagine 25%, 19%, 26% contro 25%, 27%, 15%. In due immagini su tre non fa meglio del caso. Vale per il gradiente semplice, che conta anche i pixel di sfondo. È un fatto che il report dovrà spiegare (“perché servono tecniche più raffinate”).
+
+Tienila, come hai deciso: per l’accordo (Spearman e IoU) si guarda solo dentro la maschera, quindi lì il suo rumore pesa meno. La riesaminiamo in tappa 3 con i numeri, e puoi toglierla in qualsiasi momento.
+
+Due cautele che ho aggiunto all’errata (E26)
+IG darà “100% sulla cifra” per costruzione. Con la base nera l’attribuzione è nulla dove l’immagine è nera. Nella tabella dell’attribuzione fuori dalla cifra, IG avrà 0% a prescindere dal modello: non è un merito rispetto alle altre tecniche e lo dovremo scrivere nel report. Nel check 13 la riga dice ora “100% per costruzione”.
+SHAP con sfondi dal dataset attribuisce anche dove la tua immagine è vuota ma gli sfondi hanno inchiostro. È legittimo, ma va spiegato a un pubblico non tecnico.
+Un nuovo controllo: stabilità di LIME e SHAP
+
+La grana fine di SHAP mi ha fatto aggiungere il check 15: confronta due esecuzioni della stessa tecnica che differiscono solo per il seed, con Spearman dentro la maschera. Misura il tetto di accordo raggiungibile con qualunque altra tecnica. Prova LIME, SHAP a 200 campioni e SHAP a 100. Il tempo: da 200 a 100 campioni il costo per immagine si dimezza (circa 3,4 s risparmiati, ~7–8 minuti in tutto), ma non sappiamo ancora quanto rumore in più porta. È la risposta che serve per decidere SHAP_NUM_SAMPLES.
+
+Come chiudere la tappa 0
+
+Il file dei risultati di questa sessione contiene solo 5 check. Quelli delle sessioni precedenti sono andati persi: la sessione Colab non conserva i file. Serve una sola esecuzione completa, senza --checks, che produca il JSON di chiusura e la tabella dei valori fissati (check 9 e 10, che hanno bisogno di tutte le misure). Includo anche il confronto BatchNorm, che costa circa 6 minuti ma lascia l’evidenza nel file. In tutto circa 20 minuti.
+
+%cd /content
+!git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
+%cd profai_11_xai_prj_bancavirtuosa/1_design/fase_0
+!pip -q install captum lime shap scikit-image
+print("START FULL RUN")
+%run phase0_checks.py
+print("END FULL RUN")
+
+Prima aggiorna il repository con i tre file qui sopra (phase0_checks.py, config.py, design_errata.md).
+
+Appena torno con l’output, phase0_results.json, phase0_summary.md e le figure (3, 5, 7, 8, 12), chiudo la tappa 0:
+
+la tabella dei valori fissati, con le tue conferme;
+SHAP_NUM_SAMPLES sulla base del check 15;
+la stima dei tempi con IG_STEPS=200 (ora ~28 minuti in load, 33 in train, sotto i limiti di 30 e 45 ma con poco margine in load).

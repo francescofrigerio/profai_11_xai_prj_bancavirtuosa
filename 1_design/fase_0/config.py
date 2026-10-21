@@ -66,7 +66,7 @@ class ConfigConstantsDefault:
 
     # --- XAI techniques
     # LIME and SHAP always use the reference packages `lime` and `shap` (E24): no backend switch.
-    IG_STEPS: int = 50
+    IG_STEPS: int = 200                  # phase 0, check 4: 3.0 % completeness error (50 steps: 20 %)
     OCCLUSION_WINDOW: int = 16
     OCCLUSION_STRIDE: int = 8
     LIME_NUM_SAMPLES: int = 1000

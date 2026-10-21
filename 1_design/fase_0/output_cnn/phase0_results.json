@@ -1,0 +1,409 @@
+{
+  "quick_run": false,
+  "checks": {
+    "6": {
+      "name": "Frozen DenseNet training (time, accuracy, BatchNorm)",
+      "status": "PASS",
+      "seconds": 348.52,
+      "lines": [
+        [
+          "PASS",
+          "tensor preprocessing vs torchvision PIL pipeline: max diff 0.0174, mean 0.00116 (normalized units; uint8 rounding alone is ~0.009)"
+        ],
+        [
+          "INFO",
+          "training CONFIGURED setting: 5 epoch(s), batch 64, lr 0.001, backbone frozen, FLAG_BATCHNORM_EVAL=True, FLAG_RELU_INPLACE=True"
+        ],
+        [
+          "PASS",
+          "trainable parameters: 10250 (expected 10250: the Linear head only)"
+        ],
+        [
+          "PASS",
+          "BatchNorm running statistics of the backbone unchanged after training (max drift 0.00e+00)"
+        ],
+        [
+          "PASS",
+          "validation accuracy of the FINAL epoch: 0.9700 vs MIN_VAL_ACCURACY 0.95"
+        ],
+        [
+          "PASS",
+          "validation accuracy from epoch 2 on: 0.9597, 0.9647, 0.9628, 0.9700"
+        ],
+        [
+          "INFO",
+          "time per epoch: train 60s + validation 7s (tensor preprocessing on the GPU)"
+        ],
+        [
+          "INFO",
+          "validation loss still dropping clearly (11.6% last epoch): NUM_EPOCHS could be raised (operator decision)"
+        ],
+        [
+          "INFO",
+          "phase-0 head (final epoch) saved to checkpoints/phase0_densenet121_head.pt (do not commit; used by checks 3,4,11,12)"
+        ]
+      ],
+      "values": {
+        "preproc_max_abs_diff": 0.017443180084228516,
+        "preproc_mean_abs_diff": 0.0011566908797249198,
+        "configured": {
+          "history": [
+            {
+              "epoch": 1,
+              "train_loss": 0.33880262586805554,
+              "train_acc": 0.9120925925925926,
+              "val_loss": 0.183898229598999,
+              "val_acc": 0.9496666666666667,
+              "train_seconds": 62.364694356918335,
+              "val_seconds": 7.35327672958374
+            },
+            {
+              "epoch": 2,
+              "train_loss": 0.1517291847511574,
+              "train_acc": 0.9563518518518519,
+              "val_loss": 0.14194804207483927,
+              "val_acc": 0.9596666666666667,
+              "train_seconds": 61.258766174316406,
+              "val_seconds": 7.33486795425415
+            },
+            {
+              "epoch": 3,
+              "train_loss": 0.12035446506076389,
+              "train_acc": 0.9647037037037037,
+              "val_loss": 0.12238062731424967,
+              "val_acc": 0.9646666666666667,
+              "train_seconds": 59.4921452999115,
+              "val_seconds": 7.2553534507751465
+            },
+            {
+              "epoch": 4,
+              "train_loss": 0.10445859555844908,
+              "train_acc": 0.9696481481481481,
+              "val_loss": 0.11825796858469645,
+              "val_acc": 0.9628333333333333,
+              "train_seconds": 59.51209115982056,
+              "val_seconds": 7.232959508895874
+            },
+            {
+              "epoch": 5,
+              "train_loss": 0.09394904694733797,
+              "train_acc": 0.9721111111111111,
+              "val_loss": 0.10458782847722371,
+              "val_acc": 0.97,
+              "train_seconds": 59.73346161842346,
+              "val_seconds": 7.262200117111206
+            }
+          ],
+          "n_trainable": 10250,
+          "bn_drift_epoch1": 0.0,
+          "bn_drift_final": 0.0
+        },
+        "final_val_acc": 0.97,
+        "final_val_loss": 0.10458782847722371,
+        "val_acc_per_epoch": [
+          0.9496666666666667,
+          0.9596666666666667,
+          0.9646666666666667,
+          0.9628333333333333,
+          0.97
+        ],
+        "epoch_train_seconds": 59.99911606311798,
+        "epoch_val_seconds": 7.271345257759094,
+        "val_seconds_per_image": 0.001214621925354004,
+        "last_epoch_val_loss_drop": 0.11559593210568446
+      },
+      "traceback": ""
+    },
+    "14": {
+      "name": "Checkpoint round trip",
+      "status": "PASS",
+      "seconds": 7.7,
+      "lines": [
+        [
+          "PASS",
+          "reloaded checkpoint reproduces the validation accuracy of the training run: 0.9700 vs 0.9700"
+        ],
+        [
+          "PASS",
+          "sample test image of class 7: predicted 7 with confidence 100.0%"
+        ],
+        [
+          "PASS",
+          "sample test image of class 4: predicted 4 with confidence 100.0%"
+        ],
+        [
+          "PASS",
+          "sample test image of class 1: predicted 1 with confidence 99.9%"
+        ]
+      ],
+      "values": {
+        "reloaded_val_acc": 0.97,
+        "training_run_val_acc": 0.97,
+        "samples": [
+          {
+            "true": 7,
+            "predicted": 7,
+            "confidence": 0.9999262094497681
+          },
+          {
+            "true": 4,
+            "predicted": 4,
+            "confidence": 0.9999665021896362
+          },
+          {
+            "true": 1,
+            "predicted": 1,
+            "confidence": 0.9993394017219543
+          }
+        ]
+      },
+      "traceback": ""
+    },
+    "3": {
+      "name": "LIME and SHAP reference packages",
+      "status": "REVIEW",
+      "seconds": 43.17,
+      "lines": [
+        [
+          "PASS",
+          "lime/lime: shape (128, 128), finite=True, median 3.3s/img, deterministic=True"
+        ],
+        [
+          "PASS",
+          "shap/shap: shape (128, 128), finite=True, median 6.9s/img, deterministic=True"
+        ],
+        [
+          "REVIEW",
+          "look at phase0_03_backend_maps.png: do the maps of both backends of each technique roughly highlight the digit? (meaningful only if check 6 ran first)"
+        ]
+      ],
+      "values": {
+        "backends": {
+          "lime/lime": {
+            "ok": true,
+            "shape": [
+              128,
+              128
+            ],
+            "finite": true,
+            "seconds_median": 3.320784419000006,
+            "deterministic": true,
+            "repeat_max_rel_diff": 0.0,
+            "constant_map": false,
+            "empty_maps": 0
+          },
+          "shap/shap": {
+            "ok": true,
+            "shape": [
+              128,
+              128
+            ],
+            "finite": true,
+            "seconds_median": 6.945693095000024,
+            "deterministic": true,
+            "repeat_max_rel_diff": 8.274845247675515e-07,
+            "constant_map": false,
+            "empty_maps": 0
+          }
+        }
+      },
+      "traceback": ""
+    },
+    "4": {
+      "name": "Integrated Gradients (completeness, black baseline)",
+      "status": "FAIL",
+      "seconds": 6.7,
+      "lines": [
+        [
+          "PASS",
+          "baseline is black in the original image (max |denormalized| = 3.0e-08); in normalized space it is [-2.118, -2.036, -1.804], NOT zero"
+        ],
+        [
+          "INFO",
+          "IG_STEPS=50: worst completeness error 20.27%, 0.13s/img"
+        ],
+        [
+          "INFO",
+          "IG_STEPS=100: worst completeness error 5.14%, 0.26s/img"
+        ],
+        [
+          "INFO",
+          "IG_STEPS=200: worst completeness error 2.99%, 0.53s/img"
+        ],
+        [
+          "INFO",
+          "IG_STEPS=400: worst completeness error 1.59%, 1.07s/img"
+        ],
+        [
+          "FAIL",
+          "completeness violated at IG_STEPS=50: worst error 20.27%"
+        ],
+        [
+          "INFO",
+          "smallest tested IG_STEPS meeting 5%: 200"
+        ],
+        [
+          "PASS",
+          "attribution is exactly zero wherever the image equals the baseline (background)"
+        ]
+      ],
+      "values": {
+        "normalized_black_per_channel": [
+          -2.1179039478302,
+          -2.0357141494750977,
+          -1.804444432258606
+        ],
+        "ig_sweep": {
+          "50": {
+            "worst_rel_error": 0.20268725458604153,
+            "per_image_rel_error": [
+              0.0108327674190938,
+              0.04168678865368564,
+              0.20268725458604153
+            ],
+            "seconds_median": 0.1263198530000409,
+            "zero_on_background": true
+          },
+          "100": {
+            "worst_rel_error": 0.051424583710214626,
+            "per_image_rel_error": [
+              0.019247121259632908,
+              0.017508919657702123,
+              0.051424583710214626
+            ],
+            "seconds_median": 0.2593550190000542,
+            "zero_on_background": true
+          },
+          "200": {
+            "worst_rel_error": 0.02992553244752169,
+            "per_image_rel_error": [
+              0.0025949012012330924,
+              0.006254843081427867,
+              0.02992553244752169
+            ],
+            "seconds_median": 0.5273869590000686,
+            "zero_on_background": true
+          },
+          "400": {
+            "worst_rel_error": 0.015861546771547188,
+            "per_image_rel_error": [
+              0.011258763013593716,
+              0.004569889665918275,
+              0.015861546771547188
+            ],
+            "seconds_median": 1.0681579509999892,
+            "zero_on_background": true
+          }
+        },
+        "ig_rel_error": [
+          0.20268725458604153
+        ],
+        "ig_seconds_per_image": 0.1263198530000409,
+        "ig_steps_proposed": 200
+      },
+      "traceback": ""
+    },
+    "13": {
+      "name": "Saliency (candidate sixth technique)",
+      "status": "WARN",
+      "seconds": 0.75,
+      "lines": [
+        [
+          "PASS",
+          "saliency map: shape (S,S), finite, non-negative (abs=True), not all zero"
+        ],
+        [
+          "PASS",
+          "saliency is deterministic: True"
+        ],
+        [
+          "INFO",
+          "saliency 0.049s/img (one backward pass)"
+        ],
+        [
+          "INFO",
+          "share of the attribution falling inside the digit mask (a random map would give the mask area, 22.4%): saliency 23.4%, integrated gradients 100.0%"
+        ],
+        [
+          "WARN",
+          "saliency concentrates on the digit no more than a random map would (expected to be noisy: a result to explain, not a bug)"
+        ],
+        [
+          "REVIEW",
+          "saliency is the noisiest gradient technique: the 7x7 agreement matrices and the gallery would gain a column/row. Operator decision (errata E22)."
+        ]
+      ],
+      "values": {
+        "saliency_seconds_per_image": 0.049468902000057824,
+        "mass_in_mask_saliency": [
+          0.25439608097076416,
+          0.1867714822292328,
+          0.2612152695655823
+        ],
+        "mass_in_mask_ig": [
+          0.9999101161956787,
+          0.9991440176963806,
+          0.9994639754295349
+        ],
+        "mask_area_fraction": [
+          0.2538265306122449,
+          0.26785714285714285,
+          0.14923469387755103
+        ]
+      },
+      "traceback": ""
+    }
+  },
+  "decisions": {},
+  "meta": {
+    "config": {
+      "SEED": 42,
+      "DEVICE": "auto",
+      "IMAGE_SIZE": 28,
+      "DENSENET_SIZE": 128,
+      "NUM_CLASSES": 10,
+      "VAL_SIZE": 6000,
+      "NUM_DEBUG_IMAGES": 10,
+      "BACKBONE_WEIGHTS": "IMAGENET1K_V1",
+      "FREEZE_BACKBONE": true,
+      "MIN_VAL_ACCURACY": 0.95,
+      "NUM_EPOCHS": 5,
+      "BATCH_SIZE": 64,
+      "OPTIMIZER": "adam",
+      "LEARNING_RATE_HEAD": 0.001,
+      "LEARNING_RATE_FULL": 5e-05,
+      "MODEL_MODE": "auto",
+      "CHECKPOINT_PATH": "checkpoints/densenet121_mnist.pt",
+      "FLAG_BATCHNORM_EVAL": true,
+      "FLAG_RELU_INPLACE": true,
+      "GRADCAM_LAYER": "features.norm5",
+      "GRADCAM_ALT_LAYER": "features.denseblock3",
+      "GRADCAM_DEBUG_EPOCHS": "first_last",
+      "LR_PENALTY": "l2",
+      "LR_SOLVER": "lbfgs",
+      "LR_C": 1.0,
+      "LR_MAX_ITER": 1000,
+      "IG_STEPS": 50,
+      "OCCLUSION_WINDOW": 16,
+      "OCCLUSION_STRIDE": 8,
+      "LIME_NUM_SAMPLES": 1000,
+      "LIME_GRID_CELLS": 8,
+      "SHAP_NUM_BACKGROUND": 50,
+      "SHAP_NUM_SAMPLES": 200,
+      "GALLERY_SIZE": 24,
+      "N_QUANT": 100,
+      "COMPUTE_AGREEMENT": true,
+      "SIGN_MODE": "absolute",
+      "MASK_MODE": "digit",
+      "MASK_THRESHOLD": 0.1,
+      "MASK_DILATION": 1,
+      "TOPK_FRACTION": 0.2,
+      "COMPUTE_FAITHFULNESS": false,
+      "DELETION_STEPS": 10,
+      "RUN_TESTS": false,
+      "OUTPUT_DIR": "outputs"
+    },
+    "quick": false,
+    "started": "2026-10-21 07:18:33"
+  }
+}

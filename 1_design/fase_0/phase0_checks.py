@@ -86,6 +86,7 @@ THRESHOLDS = {
     "loss_still_dropping_rel": 0.05,          # last-epoch relative val-loss drop => "still dropping"
     "mask_fraction_range": (0.05, 0.60),      # sane share of pixels in the digit mask
     "determinism_rtol": 1e-3,
+    "stability_min_rho": 0.5,                 # seed-to-seed Spearman of LIME / SHAP inside the mask
 }
 N_QUANT_CANDIDATES = (50, 100, 200)
 ERROR_EXPLAIN_EXTRA_FRACTION = 0.5   # gallery: errors are explained twice (predicted + true)
@@ -109,8 +110,9 @@ CHECK_NAMES = {
     12: "Resampling rule to the 28x28 grid",
     13: "Saliency (candidate sixth technique)",
     14: "Checkpoint round trip",
+    15: "Seed-to-seed stability of LIME and SHAP",
 }
-ORDER = [1, 2, 5, 6, 14, 3, 4, 13, 7, 8, 11, 12, 9, 10]
+ORDER = [1, 2, 5, 6, 14, 3, 4, 13, 15, 7, 8, 11, 12, 9, 10]
 SEVERITY = {"FAIL": 4, "WARN": 3, "REVIEW": 2, "PASS": 1, "INFO": 0}
 
 
@@ -916,7 +918,8 @@ def check_13(ctx):
         r.info(f"saliency {np.median(secs):.3f}s/img (one backward pass)")
         r.info("share of the attribution falling inside the digit mask (a random map would give the "
                f"mask area, {np.mean(area):.1%}): saliency {np.mean(sal_share):.1%}, "
-               f"integrated gradients {np.mean(ig_share):.1%}")
+               f"integrated gradients {np.mean(ig_share):.1%} (100% BY CONSTRUCTION: zero wherever the image "
+               "equals the black baseline, so it is not a fair comparison)")
         if np.mean(sal_share) <= np.mean(area) + 0.05:
             r.warn("saliency concentrates on the digit no more than a random map would "
                    "(expected to be noisy: a result to explain, not a bug)")
@@ -1162,6 +1165,42 @@ def check_14(ctx):
                 + ("" if int(p) == c else "  (WRONG: a ~3% event at 97% accuracy; the explanation "
                    "will be about the predicted class)"))
         r.values["samples"] = samples
+
+
+# ----------------------------------------------------------------------------------------
+# CHECK 15 - seed-to-seed stability of LIME and SHAP
+# ----------------------------------------------------------------------------------------
+def check_15(ctx):
+    """How much do two runs of the SAME explainer, differing only in the seed, agree inside the digit?
+    It is the ceiling of any agreement with another technique (Spearman within the mask)."""
+    with ctx.rec.check(15) as r:
+        from scipy.stats import spearmanr
+        cfg, dev, S = ctx.cfg, ctx.device, ctx.cfg.DENSENET_SIZE
+        model, x, pred, x28 = sample_inputs(ctx)
+        bg = get_background(ctx)
+        other = lambda c: dataclasses.replace(c, SEED=c.SEED + 1)
+        cfg100 = dataclasses.replace(cfg, SHAP_NUM_SAMPLES=100)
+        runs = {
+            f"lime ({cfg.LIME_NUM_SAMPLES} samples)": (cfg, lambda i, c: explain_lime_pkg(model, x[i:i + 1], pred[i], c, dev)),
+            f"shap ({cfg.SHAP_NUM_SAMPLES} samples)": (cfg, lambda i, c: explain_shap_pkg(model, x[i:i + 1], pred[i], bg, c)),
+            "shap (100 samples)": (cfg100, lambda i, c: explain_shap_pkg(model, x[i:i + 1], pred[i], bg, c)),
+        }
+        r.values["stability"] = {}
+        for name, (c, fn) in runs.items():
+            rhos = []
+            for i in range(len(x)):
+                mask = digit_mask(x28[i, 0].numpy(), cfg.MASK_THRESHOLD, cfg.MASK_DILATION)
+                a = to_grid28(np.abs(fn(i, c)), S)[mask]
+                b = to_grid28(np.abs(fn(i, other(c))), S)[mask]
+                rhos.append(float(spearmanr(a, b)[0]))
+            mean = float(np.nanmean(rhos))
+            r.values["stability"][name] = {"rho_per_image": rhos, "rho_mean": mean}
+            (r.ok if mean >= THRESHOLDS["stability_min_rho"] else r.warn)(
+                f"{name}: seed-to-seed Spearman inside the digit mask {mean:.2f} "
+                f"(per image: {', '.join(f'{v:.2f}' for v in rhos)})"
+                + ("" if mean >= THRESHOLDS["stability_min_rho"]
+                   else f"  -> below {THRESHOLDS['stability_min_rho']}: agreement with other techniques is capped"))
+        r.info("Grad-CAM, IG, Occlusion and Saliency are deterministic: no seed-to-seed variation to measure")
 
 
 # ----------------------------------------------------------------------------------------
@@ -1483,7 +1522,15 @@ def check_10(ctx):
             row("OCCLUSION_WINDOW/STRIDE", f"{cfg.OCCLUSION_WINDOW}/{cfg.OCCLUSION_STRIDE}",
                 f"{cfg.OCCLUSION_WINDOW}/{cfg.OCCLUSION_STRIDE}",
                 f"check 11: {c11.get('forward_images')} forwards, overlap {c11.get('overlap_mode')}", auto)
-        row("SHAP_NUM_SAMPLES", cfg.SHAP_NUM_SAMPLES, cfg.SHAP_NUM_SAMPLES, "check 3 timing", auto)
+        st = rec.values(15).get("stability", {})
+        s200 = st.get(f"shap ({cfg.SHAP_NUM_SAMPLES} samples)", {}).get("rho_mean")
+        s100 = st.get("shap (100 samples)", {}).get("rho_mean")
+        if s200 is not None and s100 is not None:
+            row("SHAP_NUM_SAMPLES", cfg.SHAP_NUM_SAMPLES, cfg.SHAP_NUM_SAMPLES,
+                f"check 15: seed-to-seed rho {s200:.2f} at {cfg.SHAP_NUM_SAMPLES} vs {s100:.2f} at 100 samples; "
+                "time/image roughly halves at 100", manual)
+        else:
+            row("SHAP_NUM_SAMPLES", cfg.SHAP_NUM_SAMPLES, cfg.SHAP_NUM_SAMPLES, "check 3 timing", auto)
         row("SHAP_NUM_BACKGROUND", cfg.SHAP_NUM_BACKGROUND, cfg.SHAP_NUM_BACKGROUND, "check 3 timing", auto)
         row("LIME_NUM_SAMPLES", cfg.LIME_NUM_SAMPLES, cfg.LIME_NUM_SAMPLES, "check 3 timing", auto)
         row("LIME_GRID_CELLS", cfg.LIME_GRID_CELLS, cfg.LIME_GRID_CELLS, "check 7 (visual)", manual)
@@ -1520,7 +1567,7 @@ def check_10(ctx):
 
 
 CHECKS = {1: check_1, 2: check_2, 3: check_3, 4: check_4, 5: check_5, 6: check_6, 7: check_7,
-          8: check_8, 9: check_9, 10: check_10, 11: check_11, 12: check_12, 13: check_13, 14: check_14}
+          8: check_8, 9: check_9, 10: check_10, 11: check_11, 12: check_12, 13: check_13, 14: check_14, 15: check_15}
 
 
 # ----------------------------------------------------------------------------------------
