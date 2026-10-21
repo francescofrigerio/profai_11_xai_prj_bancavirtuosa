@@ -1,0 +1,107 @@
+PROMPT: avrei deciso se sei d'accordo di usare le librerie standard 
+e più affidabili lime e shap . Solo Per queste due tecniche non userò quindi captum.
+
+Allego nuova maps generata.
+
+COMANDO : 
+# avoid cloning inside an already-cloned folder
+%cd /content
+!git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
+
+# wherever config.py and this file live
+%cd profai_11_xai_prj_bancavirtuosa/1_design/fase_0
+
+!pip -q install captum lime shap scikit-image
+print("START STEP checks 2,3,4,13,14")
+%run phase0_checks.py --checks 2,3,4,13,14
+print("END STEP checks 2,3,4,13,14")
+
+OUTPUT(notare START/END STEP checks 2,3,4,13,14):
+ /content
+Cloning into 'profai_11_xai_prj_bancavirtuosa'...
+remote: Enumerating objects: 144, done.
+remote: Counting objects: 100% (144/144), done.
+remote: Compressing objects: 100% (99/99), done.
+remote: Total 144 (delta 53), reused 110 (delta 30), pack-reused 0 (from 0)
+Receiving objects: 100% (144/144), 1.08 MiB | 3.57 MiB/s, done.
+Resolving deltas: 100% (53/53), done.
+/content/profai_11_xai_prj_bancavirtuosa/1_design/fase_0
+     ??????????????????????????????????????? 275.7/275.7 kB 9.0 MB/s eta 0:00:00
+  Preparing metadata (setup.py) ... done
+   ???????????????????????????????????????? 455.2/455.2 kB 20.9 MB/s eta 0:00:00
+  Building wheel for lime (setup.py) ... done
+START STEP checks 2,3,4,13,14
+
+=== CHECK 2: In-place ReLU patch and Grad-CAM ====================
+Downloading: "https://download.pytorch.org/models/densenet121-a639ec97.pth" to /root/.cache/torch/hub/checkpoints/densenet121-a639ec97.pth
+100%|¦¦¦¦¦¦¦¦¦¦| 30.8M/30.8M [00:00<00:00, 195MB/s]
+  [INFO] in-place ReLU modules in torchvision DenseNet121: 120 (plus the functional F.relu(inplace=True) in forward)
+  [INFO] FLAG_RELU_INPLACE=True: the models of the other checks use torchvision's in-place ReLUs
+  [PASS] patch removes every in-place ReLU and leaves logits unchanged (max diff 0.00e+00)
+  [PASS] gradcam on norm5 (signed): in-place model gives the same map (relative diff 0.0e+00)
+  [PASS] integrated gradients: in-place model gives the same map (relative diff 8.5e-07)
+  [PASS] saliency: in-place model gives the same map (relative diff 3.5e-07)
+/usr/local/lib/python3.13/dist-packages/captum/attr/_core/saliency.py:129: UserWarning: Input Tensor 0 did not already require gradients, required_grads has been set automatically.
+  gradient_mask = apply_gradient_requirements(inputs_tuple)
+  [PASS] gradient shap (captum): in-place model gives the same map (relative diff 1.5e-07)
+  [PASS] gradient shap (shap): in-place model gives the same map (relative diff 7.8e-08)
+  [PASS] Grad-CAM on features.norm5: shape (1, 1, 4, 4) (expected (1,1,4,4)), finite, non-negative: True; 34 ms
+  [PASS] Grad-CAM on features.denseblock3: shape (1, 1, 8, 8) (expected (1,1,8,8)), finite, non-negative: True; 39 ms
+  -> check 2 status: PASS (14.4s)
+
+=== CHECK 14: Checkpoint round trip ====================
+100%|¦¦¦¦¦¦¦¦¦¦| 9.91M/9.91M [00:00<00:00, 20.8MB/s]
+100%|¦¦¦¦¦¦¦¦¦¦| 28.9k/28.9k [00:00<00:00, 509kB/s]
+100%|¦¦¦¦¦¦¦¦¦¦| 1.65M/1.65M [00:00<00:00, 4.61MB/s]
+100%|¦¦¦¦¦¦¦¦¦¦| 4.54k/4.54k [00:00<00:00, 11.8MB/s]
+  NOTE: no phase-0 checkpoint found (run check 6 first): random head, attribution maps are not meaningful.
+  [WARN] no phase-0 checkpoint found: run check 6 first
+  -> check 14 status: WARN (3.5s)
+
+=== CHECK 3: LIME and SHAP backends ====================
+100% 1000/1000 [00:02<00:00, 350.01it/s]100% 1000/1000 [00:02<00:00, 321.67it/s]100% 1000/1000 [00:03<00:00, 324.07it/s]100% 1000/1000 [00:02<00:00, 328.19it/s]  [PASS] lime/lime: shape (128, 128), finite=True, median 3.1s/img, deterministic=True
+  [PASS] lime/captum: shape (128, 128), finite=True, median 1.5s/img, deterministic=True
+  [INFO] lime/captum: constant map (expected with a barely trained quick-run model; suspicious on the real checkpoint)
+  [PASS] shap/shap: shape (128, 128), finite=True, median 6.5s/img, deterministic=True
+  [PASS] shap/captum: shape (128, 128), finite=True, median 0.5s/img, deterministic=True
+  figure saved: outputs/phase0/phase0_03_backend_maps.png
+  [REVIEW] look at phase0_03_backend_maps.png: do the maps of both backends of each technique roughly highlight the digit? (meaningful only if check 6 ran first)
+  -> check 3 status: REVIEW (47.3s)
+
+=== CHECK 4: Integrated Gradients (completeness, black baseline) ====================
+  [PASS] baseline is black in the original image (max |denormalized| = 3.0e-08); in normalized space it is [-2.118, -2.036, -1.804], NOT zero
+  [INFO] IG_STEPS=50: worst completeness error 22.85%, 0.20s/img
+  [INFO] IG_STEPS=100: worst completeness error 14.62%, 0.32s/img
+  [INFO] IG_STEPS=200: worst completeness error 4.54%, 0.54s/img
+  [INFO] IG_STEPS=400: worst completeness error 4.42%, 1.00s/img
+  [FAIL] completeness violated at IG_STEPS=50: worst error 22.85%
+  [INFO] smallest tested IG_STEPS meeting 5%: 200
+  [PASS] attribution is exactly zero wherever the image equals the baseline (background)
+  -> check 4 status: FAIL (7.3s)
+
+=== CHECK 13: Saliency (candidate sixth technique) ====================
+/usr/local/lib/python3.13/dist-packages/captum/attr/_core/saliency.py:129: UserWarning: Input Tensor 0 did not already require gradients, required_grads has been set automatically.
+  gradient_mask = apply_gradient_requirements(inputs_tuple)
+  [PASS] saliency map: shape (S,S), finite, non-negative (abs=True), not all zero
+  [PASS] saliency is deterministic: True
+  [INFO] saliency 0.041s/img (one backward pass)
+  [INFO] share of the attribution falling inside the digit mask (a random map would give the mask area, 22.4%): saliency 22.7%, integrated gradients 100.0%
+  [WARN] saliency concentrates on the digit no more than a random map would (expected to be noisy: a result to explain, not a bug)
+  [REVIEW] saliency is the noisiest gradient technique: the 7x7 agreement matrices and the gallery would gain a column/row. Operator decision (errata E22).
+  -> check 13 status: WARN (0.6s)
+
+======================================================================
+SUMMARY
+  check  2  PASS    In-place ReLU patch and Grad-CAM  (14.43s)
+  check 14  WARN    Checkpoint round trip  (3.53s)
+  check  3  REVIEW  LIME and SHAP backends  (47.29s)
+  check  4  FAIL    Integrated Gradients (completeness, black baseline)  (7.3s)
+  check 13  WARN    Saliency (candidate sixth technique)  (0.61s)
+
+Figures to judge by eye (REVIEW): checks [3, 13]
+Results: outputs/phase0/phase0_results.json
+END STEP checks 2,3,4,13,14
+<Figure size 640x480 with 0 Axes>
+
+
+

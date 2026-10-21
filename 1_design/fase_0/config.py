@@ -11,6 +11,7 @@ Changes with respect to the design document v1 (see docs/design_errata.md):
   - FLAG_BATCHNORM_EVAL and FLAG_RELU_INPLACE added (E21).
   - SHAP_NUM_SAMPLES added: the number of gradient samples of Gradient SHAP was an
     unnamed magic number in the design (E18).
+  - LIME_BACKEND / SHAP_BACKEND removed: LIME and SHAP use the `lime` and `shap` packages (E24).
   - Validation extended to backend names, ranges and grid/window consistency (E16).
 
 Not validated here: GRADCAM_LAYER / GRADCAM_ALT_LAYER must exist in the model; that check
@@ -64,8 +65,7 @@ class ConfigConstantsDefault:
     LR_MAX_ITER: int = 1000              # check ConvergenceWarning in phase zero
 
     # --- XAI techniques
-    LIME_BACKEND: str = "lime"           # "lime" | "captum"  (provisional, phase zero)
-    SHAP_BACKEND: str = "shap"           # "shap" | "captum"  (provisional, phase zero)
+    # LIME and SHAP always use the reference packages `lime` and `shap` (E24): no backend switch.
     IG_STEPS: int = 50
     OCCLUSION_WINDOW: int = 16
     OCCLUSION_STRIDE: int = 8
@@ -108,8 +108,6 @@ class ConfigConstantsDefault:
         one_of("MODEL_MODE", ("auto", "train", "load"))
         one_of("SIGN_MODE", ("absolute", "positive"))
         one_of("MASK_MODE", ("digit", "full"))
-        one_of("LIME_BACKEND", ("lime", "captum"))
-        one_of("SHAP_BACKEND", ("shap", "captum"))
         one_of("OPTIMIZER", ("adam",))
         one_of("GRADCAM_DEBUG_EPOCHS", ("first_last",))
         one_of("LR_PENALTY", ("l1", "l2"))

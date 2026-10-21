@@ -22,6 +22,8 @@ Other options:
     --batch-size N          override CONFIG.BATCH_SIZE for check 6
     --lr-c-sweep 0.1,1.0    extra values of LR_C to evaluate in check 5
     --no-bn-comparison      skip the opposite-FLAG_BATCHNORM_EVAL variant of check 6
+    --allow-random-head     checks 3,4,13,14 normally REFUSE to run without the check-6
+                            checkpoint (it lives only in the Colab session); this overrides it
     --out-dir PATH          default: <OUTPUT_DIR>/phase0
 
 NOTHING CHANGES BY ITSELF: the script never edits config.py. It prints "proposed values"
@@ -95,7 +97,7 @@ MNIST_SIDE = CONFIG.IMAGE_SIZE
 CHECK_NAMES = {
     1: "Environment, versions, GPU, no-restart",
     2: "In-place ReLU patch and Grad-CAM",
-    3: "LIME and SHAP backends",
+    3: "LIME and SHAP reference packages",
     4: "Integrated Gradients (completeness, black baseline)",
     5: "Logistic regression (convergence, accuracy, exactness)",
     6: "Frozen DenseNet training (time, accuracy, BatchNorm)",
@@ -261,15 +263,6 @@ def worst_status(statuses) -> str:
 
 def backend_ok(entry: dict | None) -> bool:
     return bool(entry) and bool(entry.get("ok"))
-
-
-def choose_backend(check3_values: dict, technique: str, preferred: str, alternative: str):
-    """Preferred backend if it passed check 3, else the alternative, else None."""
-    table = check3_values.get("backends", {})
-    for name in (preferred, alternative):
-        if backend_ok(table.get(f"{technique}/{name}")):
-            return name
-    return None
 
 
 def estimate_run_all(t: dict, cfg, n_quant: int) -> dict:
@@ -464,9 +457,14 @@ def get_model(ctx):
     trained = ctx.ckpt_path.exists()
     if trained:
         base.load_state_dict(torch.load(ctx.ckpt_path, map_location="cpu")["state_dict"])
+    elif not ctx.quick and not ctx.args.allow_random_head:
+        raise RuntimeError(
+            f"no phase-0 checkpoint at {ctx.ckpt_path}: the explanations would be about a RANDOM head. "
+            "Run check 6 in the same session (e.g. --checks 6,14,3,4,13 --no-bn-comparison), or pass "
+            "--allow-random-head for timing-only runs. (A Colab session does not keep the checkpoint.)")
     else:
-        print("  NOTE: no phase-0 checkpoint found (run check 6 first): random head, "
-              "attribution maps are not meaningful.")
+        print("  NOTE: RANDOM head (quick or --allow-random-head): maps are not meaningful, "
+              "only shapes, finiteness and timings are valid.")
     model = wrap_for_flag(base, ctx.cfg).to(ctx.device).eval()
     for p in model.parameters():
         p.requires_grad_(False)
@@ -513,7 +511,7 @@ def explain_ig(model, x1, target, cfg, steps=None):
 
 def explain_saliency(model, x1, target):
     from captum.attr import Saliency
-    att = Saliency(model).attribute(x1, target=int(target), abs=True)
+    att = Saliency(model).attribute(x1.clone().requires_grad_(True), target=int(target), abs=True)
     return att[0].sum(0).detach().cpu().numpy()       # sum over channels, >= 0
 
 
@@ -545,18 +543,6 @@ def explain_lime_pkg(model, x1, target, cfg, device):
     return out
 
 
-def explain_lime_captum(model, x1, target, cfg, device):
-    from captum.attr import Lime
-    S = x1.shape[-1]
-    seg = torch.from_numpy(grid_segments(S, cfg.LIME_GRID_CELLS)).long().to(device)
-    mask = seg.view(1, 1, S, S).expand(1, 3, S, S).contiguous()
-    torch.manual_seed(cfg.SEED)
-    att = Lime(lambda inp: F.softmax(model(inp), dim=1)).attribute(
-        x1, baselines=black_normalized(S, device), target=int(target), feature_mask=mask,
-        n_samples=cfg.LIME_NUM_SAMPLES, perturbations_per_eval=64, show_progress=False)
-    return att[0].mean(0).detach().cpu().numpy()
-
-
 def _pick_shap_target(sv, target, num_classes):
     """shap returns a list per class (older) or an array with classes last (newer)."""
     if isinstance(sv, list):
@@ -578,18 +564,6 @@ def explain_shap_pkg(model, x1, target, background, cfg):
     torch.manual_seed(cfg.SEED)
     sv = shap.GradientExplainer(model, background).shap_values(x1, nsamples=cfg.SHAP_NUM_SAMPLES)
     return _pick_shap_target(sv, int(target), cfg.NUM_CLASSES)
-
-
-def explain_shap_captum(model, x1, target, background, cfg, chunk=50):
-    from captum.attr import GradientShap
-    gs, total, done, k = GradientShap(model), None, 0, 0
-    while done < cfg.SHAP_NUM_SAMPLES:          # chunked: bounded GPU memory
-        m = min(chunk, cfg.SHAP_NUM_SAMPLES - done)
-        set_seed(cfg.SEED + k)                      # Captum draws alphas with the NUMPY RNG too
-        a = gs.attribute(x1, baselines=background, n_samples=m, stdevs=0.0, target=int(target))
-        total = a * m if total is None else total + a * m
-        done, k = done + m, k + 1
-    return (total / cfg.SHAP_NUM_SAMPLES)[0].sum(0).detach().cpu().numpy()
 
 
 def to_grid28(map2d, size: int):
@@ -683,13 +657,6 @@ def _rel_diff(a, b) -> float:
 def _relu_probes(x, bg, cfg):
     """Technique -> function(model) -> 2D numpy map. Same seeds for both models, so any
     difference between the in-place and the patched model comes from the ReLU, not the dice."""
-    from captum.attr import GradientShap
-
-    def gradshap(m):
-        set_seed(cfg.SEED)                      # numpy + torch: Captum uses both
-        att = GradientShap(m).attribute(x, baselines=bg, n_samples=4, stdevs=0.0, target=3)
-        return att[0].sum(0).detach().cpu().numpy()
-
     def shap_pkg(m):
         import shap
         np.random.seed(cfg.SEED)
@@ -701,8 +668,7 @@ def _relu_probes(x, bg, cfg):
         "gradcam on norm5 (signed)": lambda m: explain_gradcam(m, x, 3, cfg.GRADCAM_LAYER, relu=False),
         "integrated gradients": lambda m: explain_ig(m, x, 3, cfg, steps=10)[0].sum(0).detach().cpu().numpy(),
         "saliency": lambda m: explain_saliency(m, x, 3),
-        "gradient shap (captum)": gradshap,
-        "gradient shap (shap)": shap_pkg,
+        "gradient shap (shap package)": shap_pkg,
     }
 
 
@@ -785,7 +751,7 @@ def check_2(ctx):
 
 
 # ----------------------------------------------------------------------------------------
-# CHECK 3 - LIME and SHAP backends
+# CHECK 3 - LIME and SHAP (reference packages)
 # ----------------------------------------------------------------------------------------
 def check_3(ctx):
     with ctx.rec.check(3) as r:
@@ -795,9 +761,7 @@ def check_3(ctx):
         trained = getattr(ctx.cache, "model_trained", False)
         runners = {
             "lime/lime": lambda i: explain_lime_pkg(model, x[i:i + 1], pred[i], cfg, dev),
-            "lime/captum": lambda i: explain_lime_captum(model, x[i:i + 1], pred[i], cfg, dev),
             "shap/shap": lambda i: explain_shap_pkg(model, x[i:i + 1], pred[i], bg, cfg),
-            "shap/captum": lambda i: explain_shap_captum(model, x[i:i + 1], pred[i], bg, cfg),
         }
         r.values["backends"], first_maps = {}, {}
         for key, fn in runners.items():
@@ -854,6 +818,8 @@ def check_3(ctx):
                 ax.set_title(k)
             for ax in axes:
                 ax.axis("off")
+            if not trained:
+                fig.suptitle("RANDOM HEAD - maps are not meaningful", color="red")
             save_fig(fig, ctx.out_dir / "phase0_03_backend_maps.png")
             r.review("look at phase0_03_backend_maps.png: do the maps of both backends of each "
                      "technique roughly highlight the digit? (meaningful only if check 6 ran first)")
@@ -1391,8 +1357,9 @@ def check_12(ctx):
 def collect_timings(ctx):
     rec, cfg = ctx.rec, ctx.cfg
     c3 = rec.values(3)
-    lime_b = choose_backend(c3, "lime", cfg.LIME_BACKEND, "captum" if cfg.LIME_BACKEND == "lime" else "lime")
-    shap_b = choose_backend(c3, "shap", cfg.SHAP_BACKEND, "captum" if cfg.SHAP_BACKEND == "shap" else "shap")
+    table = c3.get("backends", {})
+    lime_b = "lime" if backend_ok(table.get("lime/lime")) else None
+    shap_b = "shap" if backend_ok(table.get("shap/shap")) else None
     missing = []
 
     def get(value, label):
@@ -1460,10 +1427,10 @@ def check_10(ctx):
                          "basis": basis, "confirmation": confirmation})
 
         auto, manual = "criterion met (automatic)", "operator confirmation required"
-        row("LIME_BACKEND", cfg.LIME_BACKEND, lime_b or "NONE WORKS",
-            "check 3", auto if lime_b else "FAIL: no LIME backend works")
-        row("SHAP_BACKEND", cfg.SHAP_BACKEND, shap_b or "NONE WORKS",
-            "check 3", auto if shap_b else "FAIL: no SHAP backend works")
+        row("LIME library (E24)", "lime", "lime" if lime_b else "NOT WORKING", "check 3",
+            auto if lime_b else "FAIL: lime does not pass check 3")
+        row("SHAP library (E24)", "shap", "shap" if shap_b else "NOT WORKING", "check 3",
+            auto if shap_b else "FAIL: shap does not pass check 3")
         row("N_QUANT", cfg.N_QUANT, n_quant, "check 9 (time budget)",
             auto if n_quant else "run checks 3,4,2,11,5,6 first")
         if c6:
@@ -1535,8 +1502,8 @@ def check_10(ctx):
             "# Phase 0 - table of fixed values\n\n" + table + "\n")
         print("\n" + table)
         changed = {x["parameter"]: x["proposed"] for x in rows
-                   if x["parameter"] in ("LIME_BACKEND", "SHAP_BACKEND", "N_QUANT")
-                   and x["proposed"] not in (x["initial"], "NONE WORKS", None)}
+                   if x["parameter"] in ("N_QUANT", "IG_STEPS", "SHAP_NUM_SAMPLES")
+                   and x["proposed"] not in (x["initial"], "NOT WORKING", None)}
         r.values["proposed_config_overrides"] = changed
         if changed:
             r.info("proposed edits to config.py (NOT applied automatically): " + json.dumps(changed))
@@ -1545,7 +1512,7 @@ def check_10(ctx):
         if missing:
             r.warn("table incomplete, missing measurements from: " + ", ".join(missing))
         if not (lime_b and shap_b):
-            r.fail("a technique has no working backend: see check 3")
+            r.fail("LIME or SHAP does not pass check 3 (or check 3 was not run on the trained head)")
         if ctx.quick:
             r.warn("quick run: the table is NOT valid for decisions")
         pending = sum(1 for x in rows if x["confirmation"] == manual)
@@ -1567,6 +1534,8 @@ def parse_args(argv=None):
     p.add_argument("--batch-size", type=int, default=0)
     p.add_argument("--lr-c-sweep", type=lambda s: [float(v) for v in s.split(",") if v], default=[])
     p.add_argument("--no-bn-comparison", action="store_true")
+    p.add_argument("--allow-random-head", action="store_true",
+                   help="let checks 3,4,13,14 run without the check-6 checkpoint (timing only)")
     p.add_argument("--out-dir", type=str, default="")
     args, _ = p.parse_known_args(argv)               # tolerant: works under %run and in notebooks
     return args

@@ -1,0 +1,48 @@
+
+
+
+Applico la decisione lime + shap (sono d’accordo) e chiudo la trappola del “modello a testa casuale”, che stavolta ha prodotto sia la figura sbagliata sia i numeri di check 3, 4 e 13.
+
+
+
+Sono d’accordo con lime e shap per queste due tecniche. Devo però ritirare una parte di quello che ti ho detto sulla figura 03: la testa del modello era casuale, non addestrata.
+
+La figura 03 veniva da un modello non addestrato
+
+Ho confrontato la nuova figura con la precedente: le due sono identiche pixel per pixel nei quattro pannelli delle mappe, cambia solo il titolo. Nel tuo console, check 14 dice che nella sessione non c’era nessun checkpoint. Il checkpoint di fase zero vive solo nella sessione Colab (non è in git), quindi un runtime nuovo costruisce una testa casuale e lo segnala con una sola riga. Lo stesso vale per la figura che avevo commentato la volta scorsa.
+
+Di conseguenza ritiro queste osservazioni, che erano infondate:
+
+la mappa vuota di lime/captum (con una testa casuale le probabilità sono quasi uniformi, quindi il Lasso azzera tutto);
+il “7 classificato 8”;
+l’ipotesi che qualcosa non andasse nel caricamento del checkpoint.
+
+La stessa causa invalida i numeri di check 4 e 13 di questo giro:
+
+IG: gli errori di completezza (22,9% a 50 passi, 4,5% a 200, 4,4% a 400) non permettono di scegliere IG_STEPS. Il plateau a ~4,4% con una testa casuale è plausibilmente rumore numerico, perché le differenze di logit sono minime.
+Saliency: il 22,7% dell’attribuzione sulla cifra contro il 22,4% di area dice solo che la testa è casuale. Inoltre il 100% di IG è vero per costruzione, perché IG è zero dove l’immagine coincide con la base nera: il confronto non è equo.
+
+Per evitare che succeda di nuovo, i check 3, 4, 13 e 14 ora si rifiutano di girare senza il checkpoint (a meno di --allow-random-head), con un errore che dice cosa fare. La figura del check 3 riporta “RANDOM HEAD” in rosso se il modello non è addestrato.
+
+La decisione su lime e shap
+Applicata: via LIME_BACKEND e SHAP_BACKEND dalla config e via i test relativi. Nel piano di tappa 2 spariscono lime_captum.py e shap_captum.py, e i casi del contratto passano da 7 a 6 implementazioni (con Saliency). È registrata come E24.
+Perché sono d’accordo: sono le librerie di riferimento. Nel check 3 entrambe funzionano, sono deterministiche e rientrano nei tempi (lime 3,1 s, shap 6,5 s per immagine). Per un pubblico non tecnico poter dire “usiamo LIME e SHAP originali” è un vantaggio.
+Il prezzo: shap pesa 6,5 s su ~10,6 s per immagine. La stima di “Esegui tutto” resta intorno a 27 minuti in load (limite 30), quindi il margine è sottile. Se serve tempo, la leva giusta è SHAP_NUM_SAMPLES (ad esempio 100) o N_QUANT, non il backend. Lo decidiamo quando avremo i numeri veri.
+Cosa è valido di questo giro
+Check 2: PASS. Grad-CAM, IG, Saliency, Gradient SHAP di Captum e shap danno la stessa mappa con ReLU in-place e con ReLU patchate (differenza = 1e-6). Il confronto usa gli stessi pesi nei due casi, quindi non dipende dall’addestramento. FLAG_RELU_INPLACE=True è verificato (E21 chiusa). Il FAIL precedente era il seed NumPy di Captum.
+Check 3: shap/captum ora è deterministico, conferma della causa del seed.
+Cosa fare ora
+
+In una sola sessione Colab:
+
+%cd /content
+!git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
+%cd profai_11_xai_prj_bancavirtuosa/1_design/fase_0
+!pip -q install captum lime shap scikit-image
+%run phase0_checks.py --checks 6,14,3,4,13 --no-bn-comparison
+
+Dura circa 8–9 minuti (il training da 5 epoche pesa 6 minuti). L’ordine fa sì che il training salvi il checkpoint e che 14, 3, 4 e 13 lo usino subito. Il check 14 deve riprodurre l’accuracy di validation del training (0,9700 con tolleranza 0,001): se non coincide, il problema è nello script. Prima del git clone ricordati di aggiornare il repository con i quattro file qui sopra.
+
+Mi servono: l’output della console, la nuova phase0_03_backend_maps.png (stavolta con il modello addestrato; se il titolo ha “RANDOM HEAD” il run non è valido) e phase0_results.json.
+
+Da quell’output decido con te IG_STEPS (probabilmente 200, ma da confermare) e come leggere Saliency rispetto alle altre tecniche. Restano le tue tre conferme visive su griglia LIME 8, maschera 0,1/1 e regola di ricampionamento: le mie raccomandazioni sono nell’errata, in attesa del tuo ok.

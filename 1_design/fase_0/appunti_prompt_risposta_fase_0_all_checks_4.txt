@@ -1,6 +1,0 @@
-PROMPT: avrei deciso se sei d'accordo di usare le librerie standard 
-e più affidabili lime e shap . Solo Per queste due tecniche non userò quindi captum.
-
-
-OUTPUT DEL COMANDO : %run phase0_checks.py --checks 2,3,4,13,14
-

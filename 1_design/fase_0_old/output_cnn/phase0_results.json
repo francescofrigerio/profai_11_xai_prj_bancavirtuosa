@@ -1,0 +1,378 @@
+{
+  "quick_run": false,
+  "checks": {
+    "2": {
+      "name": "In-place ReLU patch and Grad-CAM",
+      "status": "PASS",
+      "seconds": 14.43,
+      "lines": [
+        [
+          "INFO",
+          "in-place ReLU modules in torchvision DenseNet121: 120 (plus the functional F.relu(inplace=True) in forward)"
+        ],
+        [
+          "INFO",
+          "FLAG_RELU_INPLACE=True: the models of the other checks use torchvision's in-place ReLUs"
+        ],
+        [
+          "PASS",
+          "patch removes every in-place ReLU and leaves logits unchanged (max diff 0.00e+00)"
+        ],
+        [
+          "PASS",
+          "gradcam on norm5 (signed): in-place model gives the same map (relative diff 0.0e+00)"
+        ],
+        [
+          "PASS",
+          "integrated gradients: in-place model gives the same map (relative diff 8.5e-07)"
+        ],
+        [
+          "PASS",
+          "saliency: in-place model gives the same map (relative diff 3.5e-07)"
+        ],
+        [
+          "PASS",
+          "gradient shap (captum): in-place model gives the same map (relative diff 1.5e-07)"
+        ],
+        [
+          "PASS",
+          "gradient shap (shap): in-place model gives the same map (relative diff 7.8e-08)"
+        ],
+        [
+          "PASS",
+          "Grad-CAM on features.norm5: shape (1, 1, 4, 4) (expected (1,1,4,4)), finite, non-negative: True; 34 ms"
+        ],
+        [
+          "PASS",
+          "Grad-CAM on features.denseblock3: shape (1, 1, 8, 8) (expected (1,1,8,8)), finite, non-negative: True; 39 ms"
+        ]
+      ],
+      "values": {
+        "inplace_relu_modules": 120,
+        "inplace_relu_after_patch": 0,
+        "logits_max_diff": 0.0,
+        "relu_probes": {
+          "gradcam on norm5 (signed)": {
+            "rel_diff_vs_patched": 0.0
+          },
+          "integrated gradients": {
+            "rel_diff_vs_patched": 8.494470288608123e-07
+          },
+          "saliency": {
+            "rel_diff_vs_patched": 3.4613792713744714e-07
+          },
+          "gradient shap (captum)": {
+            "rel_diff_vs_patched": 1.473176584889407e-07
+          },
+          "gradient shap (shap)": {
+            "rel_diff_vs_patched": 7.845652982306338e-08
+          }
+        },
+        "inplace_safe_for_all": true,
+        "gradcam_seconds_features.norm5": 0.033631960999997546,
+        "gradcam_seconds_features.denseblock3": 0.03894598999997356,
+        "gradcam_seconds": 0.033631960999997546
+      },
+      "traceback": ""
+    },
+    "14": {
+      "name": "Checkpoint round trip",
+      "status": "WARN",
+      "seconds": 3.53,
+      "lines": [
+        [
+          "WARN",
+          "no phase-0 checkpoint found: run check 6 first"
+        ]
+      ],
+      "values": {},
+      "traceback": ""
+    },
+    "3": {
+      "name": "LIME and SHAP backends",
+      "status": "REVIEW",
+      "seconds": 47.29,
+      "lines": [
+        [
+          "PASS",
+          "lime/lime: shape (128, 128), finite=True, median 3.1s/img, deterministic=True"
+        ],
+        [
+          "PASS",
+          "lime/captum: shape (128, 128), finite=True, median 1.5s/img, deterministic=True"
+        ],
+        [
+          "INFO",
+          "lime/captum: constant map (expected with a barely trained quick-run model; suspicious on the real checkpoint)"
+        ],
+        [
+          "PASS",
+          "shap/shap: shape (128, 128), finite=True, median 6.5s/img, deterministic=True"
+        ],
+        [
+          "PASS",
+          "shap/captum: shape (128, 128), finite=True, median 0.5s/img, deterministic=True"
+        ],
+        [
+          "REVIEW",
+          "look at phase0_03_backend_maps.png: do the maps of both backends of each technique roughly highlight the digit? (meaningful only if check 6 ran first)"
+        ]
+      ],
+      "values": {
+        "backends": {
+          "lime/lime": {
+            "ok": true,
+            "shape": [
+              128,
+              128
+            ],
+            "finite": true,
+            "seconds_median": 3.1133985489999816,
+            "deterministic": true,
+            "repeat_max_rel_diff": 0.0,
+            "constant_map": false,
+            "empty_maps": 0
+          },
+          "lime/captum": {
+            "ok": true,
+            "shape": [
+              128,
+              128
+            ],
+            "finite": true,
+            "seconds_median": 1.5096084939999912,
+            "deterministic": true,
+            "repeat_max_rel_diff": 0.0,
+            "constant_map": true,
+            "empty_maps": 3
+          },
+          "shap/shap": {
+            "ok": true,
+            "shape": [
+              128,
+              128
+            ],
+            "finite": true,
+            "seconds_median": 6.5287422290000166,
+            "deterministic": true,
+            "repeat_max_rel_diff": 7.782938459358316e-07,
+            "constant_map": false,
+            "empty_maps": 0
+          },
+          "shap/captum": {
+            "ok": true,
+            "shape": [
+              128,
+              128
+            ],
+            "finite": true,
+            "seconds_median": 0.46659087599999793,
+            "deterministic": true,
+            "repeat_max_rel_diff": 7.822192185004232e-07,
+            "constant_map": false,
+            "empty_maps": 0
+          }
+        }
+      },
+      "traceback": ""
+    },
+    "4": {
+      "name": "Integrated Gradients (completeness, black baseline)",
+      "status": "FAIL",
+      "seconds": 7.3,
+      "lines": [
+        [
+          "PASS",
+          "baseline is black in the original image (max |denormalized| = 3.0e-08); in normalized space it is [-2.118, -2.036, -1.804], NOT zero"
+        ],
+        [
+          "INFO",
+          "IG_STEPS=50: worst completeness error 22.85%, 0.20s/img"
+        ],
+        [
+          "INFO",
+          "IG_STEPS=100: worst completeness error 14.62%, 0.32s/img"
+        ],
+        [
+          "INFO",
+          "IG_STEPS=200: worst completeness error 4.54%, 0.54s/img"
+        ],
+        [
+          "INFO",
+          "IG_STEPS=400: worst completeness error 4.42%, 1.00s/img"
+        ],
+        [
+          "FAIL",
+          "completeness violated at IG_STEPS=50: worst error 22.85%"
+        ],
+        [
+          "INFO",
+          "smallest tested IG_STEPS meeting 5%: 200"
+        ],
+        [
+          "PASS",
+          "attribution is exactly zero wherever the image equals the baseline (background)"
+        ]
+      ],
+      "values": {
+        "normalized_black_per_channel": [
+          -2.1179039478302,
+          -2.0357141494750977,
+          -1.804444432258606
+        ],
+        "ig_sweep": {
+          "50": {
+            "worst_rel_error": 0.22852705546840904,
+            "per_image_rel_error": [
+              0.22852705546840904,
+              0.02644117482213784,
+              0.10813658877956481
+            ],
+            "seconds_median": 0.20001234299999737,
+            "zero_on_background": true
+          },
+          "100": {
+            "worst_rel_error": 0.14616981306507856,
+            "per_image_rel_error": [
+              0.048138162247771774,
+              0.005118642631451411,
+              0.14616981306507856
+            ],
+            "seconds_median": 0.3194493780000016,
+            "zero_on_background": true
+          },
+          "200": {
+            "worst_rel_error": 0.045435340410467304,
+            "per_image_rel_error": [
+              0.045435340410467304,
+              0.01286301383912805,
+              0.02498410394269689
+            ],
+            "seconds_median": 0.5357072399999936,
+            "zero_on_background": true
+          },
+          "400": {
+            "worst_rel_error": 0.04422302354876852,
+            "per_image_rel_error": [
+              0.029667822190278192,
+              0.010641841194651076,
+              0.04422302354876852
+            ],
+            "seconds_median": 0.9991339260000132,
+            "zero_on_background": true
+          }
+        },
+        "ig_rel_error": [
+          0.22852705546840904
+        ],
+        "ig_seconds_per_image": 0.20001234299999737,
+        "ig_steps_proposed": 200
+      },
+      "traceback": ""
+    },
+    "13": {
+      "name": "Saliency (candidate sixth technique)",
+      "status": "WARN",
+      "seconds": 0.61,
+      "lines": [
+        [
+          "PASS",
+          "saliency map: shape (S,S), finite, non-negative (abs=True), not all zero"
+        ],
+        [
+          "PASS",
+          "saliency is deterministic: True"
+        ],
+        [
+          "INFO",
+          "saliency 0.041s/img (one backward pass)"
+        ],
+        [
+          "INFO",
+          "share of the attribution falling inside the digit mask (a random map would give the mask area, 22.4%): saliency 22.7%, integrated gradients 100.0%"
+        ],
+        [
+          "WARN",
+          "saliency concentrates on the digit no more than a random map would (expected to be noisy: a result to explain, not a bug)"
+        ],
+        [
+          "REVIEW",
+          "saliency is the noisiest gradient technique: the 7x7 agreement matrices and the gallery would gain a column/row. Operator decision (errata E22)."
+        ]
+      ],
+      "values": {
+        "saliency_seconds_per_image": 0.04108891500001732,
+        "mass_in_mask_saliency": [
+          0.24912196397781372,
+          0.22998785972595215,
+          0.2022518515586853
+        ],
+        "mass_in_mask_ig": [
+          0.9998247027397156,
+          0.999119222164154,
+          0.9995650053024292
+        ],
+        "mask_area_fraction": [
+          0.2538265306122449,
+          0.26785714285714285,
+          0.14923469387755103
+        ]
+      },
+      "traceback": ""
+    }
+  },
+  "decisions": {},
+  "meta": {
+    "config": {
+      "SEED": 42,
+      "DEVICE": "auto",
+      "IMAGE_SIZE": 28,
+      "DENSENET_SIZE": 128,
+      "NUM_CLASSES": 10,
+      "VAL_SIZE": 6000,
+      "NUM_DEBUG_IMAGES": 10,
+      "BACKBONE_WEIGHTS": "IMAGENET1K_V1",
+      "FREEZE_BACKBONE": true,
+      "MIN_VAL_ACCURACY": 0.95,
+      "NUM_EPOCHS": 5,
+      "BATCH_SIZE": 64,
+      "OPTIMIZER": "adam",
+      "LEARNING_RATE_HEAD": 0.001,
+      "LEARNING_RATE_FULL": 5e-05,
+      "MODEL_MODE": "auto",
+      "CHECKPOINT_PATH": "checkpoints/densenet121_mnist.pt",
+      "FLAG_BATCHNORM_EVAL": true,
+      "FLAG_RELU_INPLACE": true,
+      "GRADCAM_LAYER": "features.norm5",
+      "GRADCAM_ALT_LAYER": "features.denseblock3",
+      "GRADCAM_DEBUG_EPOCHS": "first_last",
+      "LR_PENALTY": "l2",
+      "LR_SOLVER": "lbfgs",
+      "LR_C": 1.0,
+      "LR_MAX_ITER": 1000,
+      "LIME_BACKEND": "lime",
+      "SHAP_BACKEND": "shap",
+      "IG_STEPS": 50,
+      "OCCLUSION_WINDOW": 16,
+      "OCCLUSION_STRIDE": 8,
+      "LIME_NUM_SAMPLES": 1000,
+      "LIME_GRID_CELLS": 8,
+      "SHAP_NUM_BACKGROUND": 50,
+      "SHAP_NUM_SAMPLES": 200,
+      "GALLERY_SIZE": 24,
+      "N_QUANT": 100,
+      "COMPUTE_AGREEMENT": true,
+      "SIGN_MODE": "absolute",
+      "MASK_MODE": "digit",
+      "MASK_THRESHOLD": 0.1,
+      "MASK_DILATION": 1,
+      "TOPK_FRACTION": 0.2,
+      "COMPUTE_FAITHFULNESS": false,
+      "DELETION_STEPS": 10,
+      "RUN_TESTS": false,
+      "OUTPUT_DIR": "outputs"
+    },
+    "quick": false,
+    "started": "2026-10-20 09:42:19"
+  }
+}

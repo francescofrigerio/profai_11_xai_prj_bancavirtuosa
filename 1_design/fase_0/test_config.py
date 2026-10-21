@@ -10,9 +10,6 @@ from config import CONFIG, ConfigConstantsDefault  # noqa: E402
 
 
 def test_defaults_are_valid_and_frozen():
-    """
-         Min Accuracy Test Value
-    """
     assert CONFIG.MIN_VAL_ACCURACY == 0.95
     with pytest.raises(dataclasses.FrozenInstanceError):
         CONFIG.SEED = 1  # type: ignore[misc]
@@ -29,10 +26,12 @@ def test_early_stopping_is_gone_and_flags_exist():
     assert CONFIG.FLAG_BATCHNORM_EVAL is True and CONFIG.FLAG_RELU_INPLACE is True
 
 
+def test_no_alternative_lime_shap_backends():
+    names = {f.name for f in dataclasses.fields(ConfigConstantsDefault)}
+    assert "LIME_BACKEND" not in names and "SHAP_BACKEND" not in names
+
+
 def test_mnist_side_and_densenet_side_are_separate():
-    """
-         Mnist Size and DenseNet Size Test Value
-    """
     assert (CONFIG.IMAGE_SIZE, CONFIG.DENSENET_SIZE) == (28, 128)
 
 
@@ -57,8 +56,6 @@ def test_replace_overrides_and_revalidates():
     {"MODEL_MODE": "maybe"},
     {"SIGN_MODE": "negative"},
     {"MASK_MODE": "half"},
-    {"LIME_BACKEND": "other"},
-    {"SHAP_BACKEND": "other"},
     {"OPTIMIZER": "sgd"},
     {"DEVICE": "tpu"},
     {"TOPK_FRACTION": 0.0},

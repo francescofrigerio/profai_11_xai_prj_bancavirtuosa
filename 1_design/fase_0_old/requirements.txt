@@ -1,0 +1,14 @@
+# PROVISIONAL (stage 0). torch and torchvision are deliberately absent: Colab provides them.
+# Phase-0 check 1 writes outputs/phase0/requirements_candidate.txt with the versions measured
+# on Colab; at the end of stage 0 these lines are replaced by exact pins (==).
+captum
+lime
+shap
+scikit-learn
+scikit-image
+scipy
+numpy
+matplotlib
+pandas
+seaborn
+pytest
