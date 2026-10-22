@@ -35,9 +35,9 @@ Il file dei risultati di questa sessione contiene solo 5 check. Quelli delle ses
 !git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
 %cd profai_11_xai_prj_bancavirtuosa/1_design/fase_0
 !pip -q install captum lime shap scikit-image
-print("START FULL RUN")
+print("START FULL FINAL RUN")
 %run phase0_checks.py
-print("END FULL RUN")
+print("END FULL FINAL RUN")
 
 Prima aggiorna il repository con i tre file qui sopra (phase0_checks.py, config.py, design_errata.md).
 
@@ -46,3 +46,6 @@ Appena torno con l’output, phase0_results.json, phase0_summary.md e le figure (3
 la tabella dei valori fissati, con le tue conferme;
 SHAP_NUM_SAMPLES sulla base del check 15;
 la stima dei tempi con IG_STEPS=200 (ora ~28 minuti in load, 33 in train, sotto i limiti di 30 e 45 ma con poco margine in load).
+
+
+

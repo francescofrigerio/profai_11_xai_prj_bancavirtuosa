@@ -1,10 +1,197 @@
 {
   "quick_run": false,
   "checks": {
+    "1": {
+      "name": "Environment, versions, GPU, no-restart",
+      "status": "PASS",
+      "seconds": 8.2,
+      "lines": [
+        [
+          "PASS",
+          "all required libraries import: torch=2.11.0+cu130, torchvision=0.26.0+cu130, numpy=2.1.3, scipy=1.16.3, scikit-learn=1.6.1, captum=0.9.0, lime=0.2.0.1, shap=0.54.1, scikit-image=0.25.2, matplotlib=3.10.0, pandas=2.2.3, seaborn=0.13.2"
+        ],
+        [
+          "PASS",
+          "no package changed after being loaded (no restart needed)"
+        ],
+        [
+          "PASS",
+          "torch <-> numpy round trip works (ABI compatible)"
+        ],
+        [
+          "PASS",
+          "GPU available: Tesla T4"
+        ],
+        [
+          "INFO",
+          "candidate pins written to outputs/phase0/requirements_candidate.txt"
+        ]
+      ],
+      "values": {
+        "python": "3.13.15",
+        "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+        "colab": true,
+        "versions": {
+          "torch": "2.11.0+cu130",
+          "torchvision": "0.26.0+cu130",
+          "numpy": "2.1.3",
+          "scipy": "1.16.3",
+          "scikit-learn": "1.6.1",
+          "captum": "0.9.0",
+          "lime": "0.2.0.1",
+          "shap": "0.54.1",
+          "scikit-image": "0.25.2",
+          "matplotlib": "3.10.0",
+          "pandas": "2.2.3",
+          "seaborn": "0.13.2"
+        },
+        "cuda": true,
+        "gpu": "Tesla T4"
+      },
+      "traceback": ""
+    },
+    "2": {
+      "name": "In-place ReLU patch and Grad-CAM",
+      "status": "PASS",
+      "seconds": 5.21,
+      "lines": [
+        [
+          "INFO",
+          "in-place ReLU modules in torchvision DenseNet121: 120 (plus the functional F.relu(inplace=True) in forward)"
+        ],
+        [
+          "INFO",
+          "FLAG_RELU_INPLACE=True: the models of the other checks use torchvision's in-place ReLUs"
+        ],
+        [
+          "PASS",
+          "patch removes every in-place ReLU and leaves logits unchanged (max diff 0.00e+00)"
+        ],
+        [
+          "PASS",
+          "gradcam on norm5 (signed): in-place model gives the same map (relative diff 0.0e+00)"
+        ],
+        [
+          "PASS",
+          "integrated gradients: in-place model gives the same map (relative diff 9.4e-07)"
+        ],
+        [
+          "PASS",
+          "saliency: in-place model gives the same map (relative diff 2.4e-07)"
+        ],
+        [
+          "PASS",
+          "gradient shap (shap package): in-place model gives the same map (relative diff 9.4e-08)"
+        ],
+        [
+          "PASS",
+          "Grad-CAM on features.norm5: shape (1, 1, 4, 4) (expected (1,1,4,4)), finite, non-negative: True; 21 ms"
+        ],
+        [
+          "PASS",
+          "Grad-CAM on features.denseblock3: shape (1, 1, 8, 8) (expected (1,1,8,8)), finite, non-negative: True; 25 ms"
+        ]
+      ],
+      "values": {
+        "inplace_relu_modules": 120,
+        "inplace_relu_after_patch": 0,
+        "logits_max_diff": 0.0,
+        "relu_probes": {
+          "gradcam on norm5 (signed)": {
+            "rel_diff_vs_patched": 0.0
+          },
+          "integrated gradients": {
+            "rel_diff_vs_patched": 9.438301211490905e-07
+          },
+          "saliency": {
+            "rel_diff_vs_patched": 2.379698043144012e-07
+          },
+          "gradient shap (shap package)": {
+            "rel_diff_vs_patched": 9.401169192919963e-08
+          }
+        },
+        "inplace_safe_for_all": true,
+        "gradcam_seconds_features.norm5": 0.021062432999997327,
+        "gradcam_seconds_features.denseblock3": 0.025426647999978513,
+        "gradcam_seconds": 0.021062432999997327
+      },
+      "traceback": ""
+    },
+    "5": {
+      "name": "Logistic regression (convergence, accuracy, exactness)",
+      "status": "REVIEW",
+      "seconds": 69.75,
+      "lines": [
+        [
+          "INFO",
+          "sklearn 1.6.1; LR input range [0.0, 1.0], 784 features, not standardized"
+        ],
+        [
+          "INFO",
+          "C=1.0: fit 65.3s, n_iter 248, val acc 0.9222"
+        ],
+        [
+          "PASS",
+          "C=1.0: ConvergenceWarning=False"
+        ],
+        [
+          "PASS",
+          "C=1.0: validation accuracy 0.9222 (design expects ~0.92, range 0.9-0.94)"
+        ],
+        [
+          "PASS",
+          "C=1.0: logit = sum(w*x)+b exactly (max error 0.0e+00)"
+        ],
+        [
+          "PASS",
+          "C=1.0: classes_ == 0..9 (coefficient rows aligned)"
+        ],
+        [
+          "PASS",
+          "C=1.0: per-pixel sum of coefficients over classes max 1.0e-13 (~0 with l2: relative and absolute coefficients coincide)"
+        ],
+        [
+          "INFO",
+          "C=1.0: warning raised -> DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in"
+        ],
+        [
+          "INFO",
+          "C=1.0: warning raised -> DeprecationWarning: scipy.optimize: The `disp` and `iprint` options of the L-BFGS-B solver are deprecated and will be removed in SciPy 1.18.0."
+        ],
+        [
+          "REVIEW",
+          "look at the phase0_05_lr_global_maps_*.png: are the maps readable (smooth, digit-shaped) at the configured LR_C?"
+        ]
+      ],
+      "values": {
+        "sklearn": "1.6.1",
+        "input_range": [
+          0.0,
+          1.0
+        ],
+        "runs": {
+          "1.0": {
+            "fit_seconds": 65.34871983528137,
+            "n_iter": 248,
+            "convergence_warning": false,
+            "other_warnings": [
+              "DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in",
+              "DeprecationWarning: scipy.optimize: The `disp` and `iprint` options of the L-BFGS-B solver are deprecated and will be removed in SciPy 1.18.0."
+            ],
+            "val_accuracy": 0.9221666666666667,
+            "coef_colsum_max": 1.0147438445073931e-13,
+            "decision_exact_max_err": 0.0,
+            "classes_ok": true
+          }
+        },
+        "fit_seconds": 65.34871983528137
+      },
+      "traceback": ""
+    },
     "6": {
       "name": "Frozen DenseNet training (time, accuracy, BatchNorm)",
       "status": "PASS",
-      "seconds": 348.52,
+      "seconds": 681.82,
       "lines": [
         [
           "PASS",
@@ -32,7 +219,7 @@
         ],
         [
           "INFO",
-          "time per epoch: train 60s + validation 7s (tensor preprocessing on the GPU)"
+          "time per epoch: train 59s + validation 7s (tensor preprocessing on the GPU)"
         ],
         [
           "INFO",
@@ -41,6 +228,18 @@
         [
           "INFO",
           "phase-0 head (final epoch) saved to checkpoints/phase0_densenet121_head.pt (do not commit; used by checks 3,4,11,12)"
+        ],
+        [
+          "INFO",
+          "training OPPOSITE setting for comparison: FLAG_BATCHNORM_EVAL=False"
+        ],
+        [
+          "INFO",
+          "opposite setting: final val acc 0.9493 (configured: 0.9700), BatchNorm drift 31.471"
+        ],
+        [
+          "PASS",
+          "the configured setting (FLAG_BATCHNORM_EVAL=True) is at least as accurate"
         ]
       ],
       "values": {
@@ -54,8 +253,8 @@
               "train_acc": 0.9120925925925926,
               "val_loss": 0.183898229598999,
               "val_acc": 0.9496666666666667,
-              "train_seconds": 62.364694356918335,
-              "val_seconds": 7.35327672958374
+              "train_seconds": 57.165148973464966,
+              "val_seconds": 7.155832529067993
             },
             {
               "epoch": 2,
@@ -63,8 +262,8 @@
               "train_acc": 0.9563518518518519,
               "val_loss": 0.14194804207483927,
               "val_acc": 0.9596666666666667,
-              "train_seconds": 61.258766174316406,
-              "val_seconds": 7.33486795425415
+              "train_seconds": 59.088921785354614,
+              "val_seconds": 7.100929498672485
             },
             {
               "epoch": 3,
@@ -72,8 +271,8 @@
               "train_acc": 0.9647037037037037,
               "val_loss": 0.12238062731424967,
               "val_acc": 0.9646666666666667,
-              "train_seconds": 59.4921452999115,
-              "val_seconds": 7.2553534507751465
+              "train_seconds": 58.94254994392395,
+              "val_seconds": 7.186040639877319
             },
             {
               "epoch": 4,
@@ -81,8 +280,8 @@
               "train_acc": 0.9696481481481481,
               "val_loss": 0.11825796858469645,
               "val_acc": 0.9628333333333333,
-              "train_seconds": 59.51209115982056,
-              "val_seconds": 7.232959508895874
+              "train_seconds": 59.196038484573364,
+              "val_seconds": 7.179159879684448
             },
             {
               "epoch": 5,
@@ -90,8 +289,8 @@
               "train_acc": 0.9721111111111111,
               "val_loss": 0.10458782847722371,
               "val_acc": 0.97,
-              "train_seconds": 59.73346161842346,
-              "val_seconds": 7.262200117111206
+              "train_seconds": 58.82791185379028,
+              "val_seconds": 7.186447381973267
             }
           ],
           "n_trainable": 10250,
@@ -107,17 +306,22 @@
           0.9628333333333333,
           0.97
         ],
-        "epoch_train_seconds": 59.99911606311798,
-        "epoch_val_seconds": 7.271345257759094,
-        "val_seconds_per_image": 0.001214621925354004,
-        "last_epoch_val_loss_drop": 0.11559593210568446
+        "epoch_train_seconds": 59.01385551691055,
+        "epoch_val_seconds": 7.16314435005188,
+        "val_seconds_per_image": 0.0011936136643091837,
+        "last_epoch_val_loss_drop": 0.11559593210568446,
+        "opposite_bn_setting": {
+          "flag": false,
+          "final_val_acc": 0.9493333333333334,
+          "bn_drift_final": 31.470638275146484
+        }
       },
       "traceback": ""
     },
     "14": {
       "name": "Checkpoint round trip",
       "status": "PASS",
-      "seconds": 7.7,
+      "seconds": 7.56,
       "lines": [
         [
           "PASS",
@@ -162,15 +366,15 @@
     "3": {
       "name": "LIME and SHAP reference packages",
       "status": "REVIEW",
-      "seconds": 43.17,
+      "seconds": 40.45,
       "lines": [
         [
           "PASS",
-          "lime/lime: shape (128, 128), finite=True, median 3.3s/img, deterministic=True"
+          "lime/lime: shape (128, 128), finite=True, median 3.2s/img, deterministic=True"
         ],
         [
           "PASS",
-          "shap/shap: shape (128, 128), finite=True, median 6.9s/img, deterministic=True"
+          "shap/shap: shape (128, 128), finite=True, median 6.8s/img, deterministic=True"
         ],
         [
           "REVIEW",
@@ -186,7 +390,7 @@
               128
             ],
             "finite": true,
-            "seconds_median": 3.320784419000006,
+            "seconds_median": 3.229052677000027,
             "deterministic": true,
             "repeat_max_rel_diff": 0.0,
             "constant_map": false,
@@ -199,9 +403,9 @@
               128
             ],
             "finite": true,
-            "seconds_median": 6.945693095000024,
+            "seconds_median": 6.801521249000189,
             "deterministic": true,
-            "repeat_max_rel_diff": 8.274845247675515e-07,
+            "repeat_max_rel_diff": 8.442976278839275e-07,
             "constant_map": false,
             "empty_maps": 0
           }
@@ -211,8 +415,8 @@
     },
     "4": {
       "name": "Integrated Gradients (completeness, black baseline)",
-      "status": "FAIL",
-      "seconds": 6.7,
+      "status": "PASS",
+      "seconds": 5.84,
       "lines": [
         [
           "PASS",
@@ -220,23 +424,19 @@
         ],
         [
           "INFO",
-          "IG_STEPS=50: worst completeness error 20.27%, 0.13s/img"
+          "IG_STEPS=100: worst completeness error 5.14%, 0.25s/img"
         ],
         [
           "INFO",
-          "IG_STEPS=100: worst completeness error 5.14%, 0.26s/img"
+          "IG_STEPS=200: worst completeness error 2.99%, 0.52s/img"
         ],
         [
           "INFO",
-          "IG_STEPS=200: worst completeness error 2.99%, 0.53s/img"
+          "IG_STEPS=400: worst completeness error 1.59%, 1.05s/img"
         ],
         [
-          "INFO",
-          "IG_STEPS=400: worst completeness error 1.59%, 1.07s/img"
-        ],
-        [
-          "FAIL",
-          "completeness violated at IG_STEPS=50: worst error 20.27%"
+          "PASS",
+          "completeness holds at the configured IG_STEPS=200: worst error 2.99%"
         ],
         [
           "INFO",
@@ -254,51 +454,41 @@
           -1.804444432258606
         ],
         "ig_sweep": {
-          "50": {
-            "worst_rel_error": 0.20268725458604153,
-            "per_image_rel_error": [
-              0.0108327674190938,
-              0.04168678865368564,
-              0.20268725458604153
-            ],
-            "seconds_median": 0.1263198530000409,
-            "zero_on_background": true
-          },
           "100": {
-            "worst_rel_error": 0.051424583710214626,
+            "worst_rel_error": 0.051425024829501884,
             "per_image_rel_error": [
-              0.019247121259632908,
-              0.017508919657702123,
-              0.051424583710214626
+              0.019247225798429104,
+              0.017509111929904956,
+              0.051425024829501884
             ],
-            "seconds_median": 0.2593550190000542,
+            "seconds_median": 0.25494169299986424,
             "zero_on_background": true
           },
           "200": {
-            "worst_rel_error": 0.02992553244752169,
+            "worst_rel_error": 0.02992442964930355,
             "per_image_rel_error": [
-              0.0025949012012330924,
-              0.006254843081427867,
-              0.02992553244752169
+              0.0025941694296597183,
+              0.006255035353630701,
+              0.02992442964930355
             ],
-            "seconds_median": 0.5273869590000686,
+            "seconds_median": 0.5159395169998788,
             "zero_on_background": true
           },
           "400": {
             "worst_rel_error": 0.015861546771547188,
             "per_image_rel_error": [
-              0.011258763013593716,
-              0.004569889665918275,
+              0.011258972091186108,
+              0.004569601257614024,
               0.015861546771547188
             ],
-            "seconds_median": 1.0681579509999892,
+            "seconds_median": 1.0522154450000016,
             "zero_on_background": true
           }
         },
         "ig_rel_error": [
-          0.20268725458604153
+          0.02992442964930355
         ],
-        "ig_seconds_per_image": 0.1263198530000409,
+        "ig_seconds_per_image": 0.5159395169998788,
         "ig_steps_proposed": 200
       },
       "traceback": ""
@@ -306,7 +496,7 @@
     "13": {
       "name": "Saliency (candidate sixth technique)",
       "status": "WARN",
-      "seconds": 0.75,
+      "seconds": 1.83,
       "lines": [
         [
           "PASS",
@@ -318,11 +508,11 @@
         ],
         [
           "INFO",
-          "saliency 0.049s/img (one backward pass)"
+          "saliency 0.039s/img (one backward pass)"
         ],
         [
           "INFO",
-          "share of the attribution falling inside the digit mask (a random map would give the mask area, 22.4%): saliency 23.4%, integrated gradients 100.0%"
+          "share of the attribution falling inside the digit mask (a random map would give the mask area, 22.4%): saliency 23.4%, integrated gradients 100.0% (100% BY CONSTRUCTION: zero wherever the image equals the black baseline, so it is not a fair comparison)"
         ],
         [
           "WARN",
@@ -334,16 +524,16 @@
         ]
       ],
       "values": {
-        "saliency_seconds_per_image": 0.049468902000057824,
+        "saliency_seconds_per_image": 0.038613403999988805,
         "mass_in_mask_saliency": [
           0.25439608097076416,
           0.1867714822292328,
-          0.2612152695655823
+          0.2612152397632599
         ],
         "mass_in_mask_ig": [
-          0.9999101161956787,
-          0.9991440176963806,
-          0.9994639754295349
+          0.9999107718467712,
+          0.9991433620452881,
+          0.9994623064994812
         ],
         "mask_area_fraction": [
           0.2538265306122449,
@@ -352,9 +542,495 @@
         ]
       },
       "traceback": ""
+    },
+    "15": {
+      "name": "Seed-to-seed stability of LIME and SHAP",
+      "status": "PASS",
+      "seconds": 80.44,
+      "lines": [
+        [
+          "PASS",
+          "lime (1000 samples): seed-to-seed Spearman inside the digit mask 0.85 (per image: 0.83, 0.90, 0.82)"
+        ],
+        [
+          "PASS",
+          "shap (200 samples): seed-to-seed Spearman inside the digit mask 0.80 (per image: 0.87, 0.87, 0.67)"
+        ],
+        [
+          "PASS",
+          "shap (100 samples): seed-to-seed Spearman inside the digit mask 0.78 (per image: 0.84, 0.83, 0.66)"
+        ],
+        [
+          "INFO",
+          "Grad-CAM, IG, Occlusion and Saliency are deterministic: no seed-to-seed variation to measure"
+        ]
+      ],
+      "values": {
+        "stability": {
+          "lime (1000 samples)": {
+            "rho_per_image": [
+              0.8268590556642047,
+              0.898034346649629,
+              0.8170321771475646
+            ],
+            "rho_mean": 0.8473085264871326
+          },
+          "shap (200 samples)": {
+            "rho_per_image": [
+              0.8667199634536318,
+              0.869510484526698,
+              0.6701883738704312
+            ],
+            "rho_mean": 0.8021396072835869
+          },
+          "shap (100 samples)": {
+            "rho_per_image": [
+              0.8350723313537385,
+              0.834074630782039,
+              0.6649432780350373
+            ],
+            "rho_mean": 0.7780300800569382
+          }
+        }
+      },
+      "traceback": ""
+    },
+    "7": {
+      "name": "LIME grid segmentation (visual)",
+      "status": "REVIEW",
+      "seconds": 1.09,
+      "lines": [
+        [
+          "INFO",
+          "grid cells touching the digit (digits 1,4,7,9): [12, 27, 23, 23]"
+        ],
+        [
+          "REVIEW",
+          "look at phase0_07_lime_grid.png: does the 8x8 grid separate the digit into a useful number of pieces (not 1-2 cells, not the whole image)? and is the quickshift row clearly worse (design D11 says so)? Confirm or change LIME_GRID_CELLS."
+        ]
+      ],
+      "values": {
+        "cells_touching_ink": [
+          12,
+          27,
+          23,
+          23
+        ]
+      },
+      "traceback": ""
+    },
+    "8": {
+      "name": "Digit mask (visual)",
+      "status": "REVIEW",
+      "seconds": 0.97,
+      "lines": [
+        [
+          "INFO",
+          "thr=0.05,dil=0: mask covers 17.9% +/- 5.4% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.05,dil=1: mask covers 30.5% +/- 7.5% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.05,dil=2: mask covers 42.6% +/- 9.4% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.1,dil=0: mask covers 17.1% +/- 5.3% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.1,dil=1: mask covers 29.8% +/- 7.4% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.1,dil=2: mask covers 41.9% +/- 9.3% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.2,dil=0: mask covers 15.9% +/- 5.1% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.2,dil=1: mask covers 28.6% +/- 7.2% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.2,dil=2: mask covers 40.8% +/- 9.1% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.3,dil=0: mask covers 14.8% +/- 4.8% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.3,dil=1: mask covers 27.6% +/- 7.0% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "INFO",
+          "thr=0.3,dil=2: mask covers 39.8% +/- 8.9% of the 784 pixels, empty masks: 0"
+        ],
+        [
+          "PASS",
+          "configured mask is never empty over 200 images (empty: 0)"
+        ],
+        [
+          "PASS",
+          "configured mask covers between 12.4% and 45.0% of the pixels (0 images outside 5%-60%)"
+        ],
+        [
+          "REVIEW",
+          "look at phase0_08_mask.png: does the dilated mask cover the whole stroke and its immediate halo without swallowing the background? Confirm MASK_THRESHOLD and MASK_DILATION. NOTE: dilation uses a 3x3 square element (8-connected), a detail the design did not specify (errata E17)."
+        ]
+      ],
+      "values": {
+        "mask_fraction_table": {
+          "thr=0.05,dil=0": {
+            "mean": 0.1789732142857143,
+            "std": 0.05376522549520741,
+            "empty": 0
+          },
+          "thr=0.05,dil=1": {
+            "mean": 0.3048214285714285,
+            "std": 0.07536840312151957,
+            "empty": 0
+          },
+          "thr=0.05,dil=2": {
+            "mean": 0.42550382653061225,
+            "std": 0.09358474063185243,
+            "empty": 0
+          },
+          "thr=0.1,dil=0": {
+            "mean": 0.17114158163265306,
+            "std": 0.05264032891596901,
+            "empty": 0
+          },
+          "thr=0.1,dil=1": {
+            "mean": 0.297672193877551,
+            "std": 0.07431020397610495,
+            "empty": 0
+          },
+          "thr=0.1,dil=2": {
+            "mean": 0.4187755102040816,
+            "std": 0.09276842448272965,
+            "empty": 0
+          },
+          "thr=0.2,dil=0": {
+            "mean": 0.15875,
+            "std": 0.0507146193476481,
+            "empty": 0
+          },
+          "thr=0.2,dil=1": {
+            "mean": 0.28586734693877547,
+            "std": 0.07237849582329443,
+            "empty": 0
+          },
+          "thr=0.2,dil=2": {
+            "mean": 0.4077232142857143,
+            "std": 0.09135766463342597,
+            "empty": 0
+          },
+          "thr=0.3,dil=0": {
+            "mean": 0.14826530612244898,
+            "std": 0.04846623915659408,
+            "empty": 0
+          },
+          "thr=0.3,dil=1": {
+            "mean": 0.2757206632653061,
+            "std": 0.0701054775428076,
+            "empty": 0
+          },
+          "thr=0.3,dil=2": {
+            "mean": 0.3978826530612245,
+            "std": 0.0893039012089451,
+            "empty": 0
+          }
+        }
+      },
+      "traceback": ""
+    },
+    "11": {
+      "name": "Occlusion behaviour (overlap, channels, forwards)",
+      "status": "PASS",
+      "seconds": 0.47,
+      "lines": [
+        [
+          "INFO",
+          "overlapping windows are averaged (distinct values on the toy model: [768.0])"
+        ],
+        [
+          "PASS",
+          "forward images used: 226 (windows expected: 225, +1 for the original image)"
+        ],
+        [
+          "PASS",
+          "windows cover all 3 channels together: channel maps identical (max diff 0.0e+00) -> take the mean over channels"
+        ],
+        [
+          "PASS",
+          "output shape (1, 3, 128, 128), finite"
+        ],
+        [
+          "INFO",
+          "Occlusion 0.33s/img"
+        ]
+      ],
+      "values": {
+        "overlap_mode": "averaged",
+        "occlusion_seconds_per_image": 0.33477225799992993,
+        "forward_images": 226,
+        "expected_windows": 225
+      },
+      "traceback": ""
+    },
+    "12": {
+      "name": "Resampling rule to the 28x28 grid",
+      "status": "REVIEW",
+      "seconds": 0.33,
+      "lines": [
+        [
+          "PASS",
+          "28 -> 128 -> 28 round trip keeps every test pixel in place: 100/100"
+        ],
+        [
+          "PASS",
+          "each 4x4 Grad-CAM cell peaks inside its own block of the 28x28 grid: 16/16"
+        ],
+        [
+          "INFO",
+          "distinct Grad-CAM values inside the digit mask (199 pixels): bilinear rule 187, nearest 11 (fewer values = more ties in Spearman/IoU)"
+        ],
+        [
+          "REVIEW",
+          "look at phase0_12_resampling.png: is the rule's 28x28 map a faithful, smooth version of the native Grad-CAM (and clearly better than blocky nearest)? Confirm the rule (errata E03)."
+        ]
+      ],
+      "values": {
+        "alignment_28_hits": "100/100",
+        "gradcam_cells_inside": "16/16",
+        "unique_values_in_mask_rule": 187,
+        "unique_values_in_mask_nearest": 11,
+        "mask_pixels": 199
+      },
+      "traceback": ""
+    },
+    "9": {
+      "name": "Timings and N_QUANT",
+      "status": "PASS",
+      "seconds": 0.0,
+      "lines": [
+        [
+          "INFO",
+          "seconds per image, all five techniques: 10.9 (LIME backend lime, SHAP backend shap)"
+        ],
+        [
+          "PASS",
+          "N_QUANT = 100: quantitative stage ~18.2 min (budget 20 min)"
+        ],
+        [
+          "PASS",
+          "'Esegui tutto' with MODEL_MODE=load: ~28 min (limit 30 min)"
+        ],
+        [
+          "PASS",
+          "'Esegui tutto' with MODEL_MODE=train: ~34 min (limit 45 min)"
+        ],
+        [
+          "INFO",
+          "breakdown: gallery 6.6 min, test inference 0.2 min, fixed overhead 2 min"
+        ]
+      ],
+      "values": {
+        "timings": {
+          "gradcam": 0.021062432999997327,
+          "ig": 0.5159395169998788,
+          "occlusion": 0.33477225799992993,
+          "lime": 3.229052677000027,
+          "shap": 6.801521249000189,
+          "saliency": 0.038613403999988805,
+          "lr_fit": 65.34871983528137,
+          "epoch_train": 59.01385551691055,
+          "epoch_val": 7.16314435005188,
+          "val_seconds_per_image": 0.0011936136643091837
+        },
+        "estimate_seconds": {
+          "per_image_all_techniques": 10.94096153800001,
+          "gallery": 393.8746153680004,
+          "quant": 1094.096153800001,
+          "test_inference": 11.936136643091837,
+          "load_total": 1685.2556256463745,
+          "train_total": 2016.1406249811866
+        },
+        "proposed_n_quant": 100,
+        "lime_backend_used": "lime",
+        "shap_backend_used": "shap"
+      },
+      "traceback": ""
+    },
+    "10": {
+      "name": "Backend decision and table of fixed values",
+      "status": "REVIEW",
+      "seconds": 0.0,
+      "lines": [
+        [
+          "INFO",
+          "no change to config.py proposed by the automatic criteria"
+        ],
+        [
+          "REVIEW",
+          "7 rows need operator confirmation (figures of checks 5, 7, 8, 12 and flagged rows)"
+        ]
+      ],
+      "values": {
+        "proposed_config_overrides": {}
+      },
+      "traceback": ""
     }
   },
-  "decisions": {},
+  "decisions": [
+    {
+      "parameter": "LIME library (E24)",
+      "initial": "lime",
+      "proposed": "lime",
+      "basis": "check 3",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "SHAP library (E24)",
+      "initial": "shap",
+      "proposed": "shap",
+      "basis": "check 3",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "N_QUANT",
+      "initial": 100,
+      "proposed": 100,
+      "basis": "check 9 (time budget)",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "NUM_EPOCHS",
+      "initial": 5,
+      "proposed": 5,
+      "basis": "check 6: last-epoch val-loss drop 11.6%",
+      "confirmation": "operator confirmation required"
+    },
+    {
+      "parameter": "MIN_VAL_ACCURACY",
+      "initial": 0.95,
+      "proposed": 0.95,
+      "basis": "check 6: final-epoch validation accuracy 0.9700",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "BATCH_SIZE",
+      "initial": 64,
+      "proposed": 64,
+      "basis": "check 6 (59s/epoch)",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "LEARNING_RATE_HEAD",
+      "initial": 0.001,
+      "proposed": 0.001,
+      "basis": "check 6 (59s/epoch)",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "FLAG_BATCHNORM_EVAL",
+      "initial": true,
+      "proposed": true,
+      "basis": "check 6: configured 0.9700 vs opposite 0.9493",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "FLAG_RELU_INPLACE",
+      "initial": true,
+      "proposed": true,
+      "basis": "check 2: in-place model gives the same maps as the patched one",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "LR_C",
+      "initial": 1.0,
+      "proposed": 1.0,
+      "basis": "check 5: val acc 0.9222, maps to review",
+      "confirmation": "operator confirmation required"
+    },
+    {
+      "parameter": "LR_MAX_ITER",
+      "initial": 1000,
+      "proposed": 1000,
+      "basis": "check 5: n_iter 248, ConvergenceWarning=False",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "IG_STEPS",
+      "initial": 200,
+      "proposed": 200,
+      "basis": "check 4: completeness error 2.99% at 200 steps (sweep in check 4)",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "Saliency as 6th technique (E22)",
+      "initial": "not in design",
+      "proposed": "operator decision",
+      "basis": "check 13: 0.039s/img, share inside the digit 23% vs mask area 22%",
+      "confirmation": "operator confirmation required"
+    },
+    {
+      "parameter": "OCCLUSION_WINDOW/STRIDE",
+      "initial": "16/8",
+      "proposed": "16/8",
+      "basis": "check 11: 226 forwards, overlap averaged",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "SHAP_NUM_SAMPLES",
+      "initial": 200,
+      "proposed": 200,
+      "basis": "check 15: seed-to-seed rho 0.80 at 200 vs 0.78 at 100 samples; time/image roughly halves at 100",
+      "confirmation": "operator confirmation required"
+    },
+    {
+      "parameter": "SHAP_NUM_BACKGROUND",
+      "initial": 50,
+      "proposed": 50,
+      "basis": "check 3 timing",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "LIME_NUM_SAMPLES",
+      "initial": 1000,
+      "proposed": 1000,
+      "basis": "check 3 timing",
+      "confirmation": "criterion met (automatic)"
+    },
+    {
+      "parameter": "LIME_GRID_CELLS",
+      "initial": 8,
+      "proposed": 8,
+      "basis": "check 7 (visual)",
+      "confirmation": "operator confirmation required"
+    },
+    {
+      "parameter": "MASK_THRESHOLD / MASK_DILATION",
+      "initial": "0.1/1",
+      "proposed": "0.1/1",
+      "basis": "check 8 (visual)",
+      "confirmation": "operator confirmation required"
+    },
+    {
+      "parameter": "28x28 resampling rule (E03)",
+      "initial": "bilinear->128->area",
+      "proposed": "bilinear->128->area",
+      "basis": "check 12 (numeric + visual)",
+      "confirmation": "operator confirmation required"
+    }
+  ],
   "meta": {
     "config": {
       "SEED": 42,
@@ -383,7 +1059,7 @@
       "LR_SOLVER": "lbfgs",
       "LR_C": 1.0,
       "LR_MAX_ITER": 1000,
-      "IG_STEPS": 50,
+      "IG_STEPS": 200,
       "OCCLUSION_WINDOW": 16,
       "OCCLUSION_STRIDE": 8,
       "LIME_NUM_SAMPLES": 1000,
@@ -404,6 +1080,6 @@
       "OUTPUT_DIR": "outputs"
     },
     "quick": false,
-    "started": "2026-10-21 07:18:33"
+    "started": "2026-10-21 08:22:39"
   }
 }

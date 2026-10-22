@@ -1,0 +1,58 @@
+
+PROMPT FINALE
+
+Allego output della console e file map xai definitivi. Non generare altri test e
+non modificare i sorgenti python .Consideriamo questa la versione
+defintiva . Commenta e Concludi perchè è ora di passare alla fase 1.
+
+Il file requirements_candidate.txt in output è stato
+modificato in relazione alla versione di shap passato alla shap==0.54.1
+dalla 0.52.1
+
+Risposta Finale:
+
+Chiusura della tappa 0
+
+La fase zero è conclusa. Non ho toccato nessun sorgente Python. Ho aggiornato soltanto docs/design_errata.md (sezione “Chiusura della tappa 0”, con la tabella dei valori fissati) e requirements.txt.
+
+Cosa dice il run definitivo
+
+Il JSON contiene 15 check e nessuna esecuzione --quick. Non ci sono traceback né FAIL. Restano visibili solo due WARN o REVIEW attesi: Saliency (che non si concentra sulla cifra, come detto) e le figure da giudicare a vista.
+
+I numeri sono riproducibili.
+Le accuracy per epoca del training sono identiche in sessioni Colab diverse.
+Le figure 8, 12 e 3 (con modello addestrato) sono identiche pixel per pixel tra due sessioni. La figura 7 ha solo i titoli su due righe, come corretto.
+Il check 14 prova che il checkpoint ricaricato riproduce lo 0,9700 del training.
+Il divario DenseNet–LR è 4,78 punti sulla validation (0,9700 contro 0,9222), dentro la forchetta 4–6 attesa dal design. Il design regge anche con la DenseNet “solo testa”.
+La stabilità di LIME e SHAP è alta (Spearman da un seed all’altro, dentro la maschera):
+Tecnica	Stabilità
+LIME	0,85
+SHAP, 200 campioni	0,80
+SHAP, 100 campioni	0,78
+È anche il tetto di accordo con qualunque altra tecnica: da dichiarare nel report accanto alle matrici.
+Le ReLU in-place sono sicure per Grad-CAM, IG, Saliency e SHAP: stesse mappe del modello patchato (differenza = 1e-6). Entrambi i flag restano True.
+Un segnale di fragilità dell’ambiente. Tra due giri shap è passato dalla 0,52 alla 0,54.1 senza cambiare risultati né tempi, ma conferma che una pin serve. Inoltre SciPy ha deprecato le opzioni di L-BFGS-B che usa scikit-learn 1.6.1: le toglierà in SciPy 1.18, e allora il fit della LR potrebbe rompersi su un Colab futuro. Va tenuto d’occhio, e la cella 1 del notebook lo farà emergere.
+Come ho trattato requirements.txt
+
+Ho pinnato con == solo ciò che pip installa davvero: captum==0.9.0, lime==0.2.0.1, shap==0.54.1. Le librerie già presenti su Colab (torch, numpy, scipy, scikit-learn, …) sono elencate nei commenti con le versioni misurate, ma non forzate: reinstallarle potrebbe richiedere il riavvio del runtime e rompere “Esegui tutto”. La cella 1 del notebook farà asserzioni sulle versioni e mostrerà un avviso visibile se cambiano. Il requirements_candidate.txt non è tra i file allegati; ho usato le versioni stampate in console.
+
+Tre punti ancora aperti
+SHAP_NUM_SAMPLES: 200 o 100? La stabilità cala di appena 0,02 (0,80 contro 0,78) mentre il tempo per immagine 
+si dimezza. Con 100 la stima di “Esegui tutto” scende da ~28 a ~20 minuti in load e da ~34 a ~26 in train, 
+con un margine molto più sicuro rispetto al limite di 30. È il mio consiglio, ma la scelta è tua. config.py ha ancora 200 e 
+lo aggiorno all’inizio della tappa 1.
+F7 (preprocessing PIL o su tensori). Il percorso su tensori è equivalente (differenza massima 0,017 in unità normalizzate) 
+e dà 0,9700 sulla validation, in linea con il tuo 0,9732 sul test con PIL. Se non mi dici il contrario, in tappa 1 
+adotto i tensori, che con la GPU di Colab evitano il collo di bottiglia sulla CPU. 
+
+Il tuo tempo per epoca con PIL mi servirebbe per confermarlo.
+Mappe globali della LR (figura 5). Non sono state allegate. I numeri (0,9222, convergenza in 248 iterazioni)bastano per fissare LR_C=1.0. La figura la rigenera il notebook e la guardiamo lì.
+Tappa 1
+
+Si parte con questo ordine: config.py definitivo ? data.py ? model.py ? baseline.py ? metrics.py ? training.py ? checks.py. Poi un run su Colab per produrre il checkpoint vero e il commit. I test partono prima di ogni modulo (e riusano la logica già collaudata in fase zero).
+
+Con la tappa 1 correggiamo anche F8 (la LR si addestra sui soli 54.000 del train, con i parametri presi dalla config) e implementiamo E05 (snapshot completo del checkpoint). Ci aspettano nel notebook anche i punti E07–E11.
+
+Dimmi cosa decidi sui primi due punti (o conferma i default che ho indicato) e parto con config.py e data.py.
+Decido SHAP_NUM_SAMPLES=100 e tensori per preprocessing
+
