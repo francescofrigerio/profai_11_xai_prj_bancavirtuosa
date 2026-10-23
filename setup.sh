@@ -8,13 +8,13 @@ run_help() {
     echo "----------------------------------------------------"
     echo "HELP IN LINEA :  cd src + PYTHONPATH=. python --help"
     echo "1 -> setup.sh --init  (inizializza progetto , install. librerie/venv) "
-    echo "2 -> setup.sh --change  (modifica struttura progetto , installazione nuove librerie) "
-    echo "3 -> setup.sh --install  (installazione librerie tramite requirements.txt) "
-    echo "4 -> setup.sh --checks  (controllo GPU/CPU verifica installazione librerie) "
-    echo "5 -> source .venv/bin/activate per attivare l'ambiente virtuale"
-    echo "6 -> deactivate per disattivare l'ambiente virtuale"
-    echo "7 -> ruff check file.py controllo superficiale di un file python"
-    echo "8 -> cd src + PYTHONPATH=. pylint train/train_baseline.py per controllo profondo di un file python"
+    # echo "2 -> setup.sh --change  (modifica struttura progetto , installazione nuove librerie) "
+    echo "2 -> setup.sh --install  (installazione librerie tramite requirements.txt) "
+    echo "3 -> setup.sh --checks  (controllo GPU/CPU verifica installazione librerie) "
+    echo "4 -> source .venv/bin/activate per attivare l'ambiente virtuale"
+    echo "5 -> deactivate per disattivare l'ambiente virtuale"
+    echo "6 -> ruff check file.py controllo superficiale di un file python"
+    # echo "7 -> cd src + PYTHONPATH=. pylint train/train_baseline.py per controllo profondo di un file python"
     
     echo "Attenzione!! comandi per pulire ambiente e ricrearlo (da eseguire solo se necessario)"
     echo "pip cache purge"
@@ -94,7 +94,7 @@ if [ "$1" == "--init" ]; then
      echo "*" >./logs/.gitignore
      echo "!.gitignore" >>./logs/.gitignore
 
-    
+     mkdir -p architecture notebooks
      touch architecture/.gitkeep
      touch notebooks/.gitkeep
 

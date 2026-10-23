@@ -3,17 +3,3 @@ __pycache__/
 *.pyc
 model/
 .ipynb_checkpoints/
-src/mlruns/
-src/train_DEBUG.log
-src/train_PROD.log
-src/train_DEMO.log
-src/outputs-baseline-prod/config.json
-src/outputs-baseline-prod/model.safetensors
-src/outputs-baseline-prod/tokenizer.json
-src/outputs-baseline-prod/tokenizer_config.json
-mlruns-debug/
-outputs-baseline-debug/
-src/outputs-baseline-prod/model_weights/
-src/outputs-baseline-debug/model_weights/
-scheduling/.env
-scheduling/logs/*
