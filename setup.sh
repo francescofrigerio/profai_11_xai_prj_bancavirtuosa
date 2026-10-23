@@ -73,6 +73,7 @@ if [ "$1" == "--init" ]; then
      # Cartella src/ e relative sottocartelle/file
      # codice per ciclo ML training test evaluate
     mkdir -p src/
+    touch src/logger.py   # script logger debug,info
     touch src/config.py   # script configuration
     touch src/data.py   # script con process data
     touch src/baseline.py   # script con baseline models

@@ -1,6 +1,6 @@
 """Global configuration of the Banca Virtuosa XAI project.
 
-Modules receive the config as an argument; only the notebook / scripts import CONFIG.
+Modules receive the config as an argument; only the notebook / run_main scripts import CONFIG.
 
 Changes with respect to the design document v1 (see docs/design_errata.md):
   - USE_SURROGATE removed (D03-bis): no surrogate model in this project.
@@ -91,6 +91,22 @@ class ConfigConstantsDefault:
     # --- Execution and outputs
     RUN_TESTS: bool = False
     OUTPUT_DIR: str = "outputs"
+
+    THRESHOLDS = { 
+                   "backend_max_seconds_per_image": 15.0,    # LIME / SHAP backend accepted if <= (T4)
+                   "quant_stage_max_minutes": 20.0,          # time budget of the quantitative stage
+                   "run_all_load_max_minutes": 30.0,         # "Esegui tutto" with MODEL_MODE=load
+                   "run_all_train_max_minutes": 45.0,        # "Esegui tutto" with MODEL_MODE=train
+                   "ig_completeness_pass_rel": 0.05,         # |sum(attr) - (f(x)-f(b))| / |f(x)-f(b)|
+                   "ig_completeness_warn_rel": 0.20,
+                   "logits_patch_atol": 1e-4,                # logits before/after the ReLU patch
+                   "preproc_max_abs_diff": 0.05,             # tensor path vs torchvision PIL path (normalized units)
+                   "lr_expected_acc_range": (0.90, 0.94),    # design expects ~92 %
+                   "lr_colsum_warn": 1e-3,                   # sum over classes of LR coefficients, per pixel
+                   "loss_still_dropping_rel": 0.05,          # last-epoch relative val-loss drop => "still dropping"
+                   "mask_fraction_range": (0.05, 0.60),      # sane share of pixels in the digit mask
+                   "determinism_rtol": 1e-3,
+                }
 
     def __post_init__(self):
         # Validate combinations and ranges that would otherwise fail late or silently.
