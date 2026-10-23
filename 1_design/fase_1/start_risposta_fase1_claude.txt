@@ -1,0 +1,80 @@
+Tappa 1
+
+Si parte con questo ordine: config.py definitivo ? data.py ? model.py ? baseline.py ? metrics.py ? training.py ? checks.py. Poi un run su Colab per produrre il checkpoint vero e il commit. I test partono prima di ogni modulo (e riusano la logica già collaudata in fase zero).
+
+Con la tappa 1 correggiamo anche F8 (la LR si addestra sui soli 54.000 del train, con i parametri presi dalla config) e implementiamo E05 (snapshot completo del checkpoint). Ci aspettano nel notebook anche i punti E07–E11.
+
+Dimmi cosa decidi sui primi due punti (o conferma i default che ho indicato) e parto con config.py e data.py.
+
+Punto 1 scelgo 100 SHAP_NUM_SAMPLES come da te indicato . Punto 2 scelgo i tensori come da te indicato , procedi
+
+Entrambe le decisioni sono registrate: SHAP_NUM_SAMPLES=100 e preprocessing su tensori (F7 chiusa). Parto dalla tappa 1 con config.py definitivo e poi i moduli, scrivendo i test prima o insieme a ciascuno.
+
+Le tre mutazioni vengono scoperte (e il codice originale torna a 54 passati): i test non sono vuoti. Manca il driver per il run reale su Colab e l’aggiornamento dell’errata.
+
+Continua
+
+Continua
+
+Tappa 1 pronta: il codice è scritto, manca il run su Colab
+
+Ho implementato i moduli della tappa 1 con i test. Le tue due decisioni sono nei file: SHAP_NUM_SAMPLES=100 e preprocessing su tensori (F7 chiusa).
+
+Cosa contiene la tappa 1
+Modulo	Che cosa fa
+config.py	Versione definitiva. Aggiunta DATA_ROOT (cartella mnist_raw, per non confonderla con il modulo data.py).
+data.py	Split stratificato per indici, le due viste della stessa immagine (LR a 784 valori in [0,1] non standardizzati; DenseNet 3×128×128 normalizzata), il “nero” normalizzato che serve da baseline.
+model.py	DenseNet121 con testa nuova, i due flag (FLAG_BATCHNORM_EVAL, FLAG_RELU_INPLACE), ottimizzatore, controllo che i layer di Grad-CAM esistano.
+baseline.py	LR addestrata solo sugli indici del train (F8 corretta), con mappe locale e globale esatte.
+training.py	MODEL_MODE auto/train/load con motivo sempre dichiarato, checkpoint con snapshot completo (E05) e SHA-256, epoche fisse senza early stopping.
+metrics.py, checks.py	Accuracy, F1, confusione, i quattro quadranti; guardie sui dati in ingresso e in uscita ai due modelli e tabella “Verifiche”.
+run_stage1.py	Driver temporaneo del run reale (verrà assorbito dal notebook in tappa 4).
+Cosa ho verificato qui, e cosa no
+
+Qui non c’è torch. I test che non lo richiedono (config, split, LR, metriche, guardie, modalità e snapshot) sono 54 casi passati su 54. Ho anche introdotto tre errori di proposito per vedere se i test li scoprono, e tutti e tre sono stati intercettati:
+
+la LR addestrata di nuovo su tutti i dati (il bug F8): due test falliscono;
+la guardia che non rifiuta più input standardizzati: falliscono due casi;
+auto che carica in silenzio un checkpoint incompatibile: fallisce il test delle modalità.
+
+Non ho potuto eseguire i 6 test che richiedono torch (viste DenseNet, test_model.py, training e checkpoint): sono scritti 
+e verificati staticamente (nessun nome non definito), ma il primo collaudo è su Colab.
+
+Un difetto l’ho trovato scrivendo i test: nel mio get_trained_model il modello veniva costruito prima di seminare, 
+quindi la testa iniziale non sarebbe stata riproducibile. Il test di riproducibilità lo avrebbe scoperto; l’ho già corretto (E28 nell’errata).
+
+Come eseguire su Colab
+
+Copia il contenuto di xai-banca-virtuosa/ nel repository (nella cartella che preferisci) e poi:
+
+%cd /content
+!git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
+%cd profai_11_xai_prj_bancavirtuosa/<cartella della tappa 1>
+!pip -q install captum==0.9.0 lime==0.2.0.1 shap==0.54.1 scikit-image
+!python -m pytest tests -q
+%run run_stage1.py
+%run run_stage1.py
+Prima i test: i 6 che richiedono torch girano qui. Sono pochi minuti, su CPU e senza scaricare ImageNet.
+run_stage1.py va lanciato due volte. La prima volta addestra (MODE: train, circa 6 minuti più 1 minuto per la LR) e 
+scrive checkpoints/densenet121_mnist.pt. La seconda deve caricarlo (MODE: load) e restituire gli stessi numeri, 
+più rapidamente. Il file di checkpoint (circa 30 MB) 
+va poi committato.
+
+Mi servono: l’output di pytest, quello delle 
+due esecuzioni, outputs/stage1/stage1_metrics.json e verifications.md.
+
+Il criterio di chiusura della tappa 1
+
+Test verdi (anche quelli di torch), MODE: train al primo run e MODE: 
+load con gli stessi numeri al secondo, tabella “Verifiche” 
+senza FAIL non spiegati.
+ Attesi in base alla fase zero: DenseNet ~0,97, LR ~0,92, scarto ~4,8 punti.
+
+Note sul conteggio dei test
+
+I test sono 42 funzioni, 9 per la config e 33 per i moduli della tappa 1: più dei circa 30 previsti all’inizio per l’intero progetto. 
+Li ho tenuti perché sono quelli che rendono falsificabili le scelte di robustezza che mi avevi chiesto (guardie con controlli negativi, 
+riproducibilità, compatibilità del checkpoint). Se in tappa 2 e 3 li terrò più stretti, 
+il totale rientra in una cinquantina. Dimmi se preferisci che sfoltisca.
+
+L’errata ha le nuove precisazioni (E27 per la callback del Grad-CAM di debug, E28, E29) e F7/F8 chiuse.
