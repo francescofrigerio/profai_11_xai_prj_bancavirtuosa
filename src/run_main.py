@@ -32,7 +32,7 @@ from sklearn.metrics import classification_report
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import time
+# import time
 
 # computer vision with pytorch
 import torchvision
@@ -45,16 +45,19 @@ import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from torch.utils.data import Subset
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-from PIL import Image
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+# from PIL import Image
 
 from config import CONFIG
 from logger import LOGGER
 from train import get_trained_model, get_device
 # from baseline import baseline
 from baseline import fit_baseline
-from data import load_data_baseline
+# from data import load_data_baseline
+from data import load_datasets
+from data import data_to_input_lr
+from output import plot_logistic_graph , plot_confusion_matrix_lr
 
 # from data import load_mnist, to_lr_input
 # from metrics import accuracy, confusion, macro_f1, quadrants, seconds_per_image
@@ -64,6 +67,8 @@ from data import load_data_baseline
 # 
 # LR_EXPECTED_VAL_ACC = (0.90, 0.94)       # design: about 0.92 (phase 0: 0.9222)
 # GAP_EXPECTED = (0.03, 0.07)              # design: 4-6 points (phase 0: 4.78 on validation)
+
+
 
 def main(cfg=CONFIG,logger=LOGGER):
     
@@ -75,19 +80,43 @@ def main(cfg=CONFIG,logger=LOGGER):
     if warning:
         logger.info("WARNING:", warning)
 
+    datasets_dict , loaders_dict = load_datasets()
 
-    X_train ,X_val, X_test , y_train ,y_val ,  y_test = load_data_baseline()
-    logger.debug(f" X_train numpy {X_train.shape}")
-    logger.debug(f" X_test numpy {X_test.shape}")
+    trainval_datasets = datasets_dict["trainval"]
+    test_datasets = datasets_dict["test"]
+
+    # Load tensor for train and test baseline
+    train_loader_lr = loaders_dict["lr"]["train"]
+    val_loader_lr = loaders_dict["lr"]["val"]
+    test_loader_lr = loaders_dict["lr"]["test"]
+
+    # Load tensor for train and test cnn
+    train_loader_cnn = loaders_dict["cnn"]["train"]
+    val_loader_cnn = loaders_dict["cnn"]["val"]
+    test_loader_cnn = loaders_dict["cnn"]["test"]
+    
+    X_train , y_train = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_val , y_val = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_test , y_test = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    
+    logger.info(f" X_train numpy {X_train.shape}")
+    logger.info(f" X_test numpy {X_test.shape}")
 
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
+
+    plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
+    plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
+    # plot barcode for class
     
-    # data = load_mnist(cfg)
-    # split = data.split
-    
-    # ---- DenseNet
-    model, info = get_trained_model(cfg, data, device)
+    # Cnn DenseNet
+    model, info = get_trained_model(cfg,
+                                    logger, 
+                                    test_datasets,
+                                    train_loader_cnn,
+                                    val_loader_cnn,
+                                    test_loader_cnn, 
+                                    device)
     
     val_acc_d = info["val_acc_reloaded"]
     
