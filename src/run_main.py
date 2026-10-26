@@ -20,12 +20,11 @@ from data import data_to_input_lr, load_datasets
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
 from training import get_device, get_trained_model
+from output import plot_logistic_graph , plot_confusion_matrix_lr
 
 # Configurazione dei Warnings (spostata DOPO tutti gli import) ---
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
 warnings.filterwarnings('ignore', category=FutureWarning)
-
-# from output import plot_logistic_graph , plot_confusion_matrix_lr
 
 def main(cfg=CONFIG,logger=LOGGER):
     """
@@ -45,7 +44,7 @@ def main(cfg=CONFIG,logger=LOGGER):
                             type=bool,
                             choices=[True,False],
                             default=True,
-                            help="Modalità di esecuzione (default: PROD)"
+                            help="Modalità di esecuzione (default: TRUE)"
                         )
 
     # Effettua il parse degli argomenti lanciati da terminale
@@ -53,6 +52,7 @@ def main(cfg=CONFIG,logger=LOGGER):
 
     flag_pretrained = False
     # Assegna la configurazione globale corretta in base all'input
+    
     if args.mode == 'LOAD':
         flag_pretrained = True
         print("Training avviato in modalità: PRODUCTION")
@@ -93,8 +93,9 @@ def main(cfg=CONFIG,logger=LOGGER):
     test_accuracy_lr = accuracy(y_test, lr.predict(X_test))
     logger.info(f"Accuratezza di test (Logistic Regression): {test_accuracy_lr}")
 
-    # plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-    # plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
+    if args.plot is True:
+        plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
+        plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
 
     y_pred_val_lr = lr.predict(X_val)
     y_pred_test_lr = lr.predict(X_test)
@@ -110,7 +111,8 @@ def main(cfg=CONFIG,logger=LOGGER):
                                     train_loader_cnn,
                                     val_loader_cnn,
                                     test_loader_cnn, 
-                                    device)
+                                    device,
+                                    pretrained=flag_pretrained)
     
     y_pred_cnn = info["y_pred"]
     test_accuracy_cnn = info["test_accuracy"]
