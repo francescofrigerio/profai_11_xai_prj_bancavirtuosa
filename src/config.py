@@ -21,13 +21,15 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ConfigConstantsDefault:
-    """Global config. Replaces magic numbers with descriptive names."""
+    """
+        Global config. Replaces magic numbers with descriptive names.
+    """
 
-    # --- Reproducibility and environment
+    # Reproducibility and environment
     SEED: int = 42
     DEVICE: str = "auto"                 # "auto" -> cuda if available, else cpu (warn on cpu)
 
-    # --- Data
+    # Data
     IMAGE_SIZE: int = 28                 # MNIST side (1x28x28): input of the LR baseline
     DENSENET_SIZE: int = 128             # DenseNet input side (3x128x128)
     NUM_CLASSES: int = 10
@@ -35,7 +37,7 @@ class ConfigConstantsDefault:
     DATA_ROOT: str = "mnist_raw"         # where torchvision downloads MNIST (not a module name)
     NUM_DEBUG_IMAGES: int = 10           # fixed validation images (one per class)
 
-    # --- Model and training
+    # Model and training
     BACKBONE_WEIGHTS: str = "IMAGENET1K_V1"
     FREEZE_BACKBONE: bool = True         # True -> head only, BatchNorm of backbone in eval
     MIN_VAL_ACCURACY: float = 0.95       # warning (not stop) if final validation accuracy is below
@@ -53,18 +55,18 @@ class ConfigConstantsDefault:
     # Nothing switches automatically: if an explanation technique needs False, say so via config.
     FLAG_RELU_INPLACE: bool = True
 
-    # --- Grad-CAM
+    # Grad-CAM
     GRADCAM_LAYER: str = "features.norm5"
     GRADCAM_ALT_LAYER: str = "features.denseblock3"   # for the comparison figure
     GRADCAM_DEBUG_EPOCHS: str = "first_last"
 
-    # --- Logistic regression baseline
+    # Logistic regression baseline
     LR_PENALTY: str = "l2"
     LR_SOLVER: str = "lbfgs"
     LR_C: float = 1.0
     LR_MAX_ITER: int = 1000              # check ConvergenceWarning in phase zero
 
-    # --- XAI techniques
+    # XAI techniques
     # LIME and SHAP always use the reference packages `lime` and `shap` (E24): no backend switch.
     IG_STEPS: int = 200                  # phase 0, check 4: 3.0 % completeness error (50 steps: 20 %)
     OCCLUSION_WINDOW: int = 16
@@ -74,11 +76,11 @@ class ConfigConstantsDefault:
     SHAP_NUM_BACKGROUND: int = 50
     SHAP_NUM_SAMPLES: int = 100          # gradient samples of Gradient SHAP; phase 0: rho 0.78 vs 0.80 at 200, half the time
 
-    # --- Sampling
+    # Sampling
     GALLERY_SIZE: int = 24
     N_QUANT: int = 100                   # quantitative sample; fixed after timing in phase zero
 
-    # --- Comparison
+    # Comparison
     COMPUTE_AGREEMENT: bool = True       # Spearman and IoU
     SIGN_MODE: str = "absolute"          # "absolute" | "positive"
     MASK_MODE: str = "digit"             # "digit" | "full"
@@ -88,7 +90,7 @@ class ConfigConstantsDefault:
     COMPUTE_FAITHFULNESS: bool = False   # deletion curves
     DELETION_STEPS: int = 10
 
-    # --- Execution and outputs
+    # Execution and outputs
     RUN_TESTS: bool = False
     OUTPUT_DIR: str = "outputs"
 

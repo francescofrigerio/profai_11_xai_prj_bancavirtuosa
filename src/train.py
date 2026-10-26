@@ -5,8 +5,12 @@ import torch
 import numpy as np
 from pathlib import Path
 
+import torch
+import torchvision
+
 from model import build_densenet, validate_layers
 from model import enter_train_mode ,  freeze_backbone, make_optimizer , define_loss_function
+from sklearn.metrics import accuracy_score
 
 def sync(device) -> None:
     """
@@ -47,62 +51,37 @@ def get_device(cfg) -> tuple:
     warning = None if want_cuda else "NO GPU: 'Esegui tutto' would be very slow. Use a GPU runtime."
     return device, warning
 
-def train_model(cfg,
-                logger,
-                model_ ,
-                dataset_,
-                dataloader_train_ ,
-                dataloader_val_ ,
-                device_ ,
-                num_epochs_):
+def resolve_mode(cfg, ckpt_exists: bool) -> tuple:
+    """
+        (action, reason). action is "train" or "load".
+    """
+    if cfg.MODEL_MODE == "train":
+        return "train", "MODEL_MODE=train"
+    if cfg.MODEL_MODE == "load":
+        if not ckpt_exists:
+            raise FileNotFoundError(f"MODEL_MODE=load but there is no checkpoint at {cfg.CHECKPOINT_PATH}")
+        return "load", "MODEL_MODE=load"
+    
+    return "error", "error"
 
-    model_ = model_.to(device_)
+def save_checkpoint(path, model, cfg, history) -> str:
+    """
+        Saves weights + history + version. 
+        Returns the path of the file.
+    """
+    
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save({
+        "state_dict": {k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
+        "history": history,
+        "versions": {"torch": torch.__version__, "torchvision": torchvision.__version__},
+    }, path)
+    return path
 
-    set_seed(cfg.SEED)
-    if cfg.FREEZE_BACKBONE:
-        freeze_backbone(model_)
-    optimizer = make_optimizer(model_, cfg)
 
-    criterion = define_loss_function()
-    # Training loop
-    for epoch in range(num_epochs_):
-        enter_train_mode(model_,cfg)
-        running_loss = 0.0
-        sync(device_)
-        t0 = time.time()
-        for i, (inputs, labels) in enumerate(dataloader_train_):
-            inputs, labels = inputs.to(device_), labels.to(device_)
-
-            optimizer.zero_grad()
-            outputs = model_(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-            if i % 1000 == 900:    # stampa ogni 100 mini-batch
-                logger.info(f'[Epoca {epoch + 1}, Ciclo {i + 1:5d}] Loss: {running_loss / 10:.3f}')
-                running_loss = 0.0
-                # break
-
-        sync(device_)
-        train_seconds = time.time() - t0
-        t1 = time.time()
-
-        # CICLO VALIDATION
-        y_pred,y_true,y_pred_desc,y_true_desc = evaluate_model(model_,
-                                                             dataset_,
-                                                             dataloader_val_,
-                                                             device_)
-        val_accuracy_cnn = accuracy_score(y_true,y_pred)
-        if ( val_accuracy_cnn < cfg.MIN_VAL_ACCURACY ):
-            logger.info(f"WARNING!! Accuracy(DenseNet Cnn) not over the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy_cnn}")
-
-        sync(device_)
-        val_seconds = time.time() - t1
-        logger.info(f'[Epoca {epoch + 1}, loop {i + 1:5d}] train time: {train_seconds:.3f}  val time: {val_seconds:.3f} ')
-
-    logger.info('Train finisched')
+def read_checkpoint(path) -> dict:
+    return torch.load(path, map_location="cpu")
 
 def evaluate_model( model_ ,
                     dataset_,
@@ -141,7 +120,77 @@ def evaluate_model( model_ ,
     y_true_ = torch.cat(y_true_).cpu().numpy()
     y_pred_ = torch.cat(y_pred_).cpu().numpy()
 
-    return y_pred_,y_true_,y_pred_desc_,y_true_desc_
+    return y_pred_,y_true_
+
+def train_model(cfg,
+                logger,
+                model_ ,
+                dataset_,
+                dataloader_train_ ,
+                dataloader_val_ ,
+                device_ ,
+                num_epochs_):
+
+    model_ = model_.to(device_)
+
+    set_seed(cfg.SEED)
+    if cfg.FREEZE_BACKBONE:
+        freeze_backbone(model_)
+    optimizer = make_optimizer(model_, cfg)
+
+    criterion = define_loss_function()
+    history = []
+    train_loss = 0 , val_accuracy = 0
+    # Training loop
+    for epoch in range(num_epochs_):
+        enter_train_mode(model_,cfg)
+        running_loss = 0.0
+        sync(device_)
+        t0 = time.time()
+        for i, (inputs, labels) in enumerate(dataloader_train_):
+            inputs, labels = inputs.to(device_), labels.to(device_)
+
+            optimizer.zero_grad()
+            outputs = model_(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            train_loss = loss.item()
+            running_loss += train_loss
+            if i % 1000 == 900:    # stampa ogni 100 mini-batch
+                logger.info(f'[Epoca {epoch + 1}, Ciclo {i + 1:5d}] Loss: {running_loss / 10:.3f}')
+                running_loss = 0.0
+                # break
+        sync(device_)
+        train_seconds = time.time() - t0
+        t1 = time.time()
+
+        # CICLO VALIDATION
+        y_pred,y_true = evaluate_model( model_,
+                                        dataset_,
+                                        dataloader_val_,
+                                        device_ )
+        val_accuracy = accuracy_score(y_true,y_pred)
+        if ( val_accuracy < cfg.MIN_VAL_ACCURACY ):
+            logger.info(f"WARNING!! Accuracy(DenseNet Cnn) not over the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy_cnn}")
+
+        
+        sync(device_)
+        val_seconds = time.time() - t1
+        logger.info(f'[Epoca {epoch + 1}, loop {i + 1:5d}] train time: {train_seconds:.3f}  val time: {val_seconds:.3f} ')
+
+        history.append({
+                    "epoch": epoch, 
+                    "train_loss": train_loss, 
+                    "val_acc": val_accuracy,
+                    "train_seconds": train_seconds,
+                    "val_seconds": val_seconds})
+        
+    logger.info('Train finisched')
+    return history
+
+
 
 def get_trained_model(cfg,
                       logger,
@@ -159,8 +208,7 @@ def get_trained_model(cfg,
     
     path = Path(cfg.CHECKPOINT_PATH)
     saved = read_checkpoint(path) if path.exists() else None
-    mismatches = snapshot_mismatches(saved["snapshot"], cfg) if saved else []
-    action, reason = resolve_mode(cfg, saved is not None, mismatches)
+    action, reason = resolve_mode(cfg, saved is not None)
     logger.info(f"MODE: {action} ({reason})")
     if action == "load":
         model = build_densenet(cfg, pretrained=False)
@@ -171,20 +219,33 @@ def get_trained_model(cfg,
         set_seed(cfg.SEED)                      
         model = build_densenet(cfg, pretrained=pretrained)
         model.to(device)
-        history = train_model(model, 
-                              data, 
-                              cfg, 
-                              device )
+        history = train_model(cfg,
+                              logger,
+                              model,
+                              test_datasets,
+                              train_loader_cnn ,
+                              val_loader_cnn ,
+                              device ,
+                              cfg.NUM_EPOCH)
         
         save_checkpoint(path, model, cfg, history)
 
-    model = model.to(device).eval()
+    # model = model.to(device).eval()
     validate_layers(model, cfg)
+
+    y_pred, y_true = evaluate_model( model ,test_datasets,test_loader_cnn ,device)
+    test_accuracy = accuracy_score(y_true,y_pred)
+    logger.info(f"Accuratezza di test (DenseNet Cnn): {test_accuracy_cnn}")
+
     # X, y = data.X_trainval.to(device), data.y_trainval.to(device)
-    _, val_acc = evaluate_model(model, X, y, torch.as_tensor(data.split.idx_val, device=device), cfg, device)
+    #_, val_acc = evaluate_model(model, X, y, torch.as_tensor(data.split.idx_val, device=device), cfg, device)
     info = {
-        "action": action, "reason": reason, "history": history, "sha256": file_sha256(path),
-        "val_acc_reloaded": val_acc, "val_acc_history": history[-1]["val_acc"] if history else None,
+        "action": action, 
+        "reason": reason,
+        "y_pred": y_pred,
+        "test_accuracy": test_accuracy, 
+        "history": history, "path": path,
+        "val_acc_history": history[-1]["val_acc"] if history else None,
         "device": str(device),
     }
     return model, info

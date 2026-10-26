@@ -58,6 +58,8 @@ from baseline import fit_baseline
 from data import load_datasets
 from data import data_to_input_lr
 from output import plot_logistic_graph , plot_confusion_matrix_lr
+from sklearn.metrics import accuracy_score
+from metrics import confusion, macro_f1, quadrants
 
 # from data import load_mnist, to_lr_input
 # from metrics import accuracy, confusion, macro_f1, quadrants, seconds_per_image
@@ -105,8 +107,18 @@ def main(cfg=CONFIG,logger=LOGGER):
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
 
-    plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-    plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
+    val_accuracy_lr = accuracy_score(y_val, lr.predict(X_val))
+    test_accuracy_lr = accuracy_score(y_test, lr.predict(X_test))
+    logger.info(f"Accuratezza di test (Logistic Regression): {test_accuracy_lr}")
+
+    # plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
+    # plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
+
+    y_pred_val_lr=model.predict(X_val)
+    y_pred_test_lr=model.predict(X_test)
+    report = classification_report(y_test,y_pred_test_lr, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
+    print(report)
+    
     # plot barcode for class
     
     # Cnn DenseNet
@@ -118,56 +130,45 @@ def main(cfg=CONFIG,logger=LOGGER):
                                     test_loader_cnn, 
                                     device)
     
-    val_acc_d = info["val_acc_reloaded"]
+    y_pred_cnn = info["y_pred"]
+    test_accuracy_cnn = info["test_accuracy"]
+    val_acc_cnn = info["val_acc_history"]
+    train_sec_cnn = info["train_seconds"]
+    val_sec_cnn = info["val_seconds"]
     
-    logits = predict_logits(model, data.X_test, cfg, device)
-    assert_proba(softmax_np(logits), cfg)
-    pred_d = logits.argmax(1)
-    y_test = data.y_test.numpy()
-    sync = torch.cuda.synchronize if device.type == "cuda" else None
-    sec_d = seconds_per_image(lambda: predict_logits(model, data.X_test[:1000], cfg, device), 1000, sync)
-
-    # ---- Logistic regression (train indices only)
-    X_trainval = to_lr_input(data.X_trainval)
-    assert_lr_input(X_trainval, cfg)
-    y_trainval = data.y_trainval.numpy()
-    lr = fit_baseline(X_trainval, y_trainval, split.idx_train, cfg,logger)
-    X_test = to_lr_input(data.X_test)
-    assert_lr_input(X_test, cfg)
-    assert_proba(lr.predict_proba(X_test[:1000]), cfg)
-    pred_l = lr.predict(X_test)
-    val_acc_l = accuracy(y_trainval[split.idx_val], lr.predict(X_trainval[split.idx_val]))
-    sec_l = seconds_per_image(lambda: lr.predict(X_test[:1000]), 1000)
-    facts = lr.check_exactness(X_trainval[split.idx_val][:2000])
     
-
-    # ---- Comparison on the test set
-    acc_d, acc_l = accuracy(y_test, pred_d), accuracy(y_test, pred_l)
-    gap = acc_d - acc_l
+    gap = test_accuracy_cnn - test_accuracy_lr
    
-    q = quadrants(y_test, pred_d, pred_l)
+    q = quadrants(y_test, y_pred_cnn, y_pred_test_lr)
     
 
     metrics = {
-        "densenet": {"val_acc": val_acc_d, "test_acc": acc_d, "test_macro_f1": macro_f1(y_test, pred_d, cfg.NUM_CLASSES),
-                     "seconds_per_image": sec_d},
-        "lr": {"val_acc": val_acc_l, "test_acc": acc_l, "test_macro_f1": macro_f1(y_test, pred_l, cfg.NUM_CLASSES),
-               "seconds_per_image": sec_l, "fit_seconds": lr.diagnostics["fit_seconds"], "n_iter": lr.diagnostics["n_iter"]},
+        "densenet": {
+                     "val_acc": val_acc_cnn, 
+                     "test_acc": test_accuracy_cnn, 
+                     "test_macro_f1": macro_f1(y_test, y_pred_cnn, cfg.NUM_CLASSES),
+                     "train_sec_cnn": train_sec_cnn,
+                     "val_sec_cnn": val_sec_cnn},
+        "lr": {"val_acc": val_accuracy_lr, 
+               "test_acc": test_accuracy_lr, 
+               "test_macro_f1": macro_f1(y_test, y_pred_test_lr, cfg.NUM_CLASSES),
+               "fit_seconds": lr.diagnostics["fit_seconds"], 
+               "n_iter": lr.diagnostics["n_iter"]},
         "quadrants": q, "gap_test_points": gap * 100,
-        "model": {k: info[k] for k in ("action", "reason", "sha256", "device")},
-        "history": info["history"], "total_seconds": time.time() - t_start,
+        "model": {k: info[k] for k in ("action", "reason", "path", "device")},
+        "history": info["history"], "total_seconds": time.time() - t_start 
     }
+    
     (out / "stage1_metrics.json").write_text(json.dumps(metrics, indent=2))
-    np.savetxt(out / "confusion_densenet.csv", confusion(y_test, pred_d, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
-    np.savetxt(out / "confusion_lr.csv", confusion(y_test, pred_l, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
+    np.savetxt(out / "confusion_densenet.csv", confusion(y_test, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
+    np.savetxt(out / "confusion_lr.csv", confusion(y_test, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
     (out / "verifications.md").write_text(v.to_markdown() + "\n")
 
-    print("\n" + v.to_markdown())
-    print(f"\nDenseNet: val {val_acc_d:.4f} | test {acc_d:.4f} | F1 {metrics['densenet']['test_macro_f1']:.4f} | {sec_d * 1000:.2f} ms/img")
-    print(f"LR:       val {val_acc_l:.4f} | test {acc_l:.4f} | F1 {metrics['lr']['test_macro_f1']:.4f} | {sec_l * 1000:.3f} ms/img")
+    print(f"\nDenseNet: val {val_acc_cnn:.4f}   | test {test_accuracy_cnn:.4f} | F1 {metrics['densenet']['test_macro_f1']:.4f} | {sec_d * 1000:.2f} ms/img")
+    print(f"LR:         val {val_accuracy_lr:.4f} | test {test_accuracy_lr:.4f} | F1 {metrics['lr']['test_macro_f1']:.4f} | {sec_l * 1000:.3f} ms/img")
     print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
-    print(f"checkpoint sha256: {info['sha256']}\nworst status: {v.worst()} | total {time.time() - t_start:.0f}s")
-    return metrics, v
+    print(f"checkpoint: {info['path']}\n | total {time.time() - t_start:.0f}s")
+    return metrics
 
 
 if __name__ == "__main__":

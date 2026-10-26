@@ -21,9 +21,28 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from checks import assert_densenet_input, assert_logits
+
+def check_model_params(cfg,logger,model):
+    """
+         Check on model params
+    """
+    # Controlli sui parametri
+    total_params = sum(p.numel() for p in model.parameters())
+
+    trainable_params = sum(p.numel() for p in model.parameters()
+        if p.requires_grad)
+
+    logger.info(f"[build_densenet] Parametri totali: {total_params:,}")
+    logger.info(f"[build_densenet] Parametri congelati: {total_params - trainable_params:,}")
+    logger.info(f"[build_densenet] Parametri addestrabili: {trainable_params:,}")
+
+    # for name, param in model.named_parameters():
+    #    if param.requires_grad:
+    #        logger.info(f"{name} , {param.shape}")
 
 # Building
-def build_densenet(cfg):
+def build_densenet(cfg,logger):
     """
          Build Model , optimizer and define loss Function
     """
@@ -40,7 +59,7 @@ def build_densenet(cfg):
     # num_classes = len(trainval_dataset_cnn.class_to_idx)
     model.classifier = nn.Linear(model.classifier.in_features, cfg.NUM_CLASSES)
 
-    check_model_params(model)
+    check_model_params(cfg,logger,model)
 
     # loss_function = nn.CrossEntropyLoss()
     # optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -53,6 +72,7 @@ def count_inplace_relu(model: nn.Module) -> int:
 def validate_layers(model: nn.Module, cfg) -> None:
     """
         The Grad-CAM layers named in the config must exist in the model.
+        This is the layer where GRADCAM run 
     """
     names = dict(model.named_modules())
     for param in ("GRADCAM_LAYER", "GRADCAM_ALT_LAYER"):
@@ -103,7 +123,7 @@ def make_optimizer(model: nn.Module, cfg):
 # ----------------------------------------------------------------------------------------
 def predict_logits(model: nn.Module, x28, cfg, device, batch_size: int = 256) -> np.ndarray:
     """(N, 1, 28, 28) CPU tensor in [0, 1] -> (N, NUM_CLASSES) logits (numpy), in eval mode."""
-    from checks import assert_densenet_input, assert_logits
+    
     from data import to_densenet_input
     model.eval()
     out = []
