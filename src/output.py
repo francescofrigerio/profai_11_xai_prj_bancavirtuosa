@@ -5,6 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 # from PIL import Image
+import torch
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
@@ -104,16 +105,16 @@ def plot_confusion_matrix_cnn(y_true_,y_pred_, title , str_train_test,cfg):
     report = classification_report(y_true_,y_pred_, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
     print(report)
 
-def save_fig(fig, path: Path) -> None:
+def save_fig(fig, cfg , path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, bbox_inches="tight")
     print(f"  figure saved: {path}")
-    plt.show() if CONFIG.IN_NOTEBOOK else plt.close(fig)
+    plt.show() if cfg.IN_NOTEBOOK else plt.close(fig)
 
 
 
 
-def plot_logistic_graph(model_,config , out_dir , c ):
+def plot_logistic_graph(model_,cfg , out_dir , c ):
     out_dir_path = Path(out_dir)  # Converte la stringa in Path
 
     # The matrix model_.coef_ has the next shape [10 ,784]:
@@ -147,9 +148,10 @@ def plot_logistic_graph(model_,config , out_dir , c ):
 
         # Con reshape i pixel da 1d-array sono disposti in a 2d matrix,
         # che può essere rappresentata come un'immagine.
-        ax.imshow(rel[k].reshape(config.IMAGE_SIZE, config.IMAGE_SIZE), cmap="seismic", vmin=-a, vmax=a)
+        ax.imshow(rel[k].reshape(cfg.IMAGE_SIZE, cfg.IMAGE_SIZE), cmap="seismic", vmin=-a, vmax=a)
         ax.set_title(f"class {k}")
         ax.axis("off")
 
     fig.suptitle(f"LR global maps (relative coefficients), C={c}")
-    save_fig(fig, out_dir_path / f"phase0_lr_global_maps.png")
+    # save_fig(fig, out_dir_path / f"phase0_lr_global_maps.png")
+    save_fig(fig, cfg, out_dir_path)

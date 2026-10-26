@@ -1,5 +1,3 @@
-from config import CONFIG
-from logger import LOGGER
 
 # pytorch
 import torch
@@ -20,15 +18,22 @@ from torch.utils.data import Subset , Dataset
 
 from sklearn.model_selection import train_test_split
 
+from config import CONFIG
+from logger import LOGGER
+
 class TransformedDataset(Dataset):
     def __init__(self, dataset, transform=None):
         self.dataset = dataset
         self.transform = transform
 
     def __len__(self):
+        """
+        """
         return len(self.dataset)
 
     def __getitem__(self, idx):
+        """
+        """
         image, label = self.dataset[idx]
 
         if self.transform is not None:
@@ -37,7 +42,8 @@ class TransformedDataset(Dataset):
         return image, label
 
 def load_datasets(cfg=CONFIG,logger=LOGGER):
-
+    """
+    """
     transform_lr = transforms.Compose([ transforms.Grayscale(num_output_channels=1),
                                         # Transform to tensor
                                         transforms.ToTensor(),
@@ -122,7 +128,8 @@ def data_to_input_lr( dataloader_ ,
                       w , h,
                       cfg=CONFIG,
                       logger=LOGGER ):
-
+    """
+    """
     # Alloc tensors 1, 28, 28
     X = torch.empty((len(dataloader_.dataset),  channels , w , h),
                 dtype=torch.float32)
@@ -153,9 +160,6 @@ def data_to_input_lr( dataloader_ ,
             f"Sample Expected: {len(dataloader_.dataset)}"
         )
 
-    logger.debug("X shape: %s", X.shape)
-    logger.debug("y shape: %s", y.shape)
-    
     # flat the tensor only for baseline
     X = X.reshape(X.shape[0], -1).numpy()
     y = y.numpy()
@@ -164,7 +168,8 @@ def data_to_input_lr( dataloader_ ,
 
 def get_images_labels(dataset_,flag_data_loader=True,idx_dataset=0,
                       cfg=CONFIG,logger=LOGGER):
-
+    """
+    """
     if flag_data_loader:
         # once
         dataloader = DataLoader(dataset_, batch_size=32, shuffle=True)

@@ -21,7 +21,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from checks import assert_densenet_input, assert_logits
 
 def check_model_params(cfg,logger,model):
     """
@@ -53,16 +52,12 @@ def build_densenet(cfg,logger):
     set_batchnorm_eval(model)
 
     for param in model.parameters():
-         param.requires_grad = False
+        param.requires_grad = False
 
     # Modifica dell'ultimo layer per il numero corretto di classi
     # num_classes = len(trainval_dataset_cnn.class_to_idx)
     model.classifier = nn.Linear(model.classifier.in_features, cfg.NUM_CLASSES)
-
     check_model_params(cfg,logger,model)
-
-    # loss_function = nn.CrossEntropyLoss()
-    # optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     return model
 
@@ -102,8 +97,7 @@ def enter_train_mode(model: nn.Module, cfg) -> None:
 def trainable_parameters(model: nn.Module) -> list:
     return [p for p in model.parameters() if p.requires_grad]
 
-
-def define_loss_function();
+def define_loss_function():
     """
         return the correct function
         for multiclass classifier
@@ -118,28 +112,4 @@ def make_optimizer(model: nn.Module, cfg):
         return torch.optim.Adam(trainable_parameters(model), lr=cfg.LEARNING_RATE_HEAD)
     return torch.optim.Adam(model.parameters(), lr=cfg.LEARNING_RATE_FULL)
 
-# ----------------------------------------------------------------------------------------
-# Prediction
-# ----------------------------------------------------------------------------------------
-def predict_logits(model: nn.Module, x28, cfg, device, batch_size: int = 256) -> np.ndarray:
-    """(N, 1, 28, 28) CPU tensor in [0, 1] -> (N, NUM_CLASSES) logits (numpy), in eval mode."""
-    
-    from data import to_densenet_input
-    model.eval()
-    out = []
-    with torch.no_grad():
-        for i in range(0, len(x28), batch_size):
-            batch = to_densenet_input(x28[i:i + batch_size].to(device), cfg.DENSENET_SIZE)
-            if i == 0:
-                assert_densenet_input(batch, cfg)
-            logits = model(batch)
-            if i == 0:
-                assert_logits(logits, cfg)
-            out.append(logits.cpu().numpy())
-    return np.concatenate(out)
 
-
-def softmax_np(logits: np.ndarray) -> np.ndarray:
-    z = logits - logits.max(axis=1, keepdims=True)
-    e = np.exp(z)
-    return e / e.sum(axis=1, keepdims=True)

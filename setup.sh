@@ -135,6 +135,9 @@ if [ "$1" == "--init" ]; then
     echo "Elenco pacchetti installati"
     .venv/bin/pip list
 
+    echo "generazione configurazione diu pylint"
+    pylint --generate-rcfile > .pylintrc
+
     echo "----------------------------------------------------"
     echo " Setup completato con successo!"
     echo " Controlli sul codespaces"

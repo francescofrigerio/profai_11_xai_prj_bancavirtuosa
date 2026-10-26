@@ -1,80 +1,64 @@
-"""Run From the final notebook).
+"""
+    Run From the final notebook).
 
-Real run on Colab: MNIST -> DenseNet (train or load, per MODEL_MODE) 
+    Real run on Colab: MNIST -> DenseNet (train or load, per MODEL_MODE) 
                          -> LR baseline -> metrics ->
     %run run_main.py
-"""
-
-
-import os
-import sys
-# import random
+""" 
+import argparse
 import json
-import time
 from pathlib import Path
-import numpy as np
-import pandas as pd
-
+import time
 import warnings
 
-# 1. Ignore warning based on deprecate args of models
-warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
-
-# 2. Ignore FutureWarning of library (ex. Pandas o NumPy on Torchvision)
-warnings.filterwarnings('ignore', category=FutureWarning)
-
-from tqdm.auto import tqdm
-
-from sklearn.metrics import confusion_matrix
+import numpy as np
 from sklearn.metrics import classification_report
 
-# pytorch
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-# import time
-
-# computer vision with pytorch
-import torchvision
-from torch.utils.data import random_split, DataLoader
-import torchvision.models as models
-from torchvision.models import DenseNet121_Weights, densenet121
-
-# preprocessd dataset with pytorch
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
-from torch.utils.data import Subset
-
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-# from PIL import Image
-
-from config import CONFIG
-from logger import LOGGER
-from train import get_trained_model, get_device
-# from baseline import baseline
 from baseline import fit_baseline
-# from data import load_data_baseline
-from data import load_datasets
-from data import data_to_input_lr
-from output import plot_logistic_graph , plot_confusion_matrix_lr
-from sklearn.metrics import accuracy_score
-from metrics import confusion, macro_f1, quadrants
+from config import CONFIG
+from data import data_to_input_lr, load_datasets
+from logger import LOGGER
+from metrics import accuracy, confusion, macro_f1, quadrants
+from training import get_device, get_trained_model
 
-# from data import load_mnist, to_lr_input
-# from metrics import accuracy, confusion, macro_f1, quadrants, seconds_per_image
-# from model import predict_logits, softmax_np
-# from training import get_trained_model, pick_device
-# import torch
-# 
-# LR_EXPECTED_VAL_ACC = (0.90, 0.94)       # design: about 0.92 (phase 0: 0.9222)
-# GAP_EXPECTED = (0.03, 0.07)              # design: 4-6 points (phase 0: 4.78 on validation)
+# Configurazione dei Warnings (spostata DOPO tutti gli import) ---
+warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
+warnings.filterwarnings('ignore', category=FutureWarning)
 
-
+# from output import plot_logistic_graph , plot_confusion_matrix_lr
 
 def main(cfg=CONFIG,logger=LOGGER):
-    
-    out = Path(cfg.OUTPUT_DIR) / "prod"
+    """
+        Main Function Of the project
+    """
+    # Initialize the parser
+    parser = argparse.ArgumentParser(description="Xai per Classificazione di Cifre in ambito Finance")
+
+    # Definisci l'argomento (es. --mode, accettando solo LOAD o PROD)
+    parser.add_argument( '--mode',
+                        type=str,
+                        choices=['PROD','LOAD'],
+                        default='PROD',
+                        help="Modalità di esecuzione (default: PROD)"
+                    )
+    parser.add_argument( '--plot',
+                            type=bool,
+                            choices=[True,False],
+                            default=True,
+                            help="Modalità di esecuzione (default: PROD)"
+                        )
+
+    # Effettua il parse degli argomenti lanciati da terminale
+    args = parser.parse_args()
+
+    flag_pretrained = False
+    # Assegna la configurazione globale corretta in base all'input
+    if args.mode == 'LOAD':
+        flag_pretrained = True
+        print("Training avviato in modalità: PRODUCTION")
+   
+    # definizione/creazione dir e file di di output
+    out = Path(cfg.OUTPUT_DIR) 
     out.mkdir(parents=True, exist_ok=True)
     t_start = time.time()
 
@@ -99,23 +83,21 @@ def main(cfg=CONFIG,logger=LOGGER):
     
     X_train , y_train = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
     X_val , y_val = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    
     X_test , y_test = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
     
-    logger.info(f" X_train numpy {X_train.shape}")
-    logger.info(f" X_test numpy {X_test.shape}")
-
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
 
-    val_accuracy_lr = accuracy_score(y_val, lr.predict(X_val))
-    test_accuracy_lr = accuracy_score(y_test, lr.predict(X_test))
+    val_accuracy_lr = accuracy(y_val, lr.predict(X_val))
+    test_accuracy_lr = accuracy(y_test, lr.predict(X_test))
     logger.info(f"Accuratezza di test (Logistic Regression): {test_accuracy_lr}")
 
     # plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
     # plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
 
-    y_pred_val_lr=model.predict(X_val)
-    y_pred_test_lr=model.predict(X_test)
+    y_pred_val_lr = lr.predict(X_val)
+    y_pred_test_lr = lr.predict(X_test)
     report = classification_report(y_test,y_pred_test_lr, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
     print(report)
     
@@ -135,7 +117,9 @@ def main(cfg=CONFIG,logger=LOGGER):
     val_acc_cnn = info["val_acc_history"]
     train_sec_cnn = info["train_seconds"]
     val_sec_cnn = info["val_seconds"]
-    
+
+    sec_l = lr.diagnostics["fit_seconds"]
+    sec_d = val_sec_cnn
     
     gap = test_accuracy_cnn - test_accuracy_lr
    
@@ -152,7 +136,7 @@ def main(cfg=CONFIG,logger=LOGGER):
         "lr": {"val_acc": val_accuracy_lr, 
                "test_acc": test_accuracy_lr, 
                "test_macro_f1": macro_f1(y_test, y_pred_test_lr, cfg.NUM_CLASSES),
-               "fit_seconds": lr.diagnostics["fit_seconds"], 
+               "fit_seconds": sec_l, 
                "n_iter": lr.diagnostics["n_iter"]},
         "quadrants": q, "gap_test_points": gap * 100,
         "model": {k: info[k] for k in ("action", "reason", "path", "device")},
@@ -162,7 +146,8 @@ def main(cfg=CONFIG,logger=LOGGER):
     (out / "stage1_metrics.json").write_text(json.dumps(metrics, indent=2))
     np.savetxt(out / "confusion_densenet.csv", confusion(y_test, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
     np.savetxt(out / "confusion_lr.csv", confusion(y_test, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
-    (out / "verifications.md").write_text(v.to_markdown() + "\n")
+    
+    # (out / "verifications.md").write_text(v.to_markdown() + "\n")
 
     print(f"\nDenseNet: val {val_acc_cnn:.4f}   | test {test_accuracy_cnn:.4f} | F1 {metrics['densenet']['test_macro_f1']:.4f} | {sec_d * 1000:.2f} ms/img")
     print(f"LR:         val {val_accuracy_lr:.4f} | test {test_accuracy_lr:.4f} | F1 {metrics['lr']['test_macro_f1']:.4f} | {sec_l * 1000:.3f} ms/img")

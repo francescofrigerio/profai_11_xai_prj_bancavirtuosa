@@ -5,13 +5,12 @@ import torch
 import numpy as np
 from pathlib import Path
 
-import torch
 import torchvision
 
 from model import build_densenet, validate_layers
 from model import enter_train_mode ,  freeze_backbone, make_optimizer , define_loss_function
-from sklearn.metrics import accuracy_score
 
+from metrics import accuracy
 def sync(device) -> None:
     """
         Syncronizer CPU and GPU to get correct train and val time
@@ -51,18 +50,20 @@ def get_device(cfg) -> tuple:
     warning = None if want_cuda else "NO GPU: 'Esegui tutto' would be very slow. Use a GPU runtime."
     return device, warning
 
-def resolve_mode(cfg, ckpt_exists: bool) -> tuple:
+def resolve_mode(cfg,pretrained: bool , ckpt_exists: bool) -> tuple:
     """
         (action, reason). action is "train" or "load".
+        If pretrained==True action is alwais "load".
     """
-    if cfg.MODEL_MODE == "train":
+    if cfg.MODEL_MODE == "train" and pretrained == False:
         return "train", "MODEL_MODE=train"
     if cfg.MODEL_MODE == "load":
         if not ckpt_exists:
             raise FileNotFoundError(f"MODEL_MODE=load but there is no checkpoint at {cfg.CHECKPOINT_PATH}")
         return "load", "MODEL_MODE=load"
+
     
-    return "error", "error"
+    return "load", "MODEL_MODE=load"
 
 def save_checkpoint(path, model, cfg, history) -> str:
     """
@@ -87,8 +88,10 @@ def evaluate_model( model_ ,
                     dataset_,
                     dataloader_ ,
                     device_ ):
-
-
+    """
+        Evaluate model with test dataset
+    """
+    from tqdm.auto import tqdm
     model_ = model_.to(device_)
 
     model_.eval()
@@ -130,7 +133,10 @@ def train_model(cfg,
                 dataloader_val_ ,
                 device_ ,
                 num_epochs_):
-
+    """
+            Train the model with train val dataset
+    """
+    from tqdm.auto import tqdm
     model_ = model_.to(device_)
 
     set_seed(cfg.SEED)
@@ -140,7 +146,11 @@ def train_model(cfg,
 
     criterion = define_loss_function()
     history = []
-    train_loss = 0 , val_accuracy = 0
+    train_loss = 0 
+
+
+    
+    val_accuracy = 0
     # Training loop
     for epoch in range(num_epochs_):
         enter_train_mode(model_,cfg)
@@ -166,14 +176,14 @@ def train_model(cfg,
         train_seconds = time.time() - t0
         t1 = time.time()
 
-        # CICLO VALIDATION
+        # LOOP VALIDATION
         y_pred,y_true = evaluate_model( model_,
                                         dataset_,
                                         dataloader_val_,
                                         device_ )
-        val_accuracy = accuracy_score(y_true,y_pred)
+        val_accuracy = accuracy(y_true,y_pred)
         if ( val_accuracy < cfg.MIN_VAL_ACCURACY ):
-            logger.info(f"WARNING!! Accuracy(DenseNet Cnn) not over the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy_cnn}")
+            logger.info(f"WARNING!! Accuracy(DenseNet Cnn) not over the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy}")
 
         
         sync(device_)
@@ -199,7 +209,7 @@ def get_trained_model(cfg,
                       val_loader_cnn,
                       test_loader_cnn, 
                       device, 
-                      pretrained=True) -> tuple:
+                      pretrained=False) -> tuple:
     """
         Builds the model according to MODEL_MODE. 
         pretrained=False` exists for the tests only (no ImageNet download)
@@ -208,16 +218,16 @@ def get_trained_model(cfg,
     
     path = Path(cfg.CHECKPOINT_PATH)
     saved = read_checkpoint(path) if path.exists() else None
-    action, reason = resolve_mode(cfg, saved is not None)
+    action, reason = resolve_mode(cfg,pretrained, saved is not None)
     logger.info(f"MODE: {action} ({reason})")
     if action == "load":
-        model = build_densenet(cfg, pretrained=False)
+        model = build_densenet(cfg,logger)
         model.load_state_dict(saved["state_dict"])
         history = saved["history"]
     else:
         # BEFORE building: the random head must be reproducible
         set_seed(cfg.SEED)                      
-        model = build_densenet(cfg, pretrained=pretrained)
+        model = build_densenet(cfg,logger)
         model.to(device)
         history = train_model(cfg,
                               logger,
@@ -234,11 +244,9 @@ def get_trained_model(cfg,
     validate_layers(model, cfg)
 
     y_pred, y_true = evaluate_model( model ,test_datasets,test_loader_cnn ,device)
-    test_accuracy = accuracy_score(y_true,y_pred)
-    logger.info(f"Accuratezza di test (DenseNet Cnn): {test_accuracy_cnn}")
+    test_accuracy = accuracy(y_true,y_pred)
+    logger.info(f"Accuratezza di test (DenseNet Cnn): {test_accuracy}")
 
-    # X, y = data.X_trainval.to(device), data.y_trainval.to(device)
-    #_, val_acc = evaluate_model(model, X, y, torch.as_tensor(data.split.idx_val, device=device), cfg, device)
     info = {
         "action": action, 
         "reason": reason,
