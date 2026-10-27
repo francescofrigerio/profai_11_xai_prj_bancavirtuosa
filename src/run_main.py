@@ -40,13 +40,7 @@ def main(cfg=CONFIG,logger=LOGGER):
                         default='PROD',
                         help="Modalità di esecuzione (default: PROD)"
                     )
-    parser.add_argument( '--noplot',
-                            type=bool,
-                            choices=[True,False],
-                            default=False,
-                            help="Modalità di esecuzione (default: TRUE)"
-                        )
-
+    
     # Effettua il parse degli argomenti lanciati da terminale
     args = parser.parse_args()
 
@@ -93,16 +87,16 @@ def main(cfg=CONFIG,logger=LOGGER):
     test_accuracy_lr = accuracy(y_test, lr.predict(X_test))
     logger.info(f"Accuratezza di test (Logistic Regression): {test_accuracy_lr}")
 
-    if args.noplot is False:
-        plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-        plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
-
+    plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
+    plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
+    # plot barcode for class
+    
     y_pred_val_lr = lr.predict(X_val)
     y_pred_test_lr = lr.predict(X_test)
     report = classification_report(y_test,y_pred_test_lr, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
     print(report)
     
-    # plot barcode for class
+    
     
     # Cnn DenseNet
     model, info = get_trained_model(cfg,
