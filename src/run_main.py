@@ -40,10 +40,10 @@ def main(cfg=CONFIG,logger=LOGGER):
                         default='PROD',
                         help="Modalità di esecuzione (default: PROD)"
                     )
-    parser.add_argument( '--plot',
+    parser.add_argument( '--noplot',
                             type=bool,
                             choices=[True,False],
-                            default=True,
+                            default=False,
                             help="Modalità di esecuzione (default: TRUE)"
                         )
 
@@ -93,7 +93,7 @@ def main(cfg=CONFIG,logger=LOGGER):
     test_accuracy_lr = accuracy(y_test, lr.predict(X_test))
     logger.info(f"Accuratezza di test (Logistic Regression): {test_accuracy_lr}")
 
-    if args.plot is True:
+    if args.noplot is False:
         plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
         plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
 
