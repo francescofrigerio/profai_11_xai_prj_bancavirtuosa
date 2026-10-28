@@ -1,5 +1,6 @@
 
 import numpy as np
+import pandas as pd
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -9,6 +10,21 @@ import torch
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
+
+def save_fig(fig, cfg, path: Path) -> None:
+    """
+         Colab (IN_NOTEBOOK=True)	
+         Codespace (IN_NOTEBOOK=False)
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, bbox_inches="tight")
+    # print(f"Figure saved: {path}")
+
+    if cfg.IN_NOTEBOOK:
+        plt.tight_layout()
+        plt.show()
+    else:
+        plt.close(fig)
 
 def imshow(img):
     """
@@ -23,18 +39,11 @@ def imshow(img):
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
 
-    # img = img / 2 + 0.5     # unnormalize
-    # print(f"type {type(img)} ")
-    # print(f"img {img.shape} ")
-    # img = (img * std) + mean # unnormalize
-    # npimg = img.numpy()
-    # plt.imshow(np.transpose(npimg, (1, 2, 0)))
-
     # Se il tensore è su GPU, lo portiamo su CPU prima di convertirlo in NumPy
     if isinstance(img, torch.Tensor):
         img = img.cpu().detach().numpy()
 
-    # 1. Portiamo i canali alla fine: (C, H, W) -> (H, W, C)
+    # Portiamo i canali alla fine: (C, H, W) -> (H, W, C)
     # Esempio: da (3, 128, 128) diventa (128, 128, 3)
     npimg = np.transpose(img, (1, 2, 0))
     # 2. Denormalizzazione corretta: x = (y * std) + mean
@@ -42,10 +51,7 @@ def imshow(img):
     npimg = (npimg * std) + mean
     plt.imshow(npimg)
 
-
-
     plt.show()
-
 
 def back_to_image(img):
     # Definizione dei valori ImageNet per i 3 canali RGB
@@ -69,8 +75,71 @@ def back_to_image(img):
 
     return npimg
 
+def plot_predict_info_lr(model,X,y_true, title , str_train_test,cfg):
+    """
+         Plot Confusion Matrix Table
+         Classification Report
+         BarPlot F1_score
+    """
 
-# Funzione per visualizzare la matrice di confusione
+    # Prediciton 
+    y_pred =  model.predict(X)
+
+    # confusion_matrix
+    cm = confusion_matrix(y_true,y_pred)
+
+    # plt.figure(figsize=(5, 4))
+    # plt.figure(figsize=(7, 5))
+    fig, ax = plt.subplots(figsize=(7, 5))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
+    ax.xlabel('Predicted ' + str_train_test)
+    ax.ylabel('True ' + str_train_test)
+    ax.title(title + str_train_test)
+    
+    save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / f"confusion_matrix_lr_{str_train_test}.png")
+
+    # Classification report
+    class_labels = list(range(cfg.NUM_CLASSES))
+
+    report = classification_report( y_true,
+                                    y_pred,
+                                    labels=class_labels,
+                                    target_names=[str(i) for i in class_labels],
+                                    output_dict=True,
+                                    zero_division=0
+                                )
+
+    df_report = pd.DataFrame(report).T
+    print(df_report.round(4))
+
+    # Extraction f1 scores from report
+    f1_scores = [ report[str(i)]["f1-score"]
+                    for i in class_labels
+                ]
+
+    # plot bar
+    # plt.figure(figsize=(9, 5))
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    bars = plt.bar(class_labels,
+                    f1_scores,
+                    color="steelblue",
+                    edgecolor="black"
+                )
+
+    ax.xlabel("MNIST Class (digit)")
+    ax.ylabel("F1-score")
+    ax.title(f"F1-score for class - {title} {str_train_test}")
+    ax.xticks(class_labels)
+    ax.ylim(0, 1.05)
+    ax.grid(axis="y", linestyle="--", alpha=0.4)
+
+    # Numeric Value upon the bars
+    ax.bar_label(bars, fmt="%.3f", padding=3)
+    save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / f"f1_score_lr_{str_train_test}.png")
+
+    return y_pred
+
 def plot_confusion_matrix_lr(model,X,y_true, title , str_train_test,cfg):
     """
          Plot Confusion Matrix Table
@@ -105,11 +174,7 @@ def plot_confusion_matrix_cnn(y_true_,y_pred_, title , str_train_test,cfg):
     report = classification_report(y_true_,y_pred_, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
     print(report)
 
-def save_fig(fig, cfg , path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=110, bbox_inches="tight")
-    print(f"  figure saved: {path}")
-    plt.show() if cfg.IN_NOTEBOOK else plt.close(fig)
+
 
 
 

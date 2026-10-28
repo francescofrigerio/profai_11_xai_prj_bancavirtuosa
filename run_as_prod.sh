@@ -12,11 +12,13 @@ else
     echo "Avvio train in modalità: $MODE"
 fi
 
-# 1. Pulizia checkpoint dedicati alla modalità attiva
+# Dir di lavoro
+cd src || exit
+
+# Pulizia checkpoint dedicati alla modalità attiva
 rm -rf "${OUT_DIR}/checkpoint*"
 
-# 2. Esecuzione del codice Python
-cd src || exit
+# Esecuzione del codice Python
 python -m run_main --mode "$MODE" 2>&1 | tee run_${MODE}.log
 
 ls -lrt $OUT_DIR

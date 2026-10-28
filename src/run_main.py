@@ -20,7 +20,7 @@ from data import data_to_input_lr, load_datasets
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
 from training import get_device, get_trained_model
-from output import plot_logistic_graph , plot_confusion_matrix_lr
+from output import plot_logistic_graph , plot_predict_info_lr
 
 # Configurazione dei Warnings (spostata DOPO tutti gli import) ---
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
@@ -57,12 +57,14 @@ def main(cfg=CONFIG,logger=LOGGER):
     
     if args.mode == 'load':
         flag_pretrained = True
-        print("Training avviato in modalità: PRODUCTION")
+        logger.info("Training avviato in modalità: LOAD")
    
     # definizione/creazione dir e file di di output
     out = Path(cfg.OUTPUT_DIR) 
     out.mkdir(parents=True, exist_ok=True)
     t_start = time.time()
+
+    logger.info(f"Output dir: {cfg.OUTPUT_DIR}")
 
     device, warning = get_device(cfg)
     if warning:
@@ -93,17 +95,23 @@ def main(cfg=CONFIG,logger=LOGGER):
 
     val_accuracy_lr = accuracy(y_val, lr.predict(X_val))
     test_accuracy_lr = accuracy(y_test, lr.predict(X_test))
-    logger.info(f"Accuratezza di test (Logistic Regression): {test_accuracy_lr}")
+    logger.info(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
+    logger.info(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
 
     plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-    plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-    plot_confusion_matrix_lr(lr.get_model(),X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
+    # plot_confusion_matrix_lr(lr.get_model(),X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
     # plot barcode for class
     
-    y_pred_val_lr = lr.predict(X_val)
-    y_pred_test_lr = lr.predict(X_test)
-    report = classification_report(y_test,y_pred_test_lr, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
-    print(report)
+    # y_pred_val_lr = lr.predict(X_val)
+    # y_pred_test_lr = lr.predict(X_test)
+    # report = classification_report(y_test,y_pred_test_lr, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
+    # print(report)
+    y_pred_test_lr = plot_predict_info_lr(lr.get_model(),
+                                            X_test,
+                                            y_test, 
+                                            "CLASSIFIER LR ON MNIST DATASET " , 
+                                            "TEST",
+                                            CONFIG)
     
     # if args.cnn is True:
     logger.info(f" RUN_TESTS FLAG {cfg.RUN_TESTS}")
