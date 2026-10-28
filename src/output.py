@@ -11,10 +11,11 @@ import torch
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 
-def save_fig(fig, cfg, path: Path):
+def save_fig(fig, cfg, path: Path) -> None:
     """
          Colab (IN_NOTEBOOK=True)	
          Codespace (IN_NOTEBOOK=False)
+         return None to avoid print(Figure size)
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, bbox_inches="tight")
@@ -25,6 +26,8 @@ def save_fig(fig, cfg, path: Path):
         plt.show()
     else:
         plt.close(fig)
+
+    return None
 
 def imshow(img):
     """
@@ -94,7 +97,8 @@ def plot_predict_info(y_true_,
     cm = confusion_matrix(y_true_,y_pred_)
 
     fig, ax = plt.subplots(figsize=(7, 5))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
+    # ax=ax associates heatmap to axis
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False , ax=ax)
     ax.set_xlabel('Predicted ' + str_train_test)
     ax.set_ylabel('True ' + str_train_test)
     ax.set_title(title + str_train_test)
@@ -120,11 +124,18 @@ def plot_predict_info(y_true_,
                     for i in class_labels
                 ]
 
+    # Order class for F1-score ascending
+    sorted_indices = np.argsort(f1_scores)
+
+    class_labels_sorted = [str(class_labels[i]) for i in sorted_indices]
+    f1_scores_sorted = [f1_scores[i] for i in sorted_indices]
+
+
     # plot bar
     fig, ax = plt.subplots(figsize=(9, 5))
 
-    bars = plt.bar(class_labels,
-                    f1_scores,
+    bars = plt.bar(class_labels_sorted,
+                    f1_scores_sorted,
                     color="steelblue",
                     edgecolor="black"
                 )

@@ -97,9 +97,9 @@ class ConfigConstantsDefault:
     DELETION_STEPS: int = 10
 
     # Execution and outputs ONLY on Notebook
-    RUN_TESTS: bool = False
+    # RUN_TESTS: bool = False
     # Execution and outputs ALWAIS on Codespace github
-    # RUN_TESTS: bool = True
+    RUN_TESTS: bool = True
     OUTPUT_DIR: str = "outputs"
     IN_NOTEBOOK = "ipykernel" in sys.modules
 

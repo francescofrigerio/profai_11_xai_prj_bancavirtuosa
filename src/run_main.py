@@ -166,12 +166,13 @@ def main(cfg=CONFIG,logger=LOGGER):
               f"test {test_accuracy_cnn:.4f} | " \
               f"F1 {metrics['densenet']['test_macro_f1']:.4f} | {train_sec_cnn * 1000:.2f} ms/img")
         
-        print(f"LR:          val {val_accuracy_lr:.4f} | " \
+        print(f"LR:       val {val_accuracy_lr:.4f}   | " \
               f"test {test_accuracy_lr:.4f} | " \
               f"F1 {metrics['lr']['test_macro_f1']:.4f} | {train_sec_lr * 1000:.3f} ms/img")
         
         print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
-        print(f"checkpoint: {info_cnn['path']}\n | total {time.time() - t_start:.0f}s")
+        # print(f"checkpoint: {info_cnn['path']}\n | total {time.time() - t_start:.0f}s")
+        print(f"checkpoint: {info_cnn['path']}\n | total {time.perf_counter() - t_start:.0f}s")
         return metrics
     
     logger.info(

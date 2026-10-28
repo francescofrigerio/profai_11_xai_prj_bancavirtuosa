@@ -1,4 +1,7 @@
 
+
+import numpy as np
+
 # pytorch
 import torch
 import torch.nn as nn
@@ -21,6 +24,12 @@ from sklearn.model_selection import train_test_split
 from config import CONFIG
 from logger import LOGGER
 
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
+
+IMAGENET_MEAN_TRANSFORM  =  [0.485, 0.456, 0.406]
+IMAGENET_STD_TRANSFORM =   [0.229, 0.224, 0.225]
+
 class TransformedDataset(Dataset):
     def __init__(self, dataset, transform=None):
         self.dataset = dataset
@@ -41,9 +50,47 @@ class TransformedDataset(Dataset):
 
         return image, label
 
+# ----------------------------------------------------------------------------------------
+# DenseNet view
+# ----------------------------------------------------------------------------------------
+def image_net_stats(like):
+    mean = torch.tensor(IMAGENET_MEAN, dtype=like.dtype, device=like.device).view(1, 3, 1, 1)
+    std = torch.tensor(IMAGENET_STD, dtype=like.dtype, device=like.device).view(1, 3, 1, 1)
+    return mean, std
+
+
+def normalize(x):
+    """
+        Image Net Normalize
+    """
+    mean, std = image_net_stats(x)
+    return (x - mean) / std
+
+
+def denormalize(x):
+    """
+        Rollback from image net Normalize value
+    """
+    mean, std = image_net_stats(x)
+    return x * std + mean
+
+
+def denormalize_np(x: np.ndarray) -> np.ndarray:
+    """
+        numpy version of denormalize, for the contract checks (no torch needed).
+    """
+    mean = np.asarray(IMAGENET_MEAN, dtype=np.float64).reshape(1, 3, 1, 1)
+    std = np.asarray(IMAGENET_STD, dtype=np.float64).reshape(1, 3, 1, 1)
+    return np.asarray(x, dtype=np.float64) * std + mean
+
+
 def load_datasets(cfg=CONFIG,logger=LOGGER):
     """
-    """
+       The transform (x - mean) / std (mean and std of ImageNet) is mandatory 
+       to pass images at DenseNet model . 
+       DenseNet expect pixels are passed  
+       with this specify media/std to calc correctly logit and gradients.
+       """
     transform_lr = transforms.Compose([ transforms.Grayscale(num_output_channels=1),
                                         # Transform to tensor
                                         transforms.ToTensor(),
@@ -57,8 +104,10 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
                                         transforms.Lambda(lambda x: x.repeat(3, 1, 1) if x.shape[0] == 1 else x), # Espande a 3 canali
                                         # normalize img
                                         transforms.Normalize(
-                                        mean=   [0.485, 0.456, 0.406],
-                                        std=[0.229, 0.224, 0.225]
+                                        # mean=   [0.485, 0.456, 0.406],
+                                        # std=[0.229, 0.224, 0.225]
+                                        mean  =  IMAGENET_MEAN_TRANSFORM,
+                                        std  =IMAGENET_STD_TRANSFORM
                                         )
                                         ])
     
@@ -78,9 +127,6 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
     targets = trainval_base.targets
     
     # split size (ex. 6000 su 54000 = ~11.1%)
-    # train_size = len(trainval_base) - cfg.VAL_SIZE
-    # val_size = cfg.VAL_SIZE
-    # val_fraction = val_size / (train_size + val_size)
     val_fraction = cfg.VAL_SIZE / len(trainval_base)
     
     # get stratify indexes for train and validation
@@ -92,12 +138,12 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
                                                 random_state=cfg.SEED
                                          )
     
-    # Viste per la Regressione Logistica
+    # Regressione Logistic View
     train_lr = TransformedDataset(Subset(trainval_base, train_idx), transform_lr)
     val_lr = TransformedDataset(Subset(trainval_base, val_idx), transform_lr)
     test_lr = TransformedDataset(test_base, transform_lr)
 
-    # Viste per DenseNet
+    # DenseNet View
     train_cnn = TransformedDataset(Subset(trainval_base, train_idx), transform_cnn)
     val_cnn = TransformedDataset(Subset(trainval_base, val_idx), transform_cnn)
     test_cnn = TransformedDataset(test_base, transform_cnn)
@@ -137,8 +183,8 @@ def data_to_input_lr( dataloader_ ,
                 dtype=torch.int64)
     start = 0
     for images, labels in dataloader_:
-        # images ha forma (64, 1, 28, 28) -> X
-        # labels ha forma (64,)           -> y
+        # images shape (64, 1, 28, 28) -> X
+        # labels shape (64,)           -> y
         n = images.size(0)
 
         if tuple(images.shape[1:]) != (channels, w, h):
@@ -151,8 +197,6 @@ def data_to_input_lr( dataloader_ ,
         y[start:start+n].copy_(labels)
 
         start += n
-
-    
 
     if start != len(dataloader_.dataset):
         raise ValueError(
