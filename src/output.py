@@ -11,7 +11,7 @@ import torch
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 
-def save_fig(fig, cfg, path: Path) -> None:
+def save_fig(fig, cfg, path: Path):
     """
          Colab (IN_NOTEBOOK=True)	
          Codespace (IN_NOTEBOOK=False)

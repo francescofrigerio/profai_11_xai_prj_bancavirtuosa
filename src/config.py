@@ -94,9 +94,10 @@ class ConfigConstantsDefault:
     COMPUTE_FAITHFULNESS: bool = False   # deletion curves
     DELETION_STEPS: int = 10
 
-    # Execution and outputs
-    # RUN_TESTS: bool = False
-    RUN_TESTS: bool = True
+    # Execution and outputs ONLY on Notebook
+    RUN_TESTS: bool = False
+    # Execution and outputs ALWAIS on Codespace github
+    # RUN_TESTS: bool = True
     OUTPUT_DIR: str = "outputs"
     IN_NOTEBOOK = "ipykernel" in sys.modules
 

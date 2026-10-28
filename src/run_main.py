@@ -12,7 +12,6 @@ import time
 import warnings
 
 import numpy as np
-from sklearn.metrics import classification_report
 
 from baseline import fit_baseline
 from config import CONFIG
@@ -112,7 +111,7 @@ def main(cfg=CONFIG,logger=LOGGER):
     logger.info(f" RUN_TESTS FLAG {cfg.RUN_TESTS}")
     if cfg.RUN_TESTS is False:
         # Cnn DenseNet
-        model, info_cnn = get_trained_model(cfg,
+        info_cnn = get_trained_model(cfg,
                                     logger, 
                                     test_datasets,
                                     train_loader_cnn,
@@ -154,8 +153,8 @@ def main(cfg=CONFIG,logger=LOGGER):
                  "fit_seconds": sec_l, 
                  "n_iter": lr.diagnostics["n_iter"]},
         "quadrants": q, "gap_test_points": gap * 100,
-        "model": {k: info[k] for k in ("action", "reason", "path", "device")},
-        "history": info["history"], "total_seconds": time.time() - t_start 
+        "model": {k: info_cnn[k] for k in ("action", "reason", "path", "device")},
+        "history": info_cnn["history"], "total_seconds": time.time() - t_start 
         }
     
         (out / "stage1_metrics.json").write_text(json.dumps(metrics, indent=2))
@@ -164,13 +163,20 @@ def main(cfg=CONFIG,logger=LOGGER):
     
         # (out / "verifications.md").write_text(v.to_markdown() + "\n")
 
-        print(f"\nDenseNet: val {val_acc_cnn:.4f}   | test {test_accuracy_cnn:.4f} | F1 {metrics['densenet']['test_macro_f1']:.4f} | {sec_d * 1000:.2f} ms/img")
-        print(f"LR:         val {val_accuracy_lr:.4f} | test {test_accuracy_lr:.4f} | F1 {metrics['lr']['test_macro_f1']:.4f} | {sec_l * 1000:.3f} ms/img")
+        print(f"\nDenseNet: val {val_acc_cnn:.4f}   | " \
+              f"test {test_accuracy_cnn:.4f} | " \
+              f"F1 {metrics['densenet']['test_macro_f1']:.4f} | {sec_d * 1000:.2f} ms/img")
+        
+        print(f"LR:          val {val_accuracy_lr:.4f} | " \
+              f"test {test_accuracy_lr:.4f} | " \
+              f"F1 {metrics['lr']['test_macro_f1']:.4f} | {sec_l * 1000:.3f} ms/img")
+        
         print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
-        print(f"checkpoint: {info['path']}\n | total {time.time() - t_start:.0f}s")
+        print(f"checkpoint: {info_cnn['path']}\n | total {time.time() - t_start:.0f}s")
         return metrics
     
-    logger.info(f"Programma Terminato")
+    logger.info(
+        "Programma Terminato")
 
 
 if __name__ == "__main__":

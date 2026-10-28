@@ -258,6 +258,6 @@ def get_trained_model(cfg,
         "val_acc_history": history[-1]["val_acc"] if history else None,
         "device": str(device),
     }
-    return model, info
+    return info
 
     
