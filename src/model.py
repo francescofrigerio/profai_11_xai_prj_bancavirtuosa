@@ -15,7 +15,7 @@
 from torchvision.models import DenseNet121_Weights, densenet121
 # import torchvision.models as models
 
-from __future__ import annotations
+# from __future__ import annotations
 
 import numpy as np
 import torch

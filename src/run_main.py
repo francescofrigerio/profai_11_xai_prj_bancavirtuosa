@@ -33,13 +33,21 @@ def main(cfg=CONFIG,logger=LOGGER):
     # Initialize the parser
     parser = argparse.ArgumentParser(description="Xai per Classificazione di Cifre in ambito Finance")
 
-    # Definisci l'argomento (es. --mode, accettando solo LOAD o PROD)
+    # Definisci l'argomento (--mode, accettando solo LOAD o PROD)
     parser.add_argument( '--mode',
                         type=str,
-                        choices=['PROD','LOAD'],
-                        default='PROD',
+                        choices=['train','load'],
+                        default='train',
                         help="Modalità di esecuzione (default: PROD)"
                     )
+
+    # Definisci l'argomento (--cnn, accettando solo True o False)
+    parser.add_argument( '--cnn',
+                            type=bool,
+                            choices=[True,False],
+                            default=True,
+                            help="Modalità di esecuzione (default: PROD)"
+                        )
     
     # Effettua il parse degli argomenti lanciati da terminale
     args = parser.parse_args()
@@ -47,7 +55,7 @@ def main(cfg=CONFIG,logger=LOGGER):
     flag_pretrained = False
     # Assegna la configurazione globale corretta in base all'input
     
-    if args.mode == 'LOAD':
+    if args.mode == 'load':
         flag_pretrained = True
         print("Training avviato in modalità: PRODUCTION")
    
@@ -87,8 +95,9 @@ def main(cfg=CONFIG,logger=LOGGER):
     test_accuracy_lr = accuracy(y_test, lr.predict(X_test))
     logger.info(f"Accuratezza di test (Logistic Regression): {test_accuracy_lr}")
 
-    plot_logistic_graph(lr, CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-    plot_confusion_matrix_lr(lr,X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
+    plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
+    plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
+    plot_confusion_matrix_lr(lr.get_model(),X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
     # plot barcode for class
     
     y_pred_val_lr = lr.predict(X_val)
@@ -96,10 +105,11 @@ def main(cfg=CONFIG,logger=LOGGER):
     report = classification_report(y_test,y_pred_test_lr, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
     print(report)
     
-    
-    
-    # Cnn DenseNet
-    model, info = get_trained_model(cfg,
+    # if args.cnn is True:
+    logger.info(f" RUN_TESTS FLAG {cfg.RUN_TESTS}")
+    if cfg.RUN_TESTS is False:
+        # Cnn DenseNet
+        model, info = get_trained_model(cfg,
                                     logger, 
                                     test_datasets,
                                     train_loader_cnn,
@@ -108,48 +118,49 @@ def main(cfg=CONFIG,logger=LOGGER):
                                     device,
                                     pretrained=flag_pretrained)
     
-    y_pred_cnn = info["y_pred"]
-    test_accuracy_cnn = info["test_accuracy"]
-    val_acc_cnn = info["val_acc_history"]
-    train_sec_cnn = info["train_seconds"]
-    val_sec_cnn = info["val_seconds"]
+        y_pred_cnn = info["y_pred"]
+        test_accuracy_cnn = info["test_accuracy"]
+        val_acc_cnn = info["val_acc_history"]
+        train_sec_cnn = info["train_seconds"]
+        val_sec_cnn = info["val_seconds"]
 
-    sec_l = lr.diagnostics["fit_seconds"]
-    sec_d = val_sec_cnn
+        sec_l = lr.diagnostics["fit_seconds"]
+        sec_d = val_sec_cnn
     
-    gap = test_accuracy_cnn - test_accuracy_lr
+        gap = test_accuracy_cnn - test_accuracy_lr
    
-    q = quadrants(y_test, y_pred_cnn, y_pred_test_lr)
+        q = quadrants(y_test, y_pred_cnn, y_pred_test_lr)
     
 
-    metrics = {
-        "densenet": {
+        metrics = { "densenet": {
                      "val_acc": val_acc_cnn, 
                      "test_acc": test_accuracy_cnn, 
                      "test_macro_f1": macro_f1(y_test, y_pred_cnn, cfg.NUM_CLASSES),
                      "train_sec_cnn": train_sec_cnn,
                      "val_sec_cnn": val_sec_cnn},
-        "lr": {"val_acc": val_accuracy_lr, 
-               "test_acc": test_accuracy_lr, 
-               "test_macro_f1": macro_f1(y_test, y_pred_test_lr, cfg.NUM_CLASSES),
-               "fit_seconds": sec_l, 
-               "n_iter": lr.diagnostics["n_iter"]},
+                 "lr": {"val_acc": val_accuracy_lr, 
+                 "test_acc": test_accuracy_lr, 
+                 "test_macro_f1": macro_f1(y_test, y_pred_test_lr, cfg.NUM_CLASSES),
+                 "fit_seconds": sec_l, 
+                 "n_iter": lr.diagnostics["n_iter"]},
         "quadrants": q, "gap_test_points": gap * 100,
         "model": {k: info[k] for k in ("action", "reason", "path", "device")},
         "history": info["history"], "total_seconds": time.time() - t_start 
-    }
+        }
     
-    (out / "stage1_metrics.json").write_text(json.dumps(metrics, indent=2))
-    np.savetxt(out / "confusion_densenet.csv", confusion(y_test, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
-    np.savetxt(out / "confusion_lr.csv", confusion(y_test, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
+        (out / "stage1_metrics.json").write_text(json.dumps(metrics, indent=2))
+        np.savetxt(out / "confusion_densenet.csv", confusion(y_test, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
+        np.savetxt(out / "confusion_lr.csv", confusion(y_test, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
     
-    # (out / "verifications.md").write_text(v.to_markdown() + "\n")
+        # (out / "verifications.md").write_text(v.to_markdown() + "\n")
 
-    print(f"\nDenseNet: val {val_acc_cnn:.4f}   | test {test_accuracy_cnn:.4f} | F1 {metrics['densenet']['test_macro_f1']:.4f} | {sec_d * 1000:.2f} ms/img")
-    print(f"LR:         val {val_accuracy_lr:.4f} | test {test_accuracy_lr:.4f} | F1 {metrics['lr']['test_macro_f1']:.4f} | {sec_l * 1000:.3f} ms/img")
-    print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
-    print(f"checkpoint: {info['path']}\n | total {time.time() - t_start:.0f}s")
-    return metrics
+        print(f"\nDenseNet: val {val_acc_cnn:.4f}   | test {test_accuracy_cnn:.4f} | F1 {metrics['densenet']['test_macro_f1']:.4f} | {sec_d * 1000:.2f} ms/img")
+        print(f"LR:         val {val_accuracy_lr:.4f} | test {test_accuracy_lr:.4f} | F1 {metrics['lr']['test_macro_f1']:.4f} | {sec_l * 1000:.3f} ms/img")
+        print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
+        print(f"checkpoint: {info['path']}\n | total {time.time() - t_start:.0f}s")
+        return metrics
+    
+    logger.info(f"Programma Terminato")
 
 
 if __name__ == "__main__":

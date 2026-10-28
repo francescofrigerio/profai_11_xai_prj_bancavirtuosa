@@ -26,7 +26,13 @@ class LRBaseline:
     diagnostics: dict
     accuracy: float = 0 
 
-    def predict_proba(self, X) -> np.ndarray:
+    def get_model(self) -> any :
+            """
+                return model
+            """
+            return self.model
+    
+    def predict_proba(self, X) ->  np.ndarray:
         """
             predictions func
         """

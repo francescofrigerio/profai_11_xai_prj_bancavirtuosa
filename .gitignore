@@ -3,3 +3,9 @@ __pycache__/
 *.pyc
 model/
 .ipynb_checkpoints/
+run_train.log
+run_load.log
+src/run_train.log
+src/run_load.log
+src/data
+src/outputs

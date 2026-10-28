@@ -236,7 +236,7 @@ def get_trained_model(cfg,
                               train_loader_cnn ,
                               val_loader_cnn ,
                               device ,
-                              cfg.NUM_EPOCH)
+                              cfg.NUM_EPOCHS)
         
         save_checkpoint(path, model, cfg, history)
 
