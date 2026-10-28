@@ -13,9 +13,6 @@
     Test: Grad-CAM, IG, Saliency and SHAP give the same maps in both cases.
 """
 from torchvision.models import DenseNet121_Weights, densenet121
-# import torchvision.models as models
-
-# from __future__ import annotations
 
 import numpy as np
 import torch
@@ -32,9 +29,9 @@ def check_model_params(cfg,logger,model):
     trainable_params = sum(p.numel() for p in model.parameters()
         if p.requires_grad)
 
-    logger.info(f"[build_densenet] Parametri totali: {total_params:,}")
-    logger.info(f"[build_densenet] Parametri congelati: {total_params - trainable_params:,}")
-    logger.info(f"[build_densenet] Parametri addestrabili: {trainable_params:,}")
+    logger.debug(f"[build_densenet] Parametri totali: {total_params:,}")
+    logger.debug(f"[build_densenet] Parametri congelati: {total_params - trainable_params:,}")
+    logger.debug(f"[build_densenet] Parametri addestrabili: {trainable_params:,}")
 
     # for name, param in model.named_parameters():
     #    if param.requires_grad:

@@ -148,15 +148,15 @@ def train_model(cfg,
     history = []
     train_loss = 0 
 
-
-    
     val_accuracy = 0
     # Training loop
     for epoch in range(num_epochs_):
         enter_train_mode(model_,cfg)
         running_loss = 0.0
         sync(device_)
-        t0 = time.time()
+        
+        # t0 = time.time()
+        t0 = time.perf_counter()
         for i, (inputs, labels) in enumerate(dataloader_train_):
             inputs, labels = inputs.to(device_), labels.to(device_)
 
@@ -173,8 +173,11 @@ def train_model(cfg,
                 running_loss = 0.0
                 # break
         sync(device_)
-        train_seconds = time.time() - t0
-        t1 = time.time()
+        
+        # train_seconds = time.time() - t0
+        # t1 = time.time()
+        train_seconds = time.perf_counter() - t0
+        t1 = time.perf_counter()
 
         # LOOP VALIDATION
         y_pred,y_true = evaluate_model( model_,
@@ -182,14 +185,17 @@ def train_model(cfg,
                                         dataloader_val_,
                                         device_ )
         val_accuracy = accuracy(y_true,y_pred)
-        if ( val_accuracy < cfg.MIN_VAL_ACCURACY ):
-            logger.info(f"WARNING!! Accuracy(DenseNet Cnn) not over the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy}")
-        else:
-            logger.info(f"Test Accuracy (DenseNet Cnn): {val_accuracy}")
-
         sync(device_)
-        val_seconds = time.time() - t1
+        
+        # val_seconds = time.time() - t1
+        val_seconds = time.perf_counter() - t1
         logger.info(f'[Epoca {epoch + 1}, loop {i + 1:5d}] train time: {train_seconds:.3f}  val time: {val_seconds:.3f} ')
+
+        if epoch + 1 == cfg.NUM_EPOCHS:
+            if ( val_accuracy < cfg.MIN_VAL_ACCURACY ):
+                logger.info(f"WARNING!! Accuracy(DenseNet Cnn) is lower the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy}")
+            else:
+                logger.info(f"Test Accuracy (DenseNet Cnn): {val_accuracy}")
 
         history.append({
                     "epoch": epoch, 
@@ -198,8 +204,12 @@ def train_model(cfg,
                     "train_seconds": train_seconds,
                     "val_seconds": val_seconds})
         
+    
+    cnn_train_seconds = sum(item["train_seconds"] for item in history)
+    cnn_val_seconds = sum(item["val_seconds"] for item in history)
+
     logger.info('Train finisched')
-    return history
+    return history , cnn_train_seconds , cnn_val_seconds
 
 
 
@@ -230,14 +240,14 @@ def get_trained_model(cfg,
         set_seed(cfg.SEED)                      
         model = build_densenet(cfg,logger)
         model.to(device)
-        history = train_model(cfg,
-                              logger,
-                              model,
-                              test_datasets,
-                              train_loader_cnn ,
-                              val_loader_cnn ,
-                              device ,
-                              cfg.NUM_EPOCHS)
+        history , train_sec_cnn , val_sec_cnn = train_model(cfg,
+                                                            logger,
+                                                            model,
+                                                            test_datasets,
+                                                            train_loader_cnn ,
+                                                            val_loader_cnn ,
+                                                            device ,
+                                                            cfg.NUM_EPOCHS)
         
         save_checkpoint(path, model, cfg, history)
 
@@ -254,8 +264,11 @@ def get_trained_model(cfg,
         "y_true": y_true,
         "y_pred": y_pred,
         "test_accuracy": test_accuracy, 
-        "history": history, "path": path,
+        "history": history, 
+        "path": path,
         "val_acc_history": history[-1]["val_acc"] if history else None,
+        "train_seconds": train_sec_cnn,
+        "val_seconds": val_sec_cnn,
         "device": str(device),
     }
     return info

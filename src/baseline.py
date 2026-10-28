@@ -129,9 +129,12 @@ def fit_baseline(X_t, y_t, X_v , y_v, cfg , logger ) -> LRBaseline:
     
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        t0 = time.time()
+        
+        # t0 = time.time()
+        t0 = time.perf_counter()
         model = LogisticRegression(**lr_kwargs(cfg)).fit(X_t, y_t)
-        fit_seconds = time.time() - t0
+        # fit_seconds = time.time() - t0
+        fit_seconds = time.perf_counter() - t0
    
     categories = sorted({w.category.__name__ for w in caught})
     diagnostics = {

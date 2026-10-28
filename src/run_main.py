@@ -130,31 +130,30 @@ def main(cfg=CONFIG,logger=LOGGER):
         y_pred_cnn = info_cnn["y_pred"]
         test_accuracy_cnn = info_cnn["test_accuracy"]
         val_acc_cnn = info_cnn["val_acc_history"]
+        
+        train_sec_lr = lr.diagnostics["fit_seconds"]
         train_sec_cnn = info_cnn["train_seconds"]
         val_sec_cnn = info_cnn["val_seconds"]
-
-        sec_l = lr.diagnostics["fit_seconds"]
-        sec_d = val_sec_cnn
     
         gap = test_accuracy_cnn - test_accuracy_lr
    
         q = quadrants(y_test, y_pred_cnn, y_pred_test_lr)
     
 
-        metrics = { "densenet": {
+        metrics = {  "densenet": {
                      "val_acc": val_acc_cnn, 
                      "test_acc": test_accuracy_cnn, 
                      "test_macro_f1": macro_f1(y_test, y_pred_cnn, cfg.NUM_CLASSES),
                      "train_sec_cnn": train_sec_cnn,
                      "val_sec_cnn": val_sec_cnn},
-                 "lr": {"val_acc": val_accuracy_lr, 
-                 "test_acc": test_accuracy_lr, 
-                 "test_macro_f1": macro_f1(y_test, y_pred_test_lr, cfg.NUM_CLASSES),
-                 "fit_seconds": sec_l, 
-                 "n_iter": lr.diagnostics["n_iter"]},
-        "quadrants": q, "gap_test_points": gap * 100,
-        "model": {k: info_cnn[k] for k in ("action", "reason", "path", "device")},
-        "history": info_cnn["history"], "total_seconds": time.time() - t_start 
+                     "lr": {"val_acc": val_accuracy_lr, 
+                     "test_acc": test_accuracy_lr, 
+                     "test_macro_f1": macro_f1(y_test, y_pred_test_lr, cfg.NUM_CLASSES),
+                     "fit_seconds": train_sec_lr, 
+                     "n_iter": lr.diagnostics["n_iter"]},
+                     "quadrants": q, "gap_test_points": gap * 100,
+                     "model": {k: info_cnn[k] for k in ("action", "reason", "path", "device")},
+                     "history": info_cnn["history"], "total_seconds": time.time() - t_start 
         }
     
         (out / "stage1_metrics.json").write_text(json.dumps(metrics, indent=2))
@@ -165,11 +164,11 @@ def main(cfg=CONFIG,logger=LOGGER):
 
         print(f"\nDenseNet: val {val_acc_cnn:.4f}   | " \
               f"test {test_accuracy_cnn:.4f} | " \
-              f"F1 {metrics['densenet']['test_macro_f1']:.4f} | {sec_d * 1000:.2f} ms/img")
+              f"F1 {metrics['densenet']['test_macro_f1']:.4f} | {train_sec_cnn * 1000:.2f} ms/img")
         
         print(f"LR:          val {val_accuracy_lr:.4f} | " \
               f"test {test_accuracy_lr:.4f} | " \
-              f"F1 {metrics['lr']['test_macro_f1']:.4f} | {sec_l * 1000:.3f} ms/img")
+              f"F1 {metrics['lr']['test_macro_f1']:.4f} | {train_sec_lr * 1000:.3f} ms/img")
         
         print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
         print(f"checkpoint: {info_cnn['path']}\n | total {time.time() - t_start:.0f}s")

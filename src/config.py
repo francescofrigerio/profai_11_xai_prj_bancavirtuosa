@@ -1,21 +1,23 @@
-"""Global configuration of the Banca Virtuosa XAI project.
-
-Modules receive the config as an argument; only the notebook / run_main scripts import CONFIG.
-
-Changes with respect to the design document v1 (see docs/design_errata.md):
-  - USE_SURROGATE removed (D03-bis): no surrogate model in this project.
-  - MIN_VAL_ACCURACY = 0.95 (E01).
-  - IMAGE_SIZE is now the MNIST side (28); the DenseNet input side is DENSENET_SIZE (E19).
-  - Early stopping removed (E20): the number of epochs is fixed, final weights are kept.
-  - FLAG_BATCHNORM_EVAL and FLAG_RELU_INPLACE added (E21).
-  - SHAP_NUM_SAMPLES added (E18): the gradient samples of Gradient SHAP were an unnamed magic number;
-    fixed at 100 after phase 0 (seed-to-seed Spearman 0.78 against 0.80 at 200 samples, half the time).
-  - LIME_BACKEND / SHAP_BACKEND removed: LIME and SHAP use the `lime` and `shap` packages (E24).
-  - Validation extended to backend names, ranges and grid/window consistency (E16).
-
-Not validated here: GRADCAM_LAYER / GRADCAM_ALT_LAYER must exist in the model; that check
-needs the model and lives in model.py.
 """
+    Global configuration of the Banca Virtuosa XAI project.
+
+    Modules receive the config as an argument; only the notebook / run_main scripts import CONFIG.
+
+    Changes with respect to the design document v1 (see docs/design_errata.md):
+    - USE_SURROGATE removed (D03-bis): no surrogate model in this project.
+    - MIN_VAL_ACCURACY = 0.95 (E01).
+    - IMAGE_SIZE is now the MNIST side (28); the DenseNet input side is DENSENET_SIZE (E19).
+    - Early stopping removed (E20): the number of epochs is fixed, final weights are kept.
+    - FLAG_BATCHNORM_EVAL and FLAG_RELU_INPLACE added (E21).
+    - SHAP_NUM_SAMPLES added (E18): the gradient samples of Gradient SHAP were an unnamed magic number;
+    fixed at 100 after phase 0 (seed-to-seed Spearman 0.78 against 0.80 at 200 samples, half the time).
+    - LIME_BACKEND / SHAP_BACKEND removed: LIME and SHAP use the `lime` and `shap` packages (E24).
+    - Validation extended to backend names, ranges and grid/window consistency (E16).
+
+    Not validated here: GRADCAM_LAYER / GRADCAM_ALT_LAYER must exist in the model; that check
+    needs the model and lives in model.py.
+"""
+
 from dataclasses import dataclass
 
 import sys
@@ -95,9 +97,9 @@ class ConfigConstantsDefault:
     DELETION_STEPS: int = 10
 
     # Execution and outputs ONLY on Notebook
-    RUN_TESTS: bool = False
+    # RUN_TESTS: bool = False
     # Execution and outputs ALWAIS on Codespace github
-    # RUN_TESTS: bool = True
+    RUN_TESTS: bool = True
     OUTPUT_DIR: str = "outputs"
     IN_NOTEBOOK = "ipykernel" in sys.modules
 
