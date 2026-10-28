@@ -70,8 +70,6 @@ def main(cfg=CONFIG,logger=LOGGER):
         logger.info("WARNING:", warning)
 
     datasets_dict , loaders_dict = load_datasets()
-
-    trainval_datasets = datasets_dict["trainval"]
     test_datasets = datasets_dict["test"]
 
     # Load tensor for train and test baseline
@@ -156,7 +154,9 @@ def main(cfg=CONFIG,logger=LOGGER):
                      "history": info_cnn["history"], "total_seconds": time.time() - t_start 
         }
     
-        (out / "stage1_metrics.json").write_text(json.dumps(metrics, indent=2))
+        # default=str converte gli oggetti Path in str
+        (out / "lr_cnn_metrics.json").write_text(json.dumps(metrics, indent=2, default=str))
+        
         np.savetxt(out / "confusion_densenet.csv", confusion(y_test, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
         np.savetxt(out / "confusion_lr.csv", confusion(y_test, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
     

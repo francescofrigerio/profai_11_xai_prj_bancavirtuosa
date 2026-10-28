@@ -193,9 +193,9 @@ def train_model(cfg,
 
         if epoch + 1 == cfg.NUM_EPOCHS:
             if ( val_accuracy < cfg.MIN_VAL_ACCURACY ):
-                logger.info(f"WARNING!! Accuracy(DenseNet Cnn) is lower the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy}")
+                logger.info(f"WARNING!! Validation Accuracy(DenseNet Cnn) is lower the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy}")
             else:
-                logger.info(f"Test Accuracy (DenseNet Cnn): {val_accuracy}")
+                logger.info(f"Validation Accuracy (DenseNet Cnn): {val_accuracy}")
 
         history.append({
                     "epoch": epoch, 
@@ -208,7 +208,7 @@ def train_model(cfg,
     cnn_train_seconds = sum(item["train_seconds"] for item in history)
     cnn_val_seconds = sum(item["val_seconds"] for item in history)
 
-    logger.info('Train finisched')
+    logger.debug('Train finisched')
     return history , cnn_train_seconds , cnn_val_seconds
 
 
