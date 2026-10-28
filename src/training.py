@@ -184,8 +184,9 @@ def train_model(cfg,
         val_accuracy = accuracy(y_true,y_pred)
         if ( val_accuracy < cfg.MIN_VAL_ACCURACY ):
             logger.info(f"WARNING!! Accuracy(DenseNet Cnn) not over the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy}")
+        else:
+            logger.info(f"Test Accuracy (DenseNet Cnn): {val_accuracy}")
 
-        
         sync(device_)
         val_seconds = time.time() - t1
         logger.info(f'[Epoca {epoch + 1}, loop {i + 1:5d}] train time: {train_seconds:.3f}  val time: {val_seconds:.3f} ')
@@ -245,11 +246,12 @@ def get_trained_model(cfg,
 
     y_pred, y_true = evaluate_model( model ,test_datasets,test_loader_cnn ,device)
     test_accuracy = accuracy(y_true,y_pred)
-    logger.info(f"Accuratezza di test (DenseNet Cnn): {test_accuracy}")
+    logger.info(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
 
     info = {
         "action": action, 
         "reason": reason,
+        "y_true": y_true,
         "y_pred": y_pred,
         "test_accuracy": test_accuracy, 
         "history": history, "path": path,

@@ -20,7 +20,7 @@ from data import data_to_input_lr, load_datasets
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
 from training import get_device, get_trained_model
-from output import plot_logistic_graph , plot_predict_info_lr
+from output import plot_logistic_graph , plot_predict_info
 
 # Configurazione dei Warnings (spostata DOPO tutti gli import) ---
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
@@ -99,25 +99,20 @@ def main(cfg=CONFIG,logger=LOGGER):
     logger.info(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
 
     plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-    # plot_confusion_matrix_lr(lr.get_model(),X_test,y_test, "CLASSIFIER LR ON MNIST DATASET " , "TEST",CONFIG)
-    # plot barcode for class
     
     # y_pred_val_lr = lr.predict(X_val)
-    # y_pred_test_lr = lr.predict(X_test)
-    # report = classification_report(y_test,y_pred_test_lr, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
-    # print(report)
-    y_pred_test_lr = plot_predict_info_lr(lr.get_model(),
-                                            X_test,
-                                            y_test, 
-                                            "CLASSIFIER LR ON MNIST DATASET " , 
-                                            "TEST",
-                                            CONFIG)
+    y_pred_test_lr = lr.predict(X_test)
+    plot_predict_info(y_test, 
+                      y_pred_test_lr,
+                      "CLASSIFIER LR ON MNIST DATASET " , 
+                      "TEST",
+                      CONFIG,
+                      "lr")
     
-    # if args.cnn is True:
     logger.info(f" RUN_TESTS FLAG {cfg.RUN_TESTS}")
     if cfg.RUN_TESTS is False:
         # Cnn DenseNet
-        model, info = get_trained_model(cfg,
+        model, info_cnn = get_trained_model(cfg,
                                     logger, 
                                     test_datasets,
                                     train_loader_cnn,
@@ -125,12 +120,19 @@ def main(cfg=CONFIG,logger=LOGGER):
                                     test_loader_cnn, 
                                     device,
                                     pretrained=flag_pretrained)
+
+        plot_predict_info(info_cnn["y_true"], 
+                          info_cnn["y_pred"],
+                          "CLASSIFIER CNN ON MNIST DATASET " , 
+                          "TEST",
+                          CONFIG,
+                          "cnn")
     
-        y_pred_cnn = info["y_pred"]
-        test_accuracy_cnn = info["test_accuracy"]
-        val_acc_cnn = info["val_acc_history"]
-        train_sec_cnn = info["train_seconds"]
-        val_sec_cnn = info["val_seconds"]
+        y_pred_cnn = info_cnn["y_pred"]
+        test_accuracy_cnn = info_cnn["test_accuracy"]
+        val_acc_cnn = info_cnn["val_acc_history"]
+        train_sec_cnn = info_cnn["train_seconds"]
+        val_sec_cnn = info_cnn["val_seconds"]
 
         sec_l = lr.diagnostics["fit_seconds"]
         sec_d = val_sec_cnn

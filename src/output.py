@@ -75,34 +75,37 @@ def back_to_image(img):
 
     return npimg
 
-def plot_predict_info_lr(model,X,y_true, title , str_train_test,cfg):
+def plot_predict_info(y_true_,
+                      y_pred_, 
+                      title , 
+                      str_train_test,
+                      cfg,
+                      suffix_file):
     """
          Plot Confusion Matrix Table
          Classification Report
          BarPlot F1_score
+         suffix_file -> lr or cnn
     """
 
-    # Prediciton 
-    y_pred =  model.predict(X)
+    
 
     # confusion_matrix
-    cm = confusion_matrix(y_true,y_pred)
+    cm = confusion_matrix(y_true_,y_pred_)
 
-    # plt.figure(figsize=(5, 4))
-    # plt.figure(figsize=(7, 5))
     fig, ax = plt.subplots(figsize=(7, 5))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
-    ax.xlabel('Predicted ' + str_train_test)
-    ax.ylabel('True ' + str_train_test)
-    ax.title(title + str_train_test)
+    ax.set_xlabel('Predicted ' + str_train_test)
+    ax.set_ylabel('True ' + str_train_test)
+    ax.set_title(title + str_train_test)
     
-    save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / f"confusion_matrix_lr_{str_train_test}.png")
+    save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / f"confusion_matrix_{suffix_file}_{str_train_test}.png")
 
     # Classification report
     class_labels = list(range(cfg.NUM_CLASSES))
 
-    report = classification_report( y_true,
-                                    y_pred,
+    report = classification_report( y_true_,
+                                    y_pred_,
                                     labels=class_labels,
                                     target_names=[str(i) for i in class_labels],
                                     output_dict=True,
@@ -118,7 +121,6 @@ def plot_predict_info_lr(model,X,y_true, title , str_train_test,cfg):
                 ]
 
     # plot bar
-    # plt.figure(figsize=(9, 5))
     fig, ax = plt.subplots(figsize=(9, 5))
 
     bars = plt.bar(class_labels,
@@ -127,18 +129,16 @@ def plot_predict_info_lr(model,X,y_true, title , str_train_test,cfg):
                     edgecolor="black"
                 )
 
-    ax.xlabel("MNIST Class (digit)")
-    ax.ylabel("F1-score")
-    ax.title(f"F1-score for class - {title} {str_train_test}")
-    ax.xticks(class_labels)
-    ax.ylim(0, 1.05)
+    ax.set_xlabel("MNIST Class (digit)")
+    ax.set_ylabel("F1-score")
+    ax.set_title(f"F1-score for class - {title} {str_train_test}")
+    ax.set_xticks(class_labels)
+    ax.set_ylim(0, 1.05)
     ax.grid(axis="y", linestyle="--", alpha=0.4)
 
     # Numeric Value upon the bars
     ax.bar_label(bars, fmt="%.3f", padding=3)
-    save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / f"f1_score_lr_{str_train_test}.png")
-
-    return y_pred
+    save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / f"f1_score_{suffix_file}_{str_train_test}.png")
 
 def plot_confusion_matrix_lr(model,X,y_true, title , str_train_test,cfg):
     """
@@ -157,7 +157,63 @@ def plot_confusion_matrix_lr(model,X,y_true, title , str_train_test,cfg):
     report = classification_report(y_true,y_pred, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
     print(report)
 
-# Funzione per visualizzare la matrice di confusione
+def plot_predict_info_cnn(y_true_,y_pred_, title , str_train_test,cfg):
+    """
+        Plot Confusion Matrix Table
+        Classification Report
+        BarPlot F1_score
+    """
+
+    cm = confusion_matrix(y_true_, y_pred_)
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
+    ax.set_xlabel('Predicted ' + str_train_test)
+    ax.set_ylabel('True ' + str_train_test)
+    ax.set_title(title + str_train_test)
+        
+    save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / f"confusion_matrix_cnn_{str_train_test}.png")
+    
+
+    # Classification report
+    class_labels = list(range(cfg.NUM_CLASSES))
+    
+    report = classification_report( y_true_,
+                                    y_pred_,
+                                    labels=class_labels,
+                                    target_names=[str(i) for i in class_labels],
+                                    output_dict=True,
+                                    zero_division=0
+                                    )
+    
+    df_report = pd.DataFrame(report).T
+    print(df_report.round(4))
+
+    # Extraction f1 scores from report
+    f1_scores = [ report[str(i)]["f1-score"]
+                        for i in class_labels
+                    ]
+    
+    # plot bar
+    fig, ax = plt.subplots(figsize=(9, 5))
+    
+    bars = plt.bar(class_labels,
+                        f1_scores,
+                        color="steelblue",
+                        edgecolor="black"
+                    )
+    
+    ax.set_xlabel("MNIST Class (digit)")
+    ax.set_ylabel("F1-score")
+    ax.set_title(f"F1-score for class - {title} {str_train_test}")
+    ax.set_xticks(class_labels)
+    ax.set_ylim(0, 1.05)
+    ax.grid(axis="y", linestyle="--", alpha=0.4)
+    
+    # Numeric Value upon the bars
+    ax.bar_label(bars, fmt="%.3f", padding=3)
+    save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / f"f1_score_cnn_{str_train_test}.png")
+
 def plot_confusion_matrix_cnn(y_true_,y_pred_, title , str_train_test,cfg):
     """
          Plot Confusion Matrix Table
@@ -173,11 +229,6 @@ def plot_confusion_matrix_cnn(y_true_,y_pred_, title , str_train_test,cfg):
 
     report = classification_report(y_true_,y_pred_, target_names=[str(i) for i in range(cfg.NUM_CLASSES)],digits=4)
     print(report)
-
-
-
-
-
 
 def plot_logistic_graph(model_,cfg , out_dir , c ):
     out_dir_path = Path(out_dir)  # Converte la stringa in Path
