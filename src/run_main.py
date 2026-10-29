@@ -14,7 +14,7 @@ import warnings
 import numpy as np
 
 from baseline import fit_baseline
-from config import CONFIG
+from config import CONFIG , CONFIG_CHECK_CLASSES
 from data import data_to_input_lr, load_datasets
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
@@ -26,7 +26,8 @@ from utility import run_create_list_images , run_check_class_ok_ko
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-def phase_2( cfg,
+def phase_1_2( cfg,
+             cfg_list_class,
              logger,
              out_path,
              flag_pretrained = True ) -> None :
@@ -42,12 +43,12 @@ def phase_2( cfg,
     """
 
      
-    list_class = cfg.IMAGES_CHECK_CLASSES
     
-    if len(list_class) == 0 :
+    
+    if len(cfg_list_class) == 0 :
         raise ValueError("list_class non può essere vuota")
     else:
-        n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(list_class))
+        n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(cfg_list_class))
 
     logger.debug(f"Immagini per classe: {n_for_class}")
     device, warning = get_device(cfg)
@@ -85,14 +86,14 @@ def phase_2( cfg,
     run_check_class_ok_ko( logger, 
                             y_test,
                             y_pred , 
-                            list_class,
+                            cfg_list_class,
                             "LR")
 
     list_images_lr_ok , list_images_lr_ko  = run_create_list_images( logger,
                                                                      X_test,
                                                                      y_test,
                                                                      y_pred ,
-                                                                     list_class,
+                                                                     cfg_list_class,
                                                                      n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                                      flag_before_ko=True)
     if (len(list_images_lr_ok) < cfg.NUM_IMAGES_MIN_OK ):
@@ -100,7 +101,7 @@ def phase_2( cfg,
                                                         X_test,
                                                         y_test,
                                                         y_pred ,
-                                                        list_class,
+                                                        cfg_list_class,
                                                         n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                         flag_before_ko=False)
 
@@ -119,14 +120,14 @@ def phase_2( cfg,
     run_check_class_ok_ko( logger, 
                             y_test,
                             y_pred , 
-                            list_class,
+                            cfg_list_class,
                             "CNN")
 
     list_images_cnn_ok , list_images_cnn_ko  = run_create_list_images(  logger,
                                                                         X_test,
                                                                         y_test,
                                                                         y_pred ,
-                                                                        list_class,
+                                                                        cfg_list_class,
                                                                         n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                                         flag_before_ko=True)
     if (len(list_images_cnn_ok) < cfg.NUM_IMAGES_MIN_OK ):
@@ -134,7 +135,7 @@ def phase_2( cfg,
                                                               X_test,
                                                               y_test,
                                                               y_pred ,
-                                                              list_class,
+                                                              cfg_list_class,
                                                               n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                               flag_before_ko=False)
     logger.debug(f"Risultato Finale CNN: {len(list_images_cnn_ko)} {len(list_images_cnn_ok)}")
@@ -146,10 +147,10 @@ def phase_2( cfg,
     save_dict_to_json(out_path / "images_cnn_ok.json" , list_images_cnn_ok)
     save_dict_to_json(out_path / "images_cnn_ko.json" , list_images_cnn_ko)
 
-def phase_1(cfg,
-           logger,
-           out_path,
-           flag_pretrained = False) :
+def phase_1_1(cfg,
+              logger,
+              out_path,
+              flag_pretrained = False):
     """
         This is the first run.
         - TO begin with loads data , train and test the models lr and cnn.
@@ -270,7 +271,7 @@ def phase_1(cfg,
         print(f"checkpoint: {info_cnn['path']}\n | total {time.perf_counter() - t_start:.0f}s")
         return metrics
     
-def main(cfg=CONFIG,logger=LOGGER):
+def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
     """
         Main Function Of the project
     """
@@ -308,9 +309,9 @@ def main(cfg=CONFIG,logger=LOGGER):
     out.mkdir(parents=True, exist_ok=True)
 
     if flag_pretrained is False :
-        phase_1(cfg,logger,out,flag_pretrained)
+        phase_1_1(cfg,logger,out,flag_pretrained)
     else:
-        phase_2(cfg,logger,out,flag_pretrained)
+        phase_1_2(cfg,cfg_list_class,logger,out,flag_pretrained)
 
     logger.info("Programma Terminato")
 

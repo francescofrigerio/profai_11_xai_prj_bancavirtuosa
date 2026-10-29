@@ -65,8 +65,7 @@ class ConfigConstantsDefault:
     # NUM_IMAGES_FOR_CLASS: int = 100   # to confirm in phase two
     NUM_IMAGES_FOR_CLASS: int = 50   # to confirm in phase two
     NUM_IMAGES_MIN_OK: int = 10       # to confirm in phase two
-    IMAGES_CHECK_CLASSES: list = [2,3,5,8] # confirmed by visual control
-
+    
     # Grad-CAM
     GRADCAM_LAYER: str = "features.norm5"
     GRADCAM_ALT_LAYER: str = "features.denseblock3"   # for the comparison figure
@@ -185,3 +184,4 @@ class ConfigConstantsDefault:
                 "N_QUANT must be a multiple of NUM_CLASSES (stratified by predicted class)")
     
 CONFIG = ConfigConstantsDefault()
+CONFIG_CHECK_CLASSES: list = [2,3,5,8] # confirmed by visual control
