@@ -82,7 +82,7 @@ def save_checkpoint(path, model, cfg, history) -> str:
 
 
 def read_checkpoint(path) -> dict:
-    return torch.load(path, map_location="cpu")
+    return torch.load(path, map_location="cpu", weights_only=True)
 
 def evaluate_model( model_ ,
                     dataset_,
