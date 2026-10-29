@@ -58,11 +58,7 @@ CHECK_NAMES = {
    
       Schema Unificato di Normalizzazione 
       (Pre-Processo per il Requisito 2)
-      Per garantire che le 5 mappe di salienza (Grad-CAM, Saliency, Integrated Gradients, Occlusion, SHAP/LIME) 
-      possano essere confrontate per il Requisito 2 (calcolo di correlazione e IoU), 
-      applica a ciascuna la normalizzazione Min-Max $[0, 1]$
-      In questo modo avrai 5 matrici $2D$ omogenee nello spazio $[0, 1]$, 
-      pronte per essere inserite direttamente nel calcolo della matrice di correlazione di Spearman o IoU.
+     
       
       """
        La funzione (x - mean) / std (con media e deviazione standard di ImageNet) è obbligatoria 
@@ -74,30 +70,30 @@ CHECK_NAMES = {
           return (x - mean) / std
     
       """
-          Normalizzazione min max [0,1]
+          Per garantire che le 5 mappe di salienza (Grad-CAM, Saliency, Integrated Gradients, Occlusion, SHAP/LIME) 
+          possano essere confrontate mediante l'indice di correlazione e IoU, 
+          bisogna applicare a ciascuna immagine la normalizzazione Min-Max $[0, 1]$
+          In questo modo avremo 5 matrici $2D$ omogenee nello spazio $[0, 1]$, 
+          pronte per essere inserite direttamente nel calcolo della matrice di correlazione di Spearman o IoU.
+          
           Normalizzazione della Mappa di Salienza (Min-Max $[0, 1]$): 
-          Questa va applicata dopo che l'algoritmo XAI ha calcolato l'attribuzione dei pixel. 
-          Serve a rendere omogenee e confrontabili tra loro le mappe prodotte da tecniche diverse 
-          (Grad-CAM ha intervalli di valori totalmente diversi da Integrated Gradients) prima di passarle 
-          alle metriche di concordanza (IoU) o a Matplotlib.
-          
-          Da chiamare dopo che l'algoritmo XAI ha calcolato l'attribuzione dei pixel.
-          Serve a rendere omogenee e confrontabili tra loro le mappe prodotte da tecniche diverse 
+          Da chiamare dopo che l'algoritmo XAI ha calcolato l'attribuzione dei pixel
+          per mrendere omogenee e confrontabili tra loro le mappe prodotte da tecniche diverse 
           (Grad-CAM ha intervalli di valori totalmente diversi da Integrated Gradients) 
-          prima di passarle alle metriche di concordanza (IoU) o a Matplotlib.
-          
-           Diversità di scala tra le 5 tecniche XAILe 5 tecniche che utilizzi calcolano l'importanza in modi matematicamente 
+          Da Chiamare prima di passarle alle metriche di concordanza (IoU) o a Matplotlib.
+      
+           Diversità di scala tra le 5 tecniche XAI
+           Le 5 tecniche utilizzate calcolano l'importanza in modi matematicamente 
            incompatibili per quanto riguarda la scala grezza dei valori:
            Grad-CAM: Restituisce valori nell'intervallo $[0, +\infty)$ derivanti dalle attivazioni convoluzionali uscite da una ReLU.
            Integrated Gradients: Restituisce valori basati sull'integrale del gradiente moltiplicato per l'input $(x - x_0)$, 
            con valori molto piccoli (es. tra $10^{-4}$ e $10^{-2}$).
            SHAP / LIME: Restituiscono i valori di Shapley o i coefficienti di un modello surrogato lineare.
            Occlusion: Restituisce la differenza diretta nella probabilità dell'output (es. tra $-1.0$ e $+1.0$).
-           Se confrontassi le mappe grezze con l'IoU o la correlazione, le differenze di scala renderebbero 
+           Confrontando le mappe grezze con l'IoU o la correlazione avremmo degli errori causati
+           dalle differenze di scala che renderebbero 
            i risultati privi di senso.
-           
-           
-           Il pixel meno importante della mappa assume valore $0.0$.Il pixel più importante assume valore $1.0$.
+           In questo modo il pixel meno importante della mappa assume valore $0.0$.Il pixel più importante assume valore $1.0$.
            Tutte le 5 tecniche avranno mappe perfettamente omogenee e scalate tra $0.0$ e $1.0$, 
            pronte per essere inserite nel calcolo di Spearman, IoU e per la visualizzazione con Matplotlib.
            

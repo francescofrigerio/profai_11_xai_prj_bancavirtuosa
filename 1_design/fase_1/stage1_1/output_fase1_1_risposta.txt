@@ -1,0 +1,43 @@
+Prima di commentare i risultati leggo le due matrici di confusione, per controllare che tornino con le metriche e vedere dove sbagliano i due modelli.
+
+Tappa 1: i risultati sono buoni, ma la tappa non è chiusa
+
+Il modello e il confronto funzionano. Mancano però due prove che servono a dimostrare che è tutto in ordine, e una l’ho vista io nel tuo output.
+
+Cosa è venuto bene
+
+Tutte le 13 verifiche della tabella sono PASS, e i numeri riproducono quelli della fase zero (le loss e le accuracy per epoca coincidono al quarto decimale): la versione modulare è equivalente al prototipo. È anche la conferma che la correzione sul seed (E28) non ha alterato nulla.
+
+	DenseNet121	Regressione logistica
+Validation	0,9700	0,9222
+Test	0,9708	0,9246
+F1 macro (test)	0,9703	0,9234
+Tempo per immagine	1,48 ms	0,003 ms (~540 volte meno)
+Il divario sul test è 4,62 punti, dentro la forchetta 4–6 attesa dal design.
+I quadranti sono coerenti con le matrici di confusione. Su 10.000 immagini: 9.071 giuste per entrambe, 637 solo la DenseNet, 175 solo la LR, 117 sbagliate da entrambe. Gli errori tornano: 292 della DenseNet = 175 + 117, e 754 della LR = 637 + 117.
+Il 5 è la cifra più difficile per entrambe (recall 0,927 DenseNet, 0,868 LR). Gli scambi più frequenti sono 5?3 per la DenseNet, e 2?8 (38), 5?3 (37), 4?9 (31) per la LR. Servirà per la galleria e per la narrazione.
+Le 175 immagini “solo LR giusta” sono un materiale interessante per il confronto: lì la rete più semplice ha visto meglio.
+Cosa manca (le due righe mancanti dell’output)
+I test non sono girati. L’output dice ERROR: file or directory not found: tests: nella cartella 1_design/fase_1 non c’è la sottocartella tests/. Servono sia i test di config, dati, LR, metriche e guardie, sia i 6 che richiedono torch (viste DenseNet, modello, training e checkpoint), che non ho potuto eseguire in sandbox. Sono la parte di robustezza che hai chiesto.
+Il secondo run_stage1.py non c’è. Nel console compare un solo run (MODE: train). Per la tappa serve che il secondo dica MODE: load (compatible checkpoint found), riproduca gli stessi numeri e dia lo stesso SHA-256 (eca70d29…d579).
+Come completarla
+
+Nella stessa sessione Colab in cui c’è il checkpoint (il file vive solo lì):
+
+Copia la cartella tests/ accanto a config.py, poi:
+   !python -m pytest tests -q
+
+Mi aspetto tutti passati (6 più dei 54 dello scorso giro, che qui giravano senza torch). Se qualcosa fallisce, incollami il traceback.
+2. Rilancia %run run_stage1.py. Atteso: MODE: load, numeri identici, durata di circa 2 minuti (il LR costa ancora 68 s).
+3. Scarica il checkpoint prima che la sessione si chiuda (~30 MB, sotto il limite di GitHub):
+
+   from google.colab import files
+   files.download("checkpoints/densenet121_mnist.pt")
+
+e committalo nel repository. È il checkpoint ufficiale: la sessione Colab non lo conserva.
+
+Chiusura
+
+Quando mi mandi l’output di pytest e del secondo run, chiudo la tappa 1. Poi passiamo alla tappa 2: le sei tecniche XAI (Grad-CAM, Integrated Gradients, Occlusion, Saliency con Captum; LIME e SHAP con i pacchetti originali) con il test del segnale piantato e quello dell’in-place. Inizierò quando mi dici che la tappa 1 è chiusa.
+
+I risultati e le osservazioni di questo run sono già nell’errata.

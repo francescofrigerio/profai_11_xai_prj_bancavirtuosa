@@ -1,0 +1,51 @@
+/content
+Cloning into 'profai_11_xai_prj_bancavirtuosa'...
+remote: Enumerating objects: 313, done.
+remote: Counting objects: 100% (313/313), done.
+remote: Compressing objects: 100% (228/228), done.
+remote: Total 313 (delta 149), reused 223 (delta 67), pack-reused 0 (from 0)
+Receiving objects: 100% (313/313), 4.54 MiB | 20.77 MiB/s, done.
+Resolving deltas: 100% (149/149), done.
+/content/profai_11_xai_prj_bancavirtuosa/1_design/fase_1
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Preparing metadata (pyproject.toml) ... done
+  Building wheel for lime (pyproject.toml) ... done
+
+no tests ran in 0.00s
+ERROR: file or directory not found: tests
+
+100%|¦¦¦¦¦¦¦¦¦¦| 9.91M/9.91M [00:01<00:00, 5.04MB/s]
+100%|¦¦¦¦¦¦¦¦¦¦| 28.9k/28.9k [00:00<00:00, 131kB/s]
+100%|¦¦¦¦¦¦¦¦¦¦| 1.65M/1.65M [00:01<00:00, 1.24MB/s]
+100%|¦¦¦¦¦¦¦¦¦¦| 4.54k/4.54k [00:00<00:00, 6.84MB/s]
+MODE: train (no checkpoint at checkpoints/densenet121_mnist.pt)
+Downloading: "https://download.pytorch.org/models/densenet121-a639ec97.pth" to /root/.cache/torch/hub/checkpoints/densenet121-a639ec97.pth
+100%|¦¦¦¦¦¦¦¦¦¦| 30.8M/30.8M [00:00<00:00, 202MB/s]
+epoch 1/5: train loss 0.3388 acc 0.9121 | val loss 0.1839 acc 0.9497 | 61s
+epoch 2/5: train loss 0.1517 acc 0.9564 | val loss 0.1419 acc 0.9597 | 62s
+epoch 3/5: train loss 0.1204 acc 0.9647 | val loss 0.1224 acc 0.9647 | 61s
+epoch 4/5: train loss 0.1045 acc 0.9696 | val loss 0.1183 acc 0.9628 | 61s
+epoch 5/5: train loss 0.0939 acc 0.9721 | val loss 0.1046 acc 0.9700 | 61s
+
+| Check | Status | Detail |
+|---|---|---|
+| split sizes | PASS | train 54000, validation 6000, test 10000 |
+| split is disjoint | PASS | no image in both sets |
+| model mode | INFO | train (no checkpoint at checkpoints/densenet121_mnist.pt) |
+| checkpoint round trip | PASS | reloaded validation accuracy 0.9700 vs training run 0.9700 |
+| DenseNet validation accuracy >= MIN_VAL_ACCURACY | PASS | 0.9700 vs 0.95 |
+| LR converged | PASS | 248 iterations (LR_MAX_ITER=1000) |
+| LR validation accuracy in the expected range | PASS | 0.9222 (design expects about 0.92) |
+| LR logit is exactly w.x + b | PASS | max error 0.0e+00 |
+| LR coefficients sum to ~0 over the classes | PASS | max 1.0e-13 (l2: relative = absolute coefficients) |
+| LR classes aligned with the digits | PASS | classes_ == 0..9 |
+| DenseNet beats the LR on the test set | PASS | test accuracy 0.9708 vs 0.9246 |
+| gap between the models as the design expects | PASS | 4.62 points (design: 4-6 points on validation) |
+| the four quadrants sum to the test size | PASS | {'both_correct': 9071, 'only_densenet': 637, 'only_lr': 175, 'both_wrong': 117} |
+
+DenseNet: val 0.9700 | test 0.9708 | F1 0.9703 | 1.48 ms/img
+LR:       val 0.9222 | test 0.9246 | F1 0.9234 | 0.003 ms/img
+gap on test: 4.62 points | quadrants: {'both_correct': 9071, 'only_densenet': 637, 'only_lr': 175, 'both_wrong': 117}
+checkpoint sha256: eca70d299f540eb70e9956812894979cb1ec57eeb92e707c82fd5aa9b456d579
+worst status: PASS | total 454s
