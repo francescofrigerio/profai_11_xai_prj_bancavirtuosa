@@ -70,14 +70,20 @@ def save_checkpoint(path, model, cfg, history) -> str:
         Saves weights + history + version. 
         Returns the path of the file.
     """
-    
+    print(f"start save_checkpoint {path}")
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save({
-        "state_dict": {k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
-        "history": history,
-        "versions": {"torch": torch.__version__, "torchvision": torchvision.__version__},
-    }, path)
+
+    save_dict = { "state_dict": {k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
+                    "history": history,
+                    "versions": {"torch": torch.__version__, "torchvision": torchvision.__version__},
+                }
+
+    print(f"start save_checkpoint {save_dict} ")
+    
+    torch.save(save_dict, path)
+
+    print(f"end save_checkpoint {path}")
     return path
 
 
@@ -283,7 +289,7 @@ def get_trained_model(cfg,
     path = Path(cfg.CHECKPOINT_PATH)
     saved = read_checkpoint(path) if path.exists() else None
     action, reason = resolve_mode(cfg,pretrained, saved is not None)
-    logger.info(f"MODE: {action} ({reason})")
+    logger.debug(f"MODE: {action} ({reason})")
     train_sec_cnn = 0.0 
     val_sec_cnn = 0.0
     if action == "load":
@@ -295,6 +301,7 @@ def get_trained_model(cfg,
         val_sec_cnn = sum(item["val_seconds"] for item in history)
         
     else:
+        logger.debug(f"Start Load Model")
         # BEFORE building: the random head must be reproducible
         set_seed(cfg.SEED)                      
         model = build_densenet(cfg,logger)
@@ -308,7 +315,9 @@ def get_trained_model(cfg,
                                                             device ,
                                                             cfg.NUM_EPOCHS)
         
+        logger.debug(f"before Save Model")
         save_checkpoint(path, model, cfg, history)
+        logger.debug(f"after Save Model")
 
     # model = model.to(device).eval()
     validate_layers(model, cfg)
