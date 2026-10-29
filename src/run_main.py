@@ -105,7 +105,7 @@ def phase_1_2( cfg,
                                                         n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                         flag_before_ko=False)
 
-    logger.info(f"Risultato Finale LR: {len(list_images_lr_ko)} {len(list_images_lr_ok)}")
+    logger.debug(f"Risultato Finale LR: {len(list_images_lr_ko)} {len(list_images_lr_ok)}")
     # END PROCESS LR MODEL
     
     # START PROCESS CNN MODEL 
@@ -161,11 +161,11 @@ def phase_1_1(cfg,
 
     t_start = time.time()
     
-    logger.info(f"Output dir: {cfg.OUTPUT_DIR}")
+    logger.debug(f"Output dir: {cfg.OUTPUT_DIR}")
     
     device, warning = get_device(cfg)
     if warning:
-        logger.info("WARNING:", warning)
+        logger.debug("WARNING:", warning)
     
     datasets_dict , loaders_dict = load_datasets()
     test_datasets = datasets_dict["test"]
@@ -190,8 +190,8 @@ def phase_1_1(cfg,
     
     val_accuracy_lr = accuracy(y_val, lr.predict(X_val))
     test_accuracy_lr = accuracy(y_test, lr.predict(X_test))
-    logger.info(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
-    logger.info(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
+    print(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
+    print(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
     
     plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
         
@@ -313,7 +313,7 @@ def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
     else:
         phase_1_2(cfg,cfg_list_class,logger,out,flag_pretrained)
 
-    logger.info("Programma Terminato")
+    logger.debug("Programma Terminato")
 
 if __name__ == "__main__":
     main()
