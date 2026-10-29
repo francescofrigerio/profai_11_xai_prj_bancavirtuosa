@@ -31,14 +31,14 @@ def run_create_list_images( logger,
     list_images_lr_ok = []
     list_images_lr_ko = []
 
-    logger.info(f" y_test_ {y_test_}")
-    logger.info(f" y_test_ {type(y_test_)}")
+    logger.debug(f" y_test_ {y_test_}")
+    logger.debug(f" y_test_ {type(y_test_)}")
 
     for id_class in list_class_:
-        logger.info(f" start classe {id_class}")
+        logger.debug(f" start classe {id_class}")
 
         class_mask = y_test_ == id_class
-        logger.info(f" total_class_mask {class_mask}")
+        logger.debug(f" total_class_mask {class_mask}")
 
         class_ok_mask = class_mask & correct_mask
         class_ko_mask = class_mask & wrong_mask
@@ -54,8 +54,8 @@ def run_create_list_images( logger,
         idx_ok = np.where((np.asarray(y_test_) == id_class) &
                           (np.asarray(y_test_) == np.asarray(y_pred_)))[0]
 
-        logger.info(f"Indici KO di controllo: {idx_ko[:10]}")
-        logger.info(f"Indici OK di controllo: {idx_ok[:10]}")
+        logger.debug(f"Indici KO di controllo: {idx_ko[:10]}")
+        logger.debug(f"Indici OK di controllo: {idx_ok[:10]}")
 
         # stabilisco quanti errori e quante
         # immagini corrette possiamo selezionare
@@ -67,8 +67,8 @@ def run_create_list_images( logger,
             # n_ok utilizza soltanto i posti rimasti dopo aver selezionato gli errori.
             n_ok = min(len(idx_ok), n_per_class - n_ko)
 
-            logger.info(f"BEFORE KO n_ko {n_ko}")
-            logger.info(f"BEFORE KO  n_ok {n_ok}")
+            logger.debug(f"BEFORE KO n_ko {n_ko}")
+            logger.debug(f"BEFORE KO  n_ok {n_ok}")
         else:
             # n_ok non può superare né il numero di errori 
             # disponibili né il limite per classe.
@@ -77,8 +77,8 @@ def run_create_list_images( logger,
             # n_ko utilizza soltanto i posti rimasti dopo aver selezionato gli ok.
             n_ko = min(len(idx_ko), n_per_class - n_ok)
 
-            logger.info(f"BEFORE OK n_ok {n_ok}")
-            logger.info(f"BEFORE OK n_ko {n_ko}")
+            logger.debug(f"BEFORE OK n_ok {n_ok}")
+            logger.debug(f"BEFORE OK n_ko {n_ko}")
             
         idx_ko_selected = idx_ko[:n_ko]
         idx_ok_selected = idx_ok[:n_ok]
@@ -118,7 +118,7 @@ def run_create_list_images( logger,
 
             list_images_lr_ko.append(dict_curr_ko)
 
-        logger.info(f" end classe {id_class}")
+        logger.debug(f" end classe {id_class}")
 
     return list_images_lr_ok , list_images_lr_ko
 
@@ -141,5 +141,5 @@ def run_check_class_ok_ko( logger,
                                      (y_test_ == y_pred_)
                                      )[0]
         
-        logger.info(f"Classe {id_class}: {len(idx_ko_check)} errate {dom_name_}")
-        logger.info(f"Classe {id_class}: {len(idx_ok_check)} corrette {dom_name_}")
+        logger.debug(f"Classe {id_class}: {len(idx_ko_check)} errate {dom_name_}")
+        logger.debug(f"Classe {id_class}: {len(idx_ok_check)} corrette {dom_name_}")

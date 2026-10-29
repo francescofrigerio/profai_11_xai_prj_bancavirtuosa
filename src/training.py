@@ -105,9 +105,9 @@ def get_evaluate_model( cfg,
        raise ValueError(f"in fase 2 solo MODE: {action}")
     model = build_densenet(cfg,logger)
     model.load_state_dict(saved["state_dict"])
-    model_ = model_.to(device_)
+    model = model.to(device_)
 
-    model_.eval()
+    model.eval()
     y_pred_=[]
     y_true_=[]
     X_test_=[]
@@ -121,7 +121,7 @@ def get_evaluate_model( cfg,
             # prendo l'output delle previsioni direttamente
             # dalle immagini caricate applicando la nostra rete neurale convolutiva
             # e addestrata .
-            outputs_ = model_(images)
+            outputs_ = model(images)
             # Ottengo il valore della classe prevista
             # usando le etichette per gli output ottenuti che abbiamo definito come prima.
             _, predicted = torch.max(outputs_, 1)
@@ -284,10 +284,16 @@ def get_trained_model(cfg,
     saved = read_checkpoint(path) if path.exists() else None
     action, reason = resolve_mode(cfg,pretrained, saved is not None)
     logger.info(f"MODE: {action} ({reason})")
+    train_sec_cnn = 0.0 
+    val_sec_cnn = 0.0
     if action == "load":
         model = build_densenet(cfg,logger)
         model.load_state_dict(saved["state_dict"])
         history = saved["history"]
+
+        train_sec_cnn = sum(item["train_seconds"] for item in history)
+        val_sec_cnn = sum(item["val_seconds"] for item in history)
+        
     else:
         # BEFORE building: the random head must be reproducible
         set_seed(cfg.SEED)                      
