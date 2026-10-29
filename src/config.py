@@ -21,6 +21,9 @@
 from dataclasses import dataclass
 
 import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
 
 @dataclass(frozen=True)
 class ConfigConstantsDefault:
@@ -53,7 +56,7 @@ class ConfigConstantsDefault:
     LEARNING_RATE_HEAD: float = 1e-3     # used when FREEZE_BACKBONE=True
     LEARNING_RATE_FULL: float = 5e-5     # used when FREEZE_BACKBONE=False
     
-    CHECKPOINT_PATH: str = "checkpoints/densenet121_mnist.pt"
+    CHECKPOINT_PATH: str = ROOT_DIR / "checkpoints/densenet121_mnist.pt"
     # BatchNorm of the backbone in eval during training. Effective only when FREEZE_BACKBONE=True
     # (otherwise the backbone trains normally). False reproduces plain model.train().
     FLAG_BATCHNORM_EVAL: bool = True
@@ -105,7 +108,7 @@ class ConfigConstantsDefault:
     # RUN_TESTS: bool = False
     # Execution and outputs ALWAIS on Codespace github
     RUN_TESTS: bool = True
-    OUTPUT_DIR: str = "outputs"
+    OUTPUT_DIR: str = ROOT_DIR / "src/outputs"
     IN_NOTEBOOK = "ipykernel" in sys.modules
 
     THRESHOLDS = { 
