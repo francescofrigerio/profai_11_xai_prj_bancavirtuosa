@@ -30,25 +30,7 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 IMAGENET_MEAN_TRANSFORM  =  [0.485, 0.456, 0.406]
 IMAGENET_STD_TRANSFORM =   [0.229, 0.224, 0.225]
 
-class TransformedDataset(Dataset):
-    def __init__(self, dataset, transform=None):
-        self.dataset = dataset
-        self.transform = transform
 
-    def __len__(self):
-        """
-        """
-        return len(self.dataset)
-
-    def __getitem__(self, idx):
-        """
-        """
-        image, label = self.dataset[idx]
-
-        if self.transform is not None:
-            image = self.transform(image)
-
-        return image, label
 
 # ----------------------------------------------------------------------------------------
 # DenseNet view
@@ -83,7 +65,26 @@ def denormalize_np(x: np.ndarray) -> np.ndarray:
     std = np.asarray(IMAGENET_STD, dtype=np.float64).reshape(1, 3, 1, 1)
     return np.asarray(x, dtype=np.float64) * std + mean
 
+class TransformedDataset(Dataset):
+    def __init__(self, dataset, transform=None):
+        self.dataset = dataset
+        self.transform = transform
 
+    def __len__(self):
+        """
+        """
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        """
+        """
+        image, label = self.dataset[idx]
+
+        if self.transform is not None:
+            image = self.transform(image)
+
+        return image, label
+    
 def load_datasets(cfg=CONFIG,logger=LOGGER):
     """
        The transform (x - mean) / std (mean and std of ImageNet) is mandatory 

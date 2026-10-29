@@ -61,6 +61,12 @@ class ConfigConstantsDefault:
     # Nothing switches automatically: if an explanation technique needs False, say so via config.
     FLAG_RELU_INPLACE: bool = True
 
+    # Phase 2 Parameters
+    # NUM_IMAGES_FOR_CLASS: int = 100   # to confirm in phase two
+    NUM_IMAGES_FOR_CLASS: int = 50   # to confirm in phase two
+    NUM_IMAGES_MIN_OK: int = 10       # to confirm in phase two
+    IMAGES_CHECK_CLASSES: list = [2,3,5,8] # confirmed by visual control
+
     # Grad-CAM
     GRADCAM_LAYER: str = "features.norm5"
     GRADCAM_ALT_LAYER: str = "features.denseblock3"   # for the comparison figure

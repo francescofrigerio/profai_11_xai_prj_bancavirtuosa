@@ -1,6 +1,7 @@
 
 import numpy as np
 import pandas as pd
+import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -10,6 +11,19 @@ import torch
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
+
+def save_dict_to_json(file_images , data_dict):
+    with open(file_images, "w", encoding="utf-8") as f:
+        json.dump(data_dict, f, indent=4)
+
+def load_dict_from_json(logger,file_name):
+    with open(file_name, "r", encoding="utf-8") as f:
+        list_load_dict = json.load(f)
+
+    logger.info(f"Caricati {len(list_load_dict)} elementi con successo!")
+    logger.info("Primo elemento:", list_load_dict[0])
+    return list_load_dict
+
 
 def save_fig(fig, cfg, path: Path) -> None:
     """

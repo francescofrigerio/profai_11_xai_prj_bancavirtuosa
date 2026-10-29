@@ -32,3 +32,51 @@ Motivazione del Progetto Le tecniche di Explainable AI sono essenziali per Banca
 
 Modalità di consegna:
 Link 
+
+
+
+Punti del progetto da implementare
+
+Sviluppo CNN su CV codespaces 
+Test lr più CNN su codespaces
+Commentando plot grafici 
+Oppure passare una flag in input 
+
+Comprendere test analyze della lr
+Con domande su gemini 
+Sui variabile manual 
+Fare analisi sui dati del mio train 
+Per capire qualcosa in più 
+
+Plot grafico a barre F1 score 
+Delle diverse Classi in ordine 
+Per F1 score 
+
+Avanti con fase 1 su Claude
+Eseguendo il Comando sul 
+Notebook di fase 1
+
+Eseguire anche il mio codice sul 
+Notebook di fase 1
+Passando flag true in input 
+
+
+Fase 2 
+Passare 
+Codice per selezione di 100
+Immagini errate  25 per classe 
+Codice per selezione di 100
+Immagini corrette 25 per classe 
+
+
+Sviluppo codespaces
+sviluppo test copiando da claude
+su una dir src/tests
+
+sviluppo del codice xai 
+Per gradcam ig shap saliency 
+Test solo sul notebook
+Via flag 
+Analisi e comprensione 
+
+

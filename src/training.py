@@ -84,12 +84,65 @@ def save_checkpoint(path, model, cfg, history) -> str:
 def read_checkpoint(path) -> dict:
     return torch.load(path, map_location="cpu", weights_only=True)
 
+
+
+def get_evaluate_model( cfg,
+                        logger,
+                        pretrained_,
+                        test_loader_,
+                        device_ ):
+    """
+        phase2 : evaluate model for list classes
+    """
+   
+    
+
+    path = Path(cfg.CHECKPOINT_PATH)
+    saved = read_checkpoint(path) if path.exists() else None
+    action, reason = resolve_mode(cfg,pretrained_, saved is not None)
+    logger.info(f"MODE: {action} ({reason})  ")
+    if action != "load":
+       raise ValueError(f"in fase 2 solo MODE: {action}")
+    model = build_densenet(cfg,logger)
+    model.load_state_dict(saved["state_dict"])
+    model_ = model_.to(device_)
+
+    model_.eval()
+    y_pred_=[]
+    y_true_=[]
+    X_test_=[]
+
+    with torch.no_grad():
+        for i, (images, labels) in enumerate(test_loader_):
+            images, labels = images.to(device_), labels.to(device_)
+
+            # print images gid with relative prevision and ground truth
+
+            # prendo l'output delle previsioni direttamente
+            # dalle immagini caricate applicando la nostra rete neurale convolutiva
+            # e addestrata .
+            outputs_ = model_(images)
+            # Ottengo il valore della classe prevista
+            # usando le etichette per gli output ottenuti che abbiamo definito come prima.
+            _, predicted = torch.max(outputs_, 1)
+
+            X_test_.append(images)
+            y_true_.append(labels)
+            y_pred_.append(predicted)
+
+    # Concatena tutto l'intero dataset
+    X_test_ = torch.cat(X_test_).cpu().numpy()
+    y_true_ = torch.cat(y_true_).cpu().numpy()
+    y_pred_ = torch.cat(y_pred_).cpu().numpy()
+
+    return X_test_ , y_true_ , y_pred_
+
 def evaluate_model( model_ ,
                     dataset_,
                     dataloader_ ,
                     device_ ):
     """
-        Evaluate model with test dataset
+        phase1: Evaluate model with test dataset
     """
     from tqdm.auto import tqdm
     model_ = model_.to(device_)
