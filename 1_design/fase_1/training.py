@@ -110,14 +110,16 @@ def save_checkpoint(path, model, cfg, history) -> str:
         "state_dict": {k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
         "snapshot": snapshot_from_config(cfg),
         "history": history,
-        "versions": {"torch": torch.__version__, "torchvision": torchvision.__version__},
+        # plain str(): torch.__version__ is a TorchVersion object that torch.load(weights_only=True) refuses
+        "versions": {"torch": str(torch.__version__), "torchvision": str(torchvision.__version__)},
     }, path)
     return file_sha256(path)
 
 
 def read_checkpoint(path) -> dict:
+    """The checkpoint holds only tensors and plain Python values, so the safe loader is enough."""
     import torch
-    return torch.load(path, map_location="cpu")
+    return torch.load(path, map_location="cpu", weights_only=True)
 
 
 # ----------------------------------------------------------------------------------------
