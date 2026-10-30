@@ -41,7 +41,8 @@ def run_create_list_images( logger,
     # Maschere su tutte le classi
     correct_mask = y_pred_ == y_test_
     wrong_mask = y_pred_ != y_test_
-    logger.info(f" correct_mask {correct_mask} wrong_mask {wrong_mask}")
+    logger.debug
+    (f" correct_mask {correct_mask} wrong_mask {wrong_mask}")
 
     list_images_ok = []
     list_images_ko = []
@@ -109,8 +110,8 @@ def run_create_list_images( logger,
                 img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
 
             # Adatto il dizionario al formato json
-            dict_curr_ok = {  "class": id_class,
-                              "id_dataset": i,
+            dict_curr_ok = {  "class": int(id_class),
+                              "id_dataset": int(i),
                               "image": img_to_save.tolist() ,
                               "y_true": int(y_test_[i]) if not hasattr(y_test_[i], 'item') else y_test_[i].item(),
                               "y_pred": int(y_pred_[i]) if not hasattr(y_pred_[i], 'item') else y_pred_[i].item()
@@ -128,8 +129,8 @@ def run_create_list_images( logger,
             if img_to_save.ndim == 3 and img_to_save.shape[0] == 1:
                 img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
 
-            dict_curr_ko = {  "class": id_class,
-                              "id_dataset": i,
+            dict_curr_ko = {  "class": int(id_class),
+                              "id_dataset": int(i),
                               "image": img_to_save.tolist() ,
                               "y_true": int(y_test_[i]) if not hasattr(y_test_[i], 'item') else y_test_[i].item(),
                               "y_pred": int(y_pred_[i]) if not hasattr(y_pred_[i], 'item') else y_pred_[i].item()

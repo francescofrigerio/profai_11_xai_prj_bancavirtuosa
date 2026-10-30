@@ -70,29 +70,24 @@ def save_checkpoint(path, model, cfg, history) -> str:
         Saves weights + history + version. 
         Returns the path of the file.
     """
-    print(f"start save_checkpoint {path}")
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     save_dict = { "state_dict": {k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
                     "history": history,
-                    # "versions": {"torch": torch.__version__, "torchvision": torchvision.__version__},
+                    # warning!! version has to be cast
+                    # else torch.load not work
                     "versions": { "torch": str(torch.__version__),
                                   "torchvision": str(torchvision.__version__),
                                 }
 
                 }
-
-    print(f"start save_checkpoint {save_dict.keys()} ")
     torch.save(save_dict, path)
-    print(f"end save_checkpoint {save_dict.keys()} ")
 
-    print(f"end save_checkpoint {path}")
     return path
 
 
 def read_checkpoint(path) -> dict:
-    print(f"start read_checkpoint {path} ")
     return torch.load(path, map_location="cpu", weights_only=True)
 
 
@@ -113,14 +108,16 @@ def get_evaluate_model( cfg,
     if path.exists():
         saved = read_checkpoint(path) 
     else:
-        raise ValueError(f"non esiste il file {path}")
+        raise ValueError(f"Checkpoint Not exists {path}")
         
     logger.debug(f"saved: {type(saved)})  ")
-    logger.debug(f"saved: {type(saved)} ({saved.keys()})  ")
+    
     action, reason = resolve_mode(cfg,pretrained_, saved is not None)
+    
     logger.debug(f"MODE: {action} ({reason})  ")
     if action != "load":
        raise ValueError(f"in fase 2 solo MODE: {action}")
+    
     model = build_densenet(cfg,logger)
     model.load_state_dict(saved["state_dict"])
     
