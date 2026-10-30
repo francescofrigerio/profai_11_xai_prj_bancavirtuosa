@@ -109,7 +109,7 @@ def run_create_list_images( logger,
             if img_to_save.ndim == 3 and img_to_save.shape[0] == 1:
                 img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
 
-            # Adatto il dizionario al formato json
+            # cast to int else json.write not work
             dict_curr_ok = {  "class": int(id_class),
                               "id_dataset": int(i),
                               "image": img_to_save.tolist() ,
@@ -129,6 +129,7 @@ def run_create_list_images( logger,
             if img_to_save.ndim == 3 and img_to_save.shape[0] == 1:
                 img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
 
+            # cast to int else json.write not work
             dict_curr_ko = {  "class": int(id_class),
                               "id_dataset": int(i),
                               "image": img_to_save.tolist() ,
