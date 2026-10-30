@@ -301,6 +301,7 @@ def get_trained_model(cfg,
     train_sec_cnn = 0.0
     val_sec_cnn = 0.0
     if action == "load":
+        logger.debug(f"Start Load")
         model = build_densenet(cfg,logger)
         model.load_state_dict(saved["state_dict"])
         history = saved["history"]
@@ -309,7 +310,7 @@ def get_trained_model(cfg,
         val_sec_cnn = sum(item["val_seconds"] for item in history)
    
     else:
-        logger.debug(f"Start Load Model")
+        logger.debug(f"Start Train")
         # BEFORE building: the random head must be reproducible
         set_seed(cfg.SEED)                      
         model = build_densenet(cfg,logger)
