@@ -213,7 +213,7 @@ def phase_1_1(cfg,
         flag_run_cnn = False 
 
     print(f"FINALE DEBUG FLAG {flag_run_cnn}")
-    # raise ValueError("Mi Fermo per debug {flag_run_cnn}")
+    #
     
     if flag_run_cnn is True:
         # Cnn DenseNet

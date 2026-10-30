@@ -76,7 +76,11 @@ def save_checkpoint(path, model, cfg, history) -> str:
 
     save_dict = { "state_dict": {k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
                     "history": history,
-                    "versions": {"torch": torch.__version__, "torchvision": torchvision.__version__},
+                    # "versions": {"torch": torch.__version__, "torchvision": torchvision.__version__},
+                    "versions": { "torch": str(torch.__version__),
+                                  "torchvision": str(torchvision.__version__),
+                                }
+
                 }
 
     print(f"start save_checkpoint {save_dict.keys()} ")
@@ -88,6 +92,7 @@ def save_checkpoint(path, model, cfg, history) -> str:
 
 
 def read_checkpoint(path) -> dict:
+    print(f"start read_checkpoint {path} ")
     return torch.load(path, map_location="cpu", weights_only=True)
 
 
@@ -104,8 +109,13 @@ def get_evaluate_model( cfg,
     
 
     path = Path(cfg.CHECKPOINT_PATH)
-    
-    saved = read_checkpoint(path) if path.exists() else None
+    logger.info(f"Checkpoint path: {path}")
+    logger.info(f"Checkpoint exists: {path.exists()}")
+    if path.exists():
+        saved = read_checkpoint(path) 
+    else:
+        raise ValueError(f"non esiste il file {path}")
+        
     logger.info(f"saved: {type(saved)})  ")
     logger.info(f"saved: {type(saved)} ({saved.keys()})  ")
     action, reason = resolve_mode(cfg,pretrained_, saved is not None)
