@@ -67,14 +67,16 @@ def test_load_checkpoint_weights_only(cfg=CONFIG, logger=LOGGER):
            raise ValueError(f"non esiste il file {path}")
     
     # Gestione robusta della state_dict (compatibile con dizionario o pesi diretti)
-    state_dict = saved["model_state_dict"] if isinstance(saved, dict) and "model_state_dict" in saved else saved
+    state_dict = saved["state_dict"] if isinstance(saved, dict) and "model_state_dict" in saved else saved
     print(type(state_dict))
     print(f"dict modello checkpoint {state_dict.keys()}")
     # Istanziazione e caricamento pesi
     model = build_densenet(cfg, logger)
     logger.info("[TEST] Modello istanziato . Ora carico i pesi salvati.")
-    model.load_state_dict(state_dict)
-    
+    # model.load_state_dict(state_dict)
+    model.load_state_dict(saved["state_dict"])
+    logger.info("[TEST] pesi caricati .")
+
     # Asserzioni di controllo
     assert model is not None, "Il modello non è stato instanziato correttamente."
     logger.info("[TEST] Checkpoint e modello caricati con successo.")

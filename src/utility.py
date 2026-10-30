@@ -43,8 +43,8 @@ def run_create_list_images( logger,
     wrong_mask = y_pred_ != y_test_
     logger.info(f" correct_mask {correct_mask} wrong_mask {wrong_mask}")
 
-    list_images_lr_ok = []
-    list_images_lr_ko = []
+    list_images_ok = []
+    list_images_ko = []
 
     logger.debug(f" y_test_ {y_test_}")
     logger.debug(f" y_test_ {type(y_test_)}")
@@ -109,12 +109,14 @@ def run_create_list_images( logger,
                 img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
 
             # Adatto il dizionario al formato json
-            dict_curr_ok = { "image": img_to_save.tolist() ,
+            dict_curr_ok = {  "class": id_class,
+                              "id_dataset": i,
+                              "image": img_to_save.tolist() ,
                               "y_true": int(y_test_[i]) if not hasattr(y_test_[i], 'item') else y_test_[i].item(),
                               "y_pred": int(y_pred_[i]) if not hasattr(y_pred_[i], 'item') else y_pred_[i].item()
                             }
 
-            list_images_lr_ok.append(dict_curr_ok)
+            list_images_ok.append(dict_curr_ok)
 
         for i in (idx_ko_selected):
             
@@ -126,16 +128,18 @@ def run_create_list_images( logger,
             if img_to_save.ndim == 3 and img_to_save.shape[0] == 1:
                 img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
 
-            dict_curr_ko = { "image": img_to_save.tolist() ,
+            dict_curr_ko = {  "class": id_class,
+                              "id_dataset": i,
+                              "image": img_to_save.tolist() ,
                               "y_true": int(y_test_[i]) if not hasattr(y_test_[i], 'item') else y_test_[i].item(),
                               "y_pred": int(y_pred_[i]) if not hasattr(y_pred_[i], 'item') else y_pred_[i].item()
                             }
 
-            list_images_lr_ko.append(dict_curr_ko)
+            list_images_ko.append(dict_curr_ko)
 
         logger.debug(f" end classe {id_class}")
 
-    return list_images_lr_ok , list_images_lr_ko
+    return list_images_ok , list_images_ko
 
 
 def run_check_class_ok_ko( logger, 

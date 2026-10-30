@@ -104,28 +104,26 @@ def get_evaluate_model( cfg,
                         device_ ):
     """
         phase2 : evaluate model for list classes
+        return images , true , pred
     """
    
-    
-
     path = Path(cfg.CHECKPOINT_PATH)
-    logger.info(f"Checkpoint path: {path}")
-    logger.info(f"Checkpoint exists: {path.exists()}")
+    logger.debug(f"Checkpoint path: {path}")
+    logger.debug(f"Checkpoint exists: {path.exists()}")
     if path.exists():
         saved = read_checkpoint(path) 
     else:
         raise ValueError(f"non esiste il file {path}")
         
-    logger.info(f"saved: {type(saved)})  ")
-    logger.info(f"saved: {type(saved)} ({saved.keys()})  ")
+    logger.debug(f"saved: {type(saved)})  ")
+    logger.debug(f"saved: {type(saved)} ({saved.keys()})  ")
     action, reason = resolve_mode(cfg,pretrained_, saved is not None)
-    logger.info(f"MODE: {action} ({reason})  ")
+    logger.debug(f"MODE: {action} ({reason})  ")
     if action != "load":
        raise ValueError(f"in fase 2 solo MODE: {action}")
     model = build_densenet(cfg,logger)
     model.load_state_dict(saved["state_dict"])
-    # model.load_state_dict(saved["state_dict"]) #
-    # saved = read_checkpoint(path) # OK
+    
     model = model.to(device_)
 
     model.eval()
@@ -138,7 +136,6 @@ def get_evaluate_model( cfg,
             images, labels = images.to(device_), labels.to(device_)
 
             # print images gid with relative prevision and ground truth
-
             # prendo l'output delle previsioni direttamente
             # dalle immagini caricate applicando la nostra rete neurale convolutiva
             # e addestrata .

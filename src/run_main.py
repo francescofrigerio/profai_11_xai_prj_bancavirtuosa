@@ -205,16 +205,12 @@ def phase_1_1(cfg,
                       CONFIG,
                       "lr")
 
-    print("FINALE DEBUG FLAG")
-    # To run on codespace set cfg.RUN_TESTS=True
+    # False is mandatory To run on codespace 
     flag_run_cnn = cfg.RUN_CNN_MAN
     # on codespace github alwais down
     if cfg.IN_NOTEBOOK is False :
         flag_run_cnn = False 
 
-    print(f"FINALE DEBUG FLAG {flag_run_cnn}")
-    #
-    
     if flag_run_cnn is True:
         # Cnn DenseNet
         info_cnn = get_trained_model(cfg,
@@ -286,15 +282,15 @@ def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
         Main Function Of the project
     """
 
-    ROOT_DIR = Path(__file__).resolve().parent.parent
-    print("CWD corrente:", os.getcwd())
-    ls_dir(ROOT_DIR)
-    print("CWD corrente:", ROOT_DIR)
-    print("Percorso assoluto del checkpoint:", Path(cfg.CHECKPOINT_PATH).resolve())
+    # ROOT_DIR = Path(__file__).resolve().parent.parent
+    # print("CWD corrente:", os.getcwd())
+    # ls_dir(ROOT_DIR)
+    # print("CWD corrente:", ROOT_DIR)
+    # print("Percorso assoluto del checkpoint:", Path(cfg.CHECKPOINT_PATH).resolve())
         
-    path_pt = Path(cfg.CHECKPOINT_DIR)
-    ls_dir(path_pt)
-    assert path_pt.exists(), f"Checkpoint non trovato al percorso: {path_pt}"
+    # path_pt = Path(cfg.CHECKPOINT_DIR)
+    # ls_dir(path_pt)
+    # assert path_pt.exists(), f"Checkpoint non trovato al percorso: {path_pt}"
     # raise ValueError("Mi Fermo per debug")
 
     # Initialize the parser
