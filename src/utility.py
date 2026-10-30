@@ -3,8 +3,24 @@
     Commont utility for Model Cnn and Logistic Regression
 """
 
+from pathlib import Path
 import numpy as np
 import torch
+
+def ls_dir(str_dir):
+
+    print(f"Comando ls {str_dir} ")
+
+    target_dir = Path(str_dir) 
+
+    if target_dir.exists() and target_dir.is_dir():
+        print(f"Contenuto di {target_dir.resolve()} ")
+        for item in target_dir.iterdir():
+            # Stampa se è una cartella o un file
+            tipo = "📁 [DIR] " if item.is_dir() else "📄 [FILE]"
+            print(f"{tipo} {item.name}")
+    else:
+        print(f"La cartella {target_dir} non esiste o non è una directory.")
 
 def run_create_list_images( logger, 
                             X_test_ , 
@@ -19,9 +35,8 @@ def run_create_list_images( logger,
     """
     if not list_class_:
         raise ValueError("list_class non può essere vuota")
-    else:
-        # n_per_class = n_images // len(list_class)
-        n_per_class = max(1, n_images_ // len(list_class_))
+     
+    n_per_class = max(1, n_images_ // len(list_class_))
 
     # Maschere su tutte le classi
     correct_mask = y_pred_ == y_test_

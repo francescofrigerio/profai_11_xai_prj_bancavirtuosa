@@ -6,6 +6,7 @@
     %run run_main.py
 """ 
 import argparse
+import os
 import json
 from pathlib import Path
 import time
@@ -20,7 +21,7 @@ from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
 from training import get_device, get_trained_model ,get_evaluate_model
 from output import plot_logistic_graph , plot_predict_info , save_dict_to_json , load_dict_from_json
-from utility import run_create_list_images , run_check_class_ok_ko
+from utility import run_create_list_images , run_check_class_ok_ko , ls_dir
 
 # Configurazione dei Warnings (spostata DOPO tutti gli import) ---
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
@@ -275,6 +276,18 @@ def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
     """
         Main Function Of the project
     """
+
+    ROOT_DIR = Path(__file__).resolve().parent.parent
+    print("CWD corrente:", os.getcwd())
+    ls_dir(ROOT_DIR)
+    print("CWD corrente:", ROOT_DIR)
+    print("Percorso assoluto del checkpoint:", Path(cfg.CHECKPOINT_PATH).resolve())
+        
+    path_pt = Path(cfg.CHECKPOINT_DIR)
+    ls_dir(path_pt)
+    assert path_pt.exists(), f"Checkpoint non trovato al percorso: {path_pt}"
+    raise ValueError("Mi Fermo per debug")
+
     # Initialize the parser
     parser = argparse.ArgumentParser(description="Xai per Classificazione di Cifre in ambito Finance")
 

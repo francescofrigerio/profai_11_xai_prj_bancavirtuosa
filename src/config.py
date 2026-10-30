@@ -55,7 +55,8 @@ class ConfigConstantsDefault:
     OPTIMIZER: str = "adam"
     LEARNING_RATE_HEAD: float = 1e-3     # used when FREEZE_BACKBONE=True
     LEARNING_RATE_FULL: float = 5e-5     # used when FREEZE_BACKBONE=False
-    
+
+    CHECKPOINT_DIR: str = ROOT_DIR / "checkpoints/"
     CHECKPOINT_PATH: str = ROOT_DIR / "checkpoints/densenet121_mnist.pt"
     # BatchNorm of the backbone in eval during training. Effective only when FREEZE_BACKBONE=True
     # (otherwise the backbone trains normally). False reproduces plain model.train().

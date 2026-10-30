@@ -79,9 +79,9 @@ def save_checkpoint(path, model, cfg, history) -> str:
                     "versions": {"torch": torch.__version__, "torchvision": torchvision.__version__},
                 }
 
-    print(f"start save_checkpoint {save_dict} ")
-    
+    print(f"start save_checkpoint {save_dict.keys()} ")
     torch.save(save_dict, path)
+    print(f"end save_checkpoint {save_dict.keys()} ")
 
     print(f"end save_checkpoint {path}")
     return path
@@ -104,13 +104,18 @@ def get_evaluate_model( cfg,
     
 
     path = Path(cfg.CHECKPOINT_PATH)
+    
     saved = read_checkpoint(path) if path.exists() else None
+    logger.info(f"saved: {type(saved)})  ")
+    logger.info(f"saved: {type(saved)} ({saved.keys()})  ")
     action, reason = resolve_mode(cfg,pretrained_, saved is not None)
     logger.info(f"MODE: {action} ({reason})  ")
     if action != "load":
        raise ValueError(f"in fase 2 solo MODE: {action}")
     model = build_densenet(cfg,logger)
     model.load_state_dict(saved["state_dict"])
+    # model.load_state_dict(saved["state_dict"]) #
+    # saved = read_checkpoint(path) # OK
     model = model.to(device_)
 
     model.eval()
@@ -286,11 +291,14 @@ def get_trained_model(cfg,
         Returns (model in eval mode, info dict).
     """
     
+
+
+    
     path = Path(cfg.CHECKPOINT_PATH)
     saved = read_checkpoint(path) if path.exists() else None
     action, reason = resolve_mode(cfg,pretrained, saved is not None)
     logger.debug(f"MODE: {action} ({reason})")
-    train_sec_cnn = 0.0 
+    train_sec_cnn = 0.0
     val_sec_cnn = 0.0
     if action == "load":
         model = build_densenet(cfg,logger)
@@ -299,7 +307,7 @@ def get_trained_model(cfg,
 
         train_sec_cnn = sum(item["train_seconds"] for item in history)
         val_sec_cnn = sum(item["val_seconds"] for item in history)
-        
+   
     else:
         logger.debug(f"Start Load Model")
         # BEFORE building: the random head must be reproducible

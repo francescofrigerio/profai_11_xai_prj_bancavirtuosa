@@ -12,6 +12,7 @@ sys.path.insert(0, str(SRC_DIR))
 from training import get_evaluate_model , read_checkpoint , build_densenet
 from config import CONFIG
 from logger import LOGGER
+from utility import ls_dir
 
 def test_load_checkpoint(cfg=CONFIG, logger=LOGGER):
     """
@@ -19,21 +20,27 @@ def test_load_checkpoint(cfg=CONFIG, logger=LOGGER):
     """
     ROOT_DIR = Path(__file__).resolve().parent.parent
     print("CWD corrente:", os.getcwd())
-    
+    ls_dir(ROOT_DIR)
     print("CWD corrente:", ROOT_DIR)
     print("Percorso assoluto del checkpoint:", Path(cfg.CHECKPOINT_PATH).resolve())
     
-    path = Path(cfg.CHECKPOINT_PATH)
-    assert path.exists(), f"Checkpoint non trovato al percorso: {path}"
+    path_pt = Path(cfg.CHECKPOINT_DIR)
+    ls_dir(path_pt)
+    assert path_pt.exists(), f"Checkpoint non trovato al percorso: {path_pt}"
+
+    path_pt_file = Path(cfg.CHECKPOINT_PATH)
+    assert path_pt.exists(), f"Checkpoint non trovato al percorso: {path_pt_file}"
     
     # Lettura sicura del checkpoint
-    saved = read_checkpoint(path)
+    saved = read_checkpoint(path_pt_file)
     
     # Gestione robusta della state_dict (compatibile con dizionario o pesi diretti)
-    state_dict = saved["state_dict"] if isinstance(saved, dict) and "state_dict" in saved else saved
-    
+    state_dict = saved["model_state_dict"] if isinstance(saved, dict) and "model_state_dict" in saved else saved
+    print(type(state_dict))
+    print(f"dict modello checkpoint {state_dict.keys()}")
     # Istanziazione e caricamento pesi
     model = build_densenet(cfg, logger)
+    logger.info("[TEST] Modello istanziato . Ora carico i pesi salvati.")
     model.load_state_dict(state_dict)
     
     # Asserzioni di controllo

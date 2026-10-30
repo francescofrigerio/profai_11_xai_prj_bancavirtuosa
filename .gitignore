@@ -7,5 +7,7 @@ run_train.log
 run_load.log
 src/run_train.log
 src/run_load.log
+tests/run_test_1.log
+tests/run_test_2.log
 src/data
 src/outputs
