@@ -27,7 +27,7 @@ from utility import sync
 class AttributionResult:
     technique: str
     target: int
-    map: np.ndarray
+    data_map: np.ndarray
     signed: bool
     output_space: str
     seconds: float
@@ -46,6 +46,20 @@ class Explainer:
         self.model = model
         self.cfg = cfg
 
+    def attribute(self, x_data, target: int) -> np.ndarray:
+        """ 
+            implemented by each technique
+            on derived class
+        """
+        raise NotImplementedError
+
+    def meta(self, x_data, target: int) -> dict:     
+        """
+            implemented on derived class                 
+            as optional diagnostics
+        """
+        return {}
+    
     def explain(self, x_data, target: int) -> AttributionResult:
         assert_densenet_input(x_data, self.cfg)
         if x_data.shape[0] != 1:
@@ -57,14 +71,22 @@ class Explainer:
         device = x_data.device
         sync(device)
         t0 = time.perf_counter()
-        
+        raw = self._attribute(x_data, int(target))
         sync(device)
         seconds = time.perf_counter() - t0
-        map = x_data
+        map = np.asarray(raw, dtype=np.float64)
+        if map.ndim != 2:
+            raise CheckErrors(f"{self.name}: the map must be 2D, got shape {map.shape}")
+        
         if not np.isfinite(map).all():
             raise CheckErrors(f"{self.name}: the map contains NaN or inf")
         if not self.signed and float(map.min()) < 0:
             raise CheckErrors(f"{self.name}: declared unsigned but has negative values")
-        return AttributionResult(self.name, int(target), map, self.signed, self.output_space, seconds)
+        return AttributionResult(self.name, 
+                                 int(target), 
+                                 map, 
+                                 self.signed, 
+                                 self.output_space, 
+                                 seconds)
 
 
