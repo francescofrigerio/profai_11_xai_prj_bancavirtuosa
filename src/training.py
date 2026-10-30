@@ -11,17 +11,7 @@ from model import build_densenet, validate_layers
 from model import enter_train_mode ,  freeze_backbone, make_optimizer , define_loss_function
 
 from metrics import accuracy
-def sync(device) -> None:
-    """
-        Syncronizer CPU and GPU to get correct train and val time
-        Only Running with CUDA=True
-        Run this function before get time to make cpu wait mode until GPU
-        has finisched his work.
-        Run this function before get time to avoid measure time of previous epoch
-    """
-    if torch is not None and str(device).startswith("cuda"):
-        torch.cuda.synchronize()
-
+from utility import sync
 
 def timed(fn, device):
     """
@@ -129,7 +119,8 @@ def get_evaluate_model( cfg,
     X_test_=[]
 
     with torch.no_grad():
-        for i, (images, labels) in enumerate(test_loader_):
+        # for i, (images, labels) in enumerate(test_loader_):
+        for images, labels in test_loader_:
             images, labels = images.to(device_), labels.to(device_)
 
             # print images gid with relative prevision and ground truth

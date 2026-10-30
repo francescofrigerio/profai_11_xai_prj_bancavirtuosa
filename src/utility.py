@@ -22,6 +22,18 @@ def ls_dir(str_dir):
     else:
         print(f"La cartella {target_dir} non esiste o non è una directory.")
 
+def sync(device) -> None:
+    """
+        Syncronizer CPU and GPU to get correct train and val time
+        Only Running with CUDA=True
+        Run this function before get time to make cpu wait mode until GPU
+        has finisched his work.
+        Run this function before get time to avoid measure time of previous epoch
+    """
+    if torch is not None and str(device).startswith("cuda"):
+        torch.cuda.synchronize()
+
+
 def run_create_list_images( logger, 
                             X_test_ , 
                             y_test_,

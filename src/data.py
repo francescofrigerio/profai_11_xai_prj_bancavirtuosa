@@ -1,18 +1,21 @@
-
-
+"""
+     Here we load dataset and dataloader
+"""
 import numpy as np
 
 # pytorch
+
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import time
+# 
+# import torch.nn as nn
+# import torch.nn.functional as F
+# import time
 
 # computer vision with pytorch
-import torchvision
-from torch.utils.data import random_split, DataLoader
-import torchvision.models as models
-from torchvision.models import DenseNet121_Weights, densenet121
+# import torchvision
+from torch.utils.data import DataLoader
+# import torchvision.models as models
+# from torchvision.models import DenseNet121_Weights, densenet121
 
 # preprocessd dataset with pytorch
 import torchvision.datasets as datasets
@@ -30,42 +33,43 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 IMAGENET_MEAN_TRANSFORM  =  [0.485, 0.456, 0.406]
 IMAGENET_STD_TRANSFORM =   [0.229, 0.224, 0.225]
 
-
-
-# ----------------------------------------------------------------------------------------
-# DenseNet view
-# ----------------------------------------------------------------------------------------
 def image_net_stats(like):
+    """
+        DenseNet view
+    """
     mean = torch.tensor(IMAGENET_MEAN, dtype=like.dtype, device=like.device).view(1, 3, 1, 1)
     std = torch.tensor(IMAGENET_STD, dtype=like.dtype, device=like.device).view(1, 3, 1, 1)
     return mean, std
 
 
-def normalize(x):
+def normalize(x_data):
     """
         Image Net Normalize
     """
-    mean, std = image_net_stats(x)
-    return (x - mean) / std
+    mean, std = image_net_stats(x_data)
+    return (x_data - mean) / std
 
 
-def denormalize(x):
+def denormalize(x_data):
     """
         Rollback from image net Normalize value
     """
-    mean, std = image_net_stats(x)
-    return x * std + mean
+    mean, std = image_net_stats(x_data)
+    return x_data * std + mean
 
 
-def denormalize_np(x: np.ndarray) -> np.ndarray:
+def denormalize_np(x_data: np.ndarray) -> np.ndarray:
     """
         numpy version of denormalize, for the contract checks (no torch needed).
     """
     mean = np.asarray(IMAGENET_MEAN, dtype=np.float64).reshape(1, 3, 1, 1)
     std = np.asarray(IMAGENET_STD, dtype=np.float64).reshape(1, 3, 1, 1)
-    return np.asarray(x, dtype=np.float64) * std + mean
+    return np.asarray(x_data, dtype=np.float64) * std + mean
 
 class TransformedDataset(Dataset):
+    """
+        Here we Transform Data for DataLoader
+    """
     def __init__(self, dataset, transform=None):
         self.dataset = dataset
         self.transform = transform
@@ -172,15 +176,16 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
 
 def data_to_input_lr( dataloader_ , 
                       channels , 
-                      w , h,
+                      w , 
+                      h,
                       cfg=CONFIG,
                       logger=LOGGER ):
     """
     """
     # Alloc tensors 1, 28, 28
-    X = torch.empty((len(dataloader_.dataset),  channels , w , h),
+    X_input = torch.empty((len(dataloader_.dataset),  channels , w , h),
                 dtype=torch.float32)
-    y = torch.empty((len(dataloader_.dataset),),
+    y_input = torch.empty((len(dataloader_.dataset),),
                 dtype=torch.int64)
     start = 0
     for images, labels in dataloader_:
@@ -194,8 +199,8 @@ def data_to_input_lr( dataloader_ ,
                 f"attesa {(channels, w, h)}"
             )
         
-        X[start:start+n].copy_(images)
-        y[start:start+n].copy_(labels)
+        X_input[start:start+n].copy_(images)
+        y_input[start:start+n].copy_(labels)
 
         start += n
 
@@ -206,10 +211,11 @@ def data_to_input_lr( dataloader_ ,
         )
 
     # flat the tensor only for baseline
-    X = X.reshape(X.shape[0], -1).numpy()
-    y = y.numpy()
+    X_input = X_input.reshape(X_input
+                              .shape[0], -1).numpy()
+    y_input = y_input.numpy()
     
-    return X , y
+    return X_input , y_input
 
 def get_images_labels(dataset_,flag_data_loader=True,idx_dataset=0,
                       cfg=CONFIG,logger=LOGGER):
