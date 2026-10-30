@@ -294,5 +294,5 @@ def plot_logistic_graph(model_,cfg , out_dir , c ):
         ax.axis("off")
 
     fig.suptitle(f"LR global maps (relative coefficients), C={c}")
-    # save_fig(fig, out_dir_path / f"phase0_lr_global_maps.png")
-    save_fig(fig, cfg, out_dir_path)
+    save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / "phase0_lr_global_maps.png")
+    # save_fig(fig, cfg, out_dir_path)

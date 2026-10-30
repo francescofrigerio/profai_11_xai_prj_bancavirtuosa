@@ -106,10 +106,10 @@ class ConfigConstantsDefault:
     DELETION_STEPS: int = 10
 
     # Execution and outputs ONLY on Notebook
-    # RUN_TESTS: bool = False
+    RUN_CNN_MAN: bool = True
     # Execution and outputs ALWAIS on Codespace github
-    RUN_TESTS: bool = True
-    OUTPUT_DIR: str = ROOT_DIR / "src/outputs"
+    # RUN_CNN_MAN: bool = False
+    OUTPUT_DIR: str = ROOT_DIR / "outputs"
     IN_NOTEBOOK = "ipykernel" in sys.modules
 
     THRESHOLDS = { 

@@ -204,9 +204,18 @@ def phase_1_1(cfg,
                       "TEST",
                       CONFIG,
                       "lr")
-        
+
+    print("FINALE DEBUG FLAG")
     # To run on codespace set cfg.RUN_TESTS=True
-    if cfg.RUN_TESTS is False:
+    flag_run_cnn = cfg.RUN_CNN_MAN
+    # on codespace github alwais down
+    if cfg.IN_NOTEBOOK is False :
+        flag_run_cnn = False 
+
+    print(f"FINALE DEBUG FLAG {flag_run_cnn}")
+    # raise ValueError("Mi Fermo per debug {flag_run_cnn}")
+    
+    if flag_run_cnn is True:
         # Cnn DenseNet
         info_cnn = get_trained_model(cfg,
                                         logger, 
@@ -286,7 +295,7 @@ def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
     path_pt = Path(cfg.CHECKPOINT_DIR)
     ls_dir(path_pt)
     assert path_pt.exists(), f"Checkpoint non trovato al percorso: {path_pt}"
-    raise ValueError("Mi Fermo per debug")
+    # raise ValueError("Mi Fermo per debug")
 
     # Initialize the parser
     parser = argparse.ArgumentParser(description="Xai per Classificazione di Cifre in ambito Finance")
