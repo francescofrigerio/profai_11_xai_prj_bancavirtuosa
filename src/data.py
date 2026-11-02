@@ -27,7 +27,7 @@ from sklearn.model_selection import train_test_split
 from config import CONFIG
 from logger import LOGGER
 
-
+from config import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 
 class TransformedDataset(Dataset):
     """

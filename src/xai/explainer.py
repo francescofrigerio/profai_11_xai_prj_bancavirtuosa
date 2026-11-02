@@ -26,12 +26,12 @@ from utility import sync
 @dataclass
 class AttributionResult:
     technique: str
-    target: int
+    input_labels: int
     data_map: np.ndarray
     signed: bool
     output_space: str
     seconds: float
-    # meta: dict = field(default_factory=dict)
+    meta: dict = field(default_factory=dict)
 
 class Explainer:
     """
@@ -46,7 +46,8 @@ class Explainer:
         self.model = model
         self.cfg = cfg
 
-    def attribute(self, x_data, target: int) -> np.ndarray:
+    def attribute(self, input_img
+                  , input_label: int) -> np.ndarray:
         """ 
             implemented by each technique
             on derived class
@@ -63,7 +64,7 @@ class Explainer:
     def explain(self, input_img, input_label: int) -> AttributionResult:
         assert_densenet_input(input_img, self.cfg)
         if input_img.shape[0] != 1:
-            raise CheckErrors(f"{self.name}: explains ONE image at a time, got a batch of {x_data.shape[0]}")
+            raise CheckErrors(f"{self.name}: explains ONE image at a time, got a batch of {input_img.shape[0]}")
         if not (0 <= int(input_label) < self.cfg.NUM_CLASSES):
             raise CheckErrors(f"{self.name}: target {input_label} is not a class of the model")
         if self.model.training:
@@ -71,7 +72,7 @@ class Explainer:
         device = input_img.device
         sync(device)
         t0 = time.perf_counter()
-        raw = self._attribute(input_img, int(input_label))
+        raw = self.attribute(input_img, int(input_label))
         sync(device)
         seconds = time.perf_counter() - t0
         map = np.asarray(raw, dtype=np.float64)
@@ -83,7 +84,7 @@ class Explainer:
         if not self.signed and float(map.min()) < 0:
             raise CheckErrors(f"{self.name}: declared unsigned but has negative values")
         return AttributionResult(self.name, 
-                                 int(target), 
+                                 int(input_label), 
                                  map, 
                                  self.signed, 
                                  self.output_space, 

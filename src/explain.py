@@ -54,7 +54,7 @@ from captum.attr import Occlusion
 import shap
 from lime import lime_image
 
-from utility import normalize_saliency_map ,  normalize_imagenet
+from utility import normalize_saliency_map ,  normalize_imagenet , normalize_imagenet_np
 from utility import denormalize_imagenet , black_normalized
 
 try:
@@ -218,7 +218,8 @@ def explain_shap_lib_with_norm(cfg,model, input_img, input_label, n_evals=200):
     #  and apply ImageNet norm e predict
     def predict_fn(np_images):
         # Ripristina la normalizzazione ImageNet per la rete: (x - mean) / std
-        norm_images = (np_images - IMAGENET_MEAN) / IMAGENET_STD
+        # norm_images = (np_images - IMAGENET_MEAN) / IMAGENET_STD
+        norm_images = normalize_imagenet_np(np_images)
         
         # Convert into (B, C, H, W) PyTorch Tensor
         tensor_in = torch.tensor(norm_images, dtype=torch.float32).permute(0, 3, 1, 2).to(device)
@@ -346,7 +347,8 @@ def explain_lime_lib(model, input_img, input_label, num_samples=500):
         """
        
         # Rollback to the ImageNet normalize for the cnn net : (x - mean) / std
-        norm_images = (np_images - IMAGENET_MEAN) / IMAGENET_STD
+        # norm_images = (np_images - IMAGENET_MEAN) / IMAGENET_STD
+        norm_images = normalize_imagenet_np(np_images)
         
         # Permute into (B, C, H, W) and send to device
         tensor_in = torch.tensor(norm_images, dtype=torch.float32).permute(0, 3, 1, 2).to(device)

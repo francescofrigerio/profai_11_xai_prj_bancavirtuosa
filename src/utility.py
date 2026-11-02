@@ -5,16 +5,9 @@
 from pathlib import Path
 import numpy as np
 import torch
+from config import IMAGENET_MEAN , IMAGENET_STD
 
-IMAGENET_MEAN = (0.485, 0.456, 0.406)
-IMAGENET_STD = (0.229, 0.224, 0.225)
-
-IMAGENET_MEAN_TRANSFORM  =  [0.485, 0.456, 0.406]
-IMAGENET_STD_TRANSFORM =   [0.229, 0.224, 0.225]
-
-# Statistiche standard ImageNet
-IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-IMAGENET_STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+from config import IMAGENET_MEAN_NP , IMAGENET_STD_NP
 
 def normalize_saliency_map(saliency_map: np.ndarray) -> np.ndarray:
     """
@@ -50,6 +43,9 @@ def normalize_imagenet(input_img):
     std = torch.tensor(IMAGENET_STD, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
 
     return (input_img - mean) / std
+
+def normalize_imagenet_np(input_img):
+    return (input_img - IMAGENET_MEAN_NP) / IMAGENET_STD_NP
 
 def black_normalized(size: int, device):
     """

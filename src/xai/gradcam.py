@@ -1,9 +1,13 @@
-# from xai.contract import Explainer
-from xai.explainer import Explainer
+"""
+"""
 from captum.attr import LayerGradCam
 
-class GradCam(Explainer):
+from xai.explainer import Explainer
+
+
+class GradCamCaptum(Explainer):
     """
+        get Captum GradCam map
     """
     name = "gradcam"
     signed = False                      # relu_attributions=True: only what pushes the class UP

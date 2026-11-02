@@ -6,14 +6,15 @@
 """
 from __future__ import annotations
 import torch
+from captum.attr import IntegratedGradients as ig
 
 from utility import black_normalized
 from xai import Explainer
-from captum.attr import IntegratedGradients as ig
 
-class IntegratedGradients(Explainer):
+
+class IntegratedGradientsCaptum(Explainer):
     """
-         IntegratedGradients Explainer
+            get Captum IntegratedGradients map
     """
     name = "integrated_gradients"
     signed = True
@@ -58,6 +59,8 @@ class IntegratedGradients(Explainer):
         # 1. Take abs to consider the magnitude of the element
         # 2. Select element of the batch 
         # 3. Sum along the channels to reduce the shape at (H, W)
+        # ( difference compare to Occlusion : 
+        # every channel contributes to the value attributes at pixel)
         # 4. detach from compute graph
         # 5. Convert to NumPy 2D
         # return ig_attr[0].sum(0).detach().cpu().numpy()
@@ -74,5 +77,5 @@ class IntegratedGradients(Explainer):
         with torch.no_grad():
             delta = (self.model(input_img)[0, input_label] - self.model(base)[0, input_label]).item()
         # error relative and norm
-        error = abs(self._last_sum - delta) / max(abs(delta), 1e-6)
+        error = abs(self.last_sum - delta) / max(abs(delta), 1e-6)
         return {"completeness_error": error, "f_x_minus_f_baseline": delta, "steps": self.cfg.IG_STEPS}

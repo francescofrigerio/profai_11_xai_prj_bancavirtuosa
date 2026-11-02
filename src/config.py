@@ -197,3 +197,14 @@ class ConfigConstantsDefault:
     
 CONFIG = ConfigConstantsDefault()
 CONFIG_CHECK_CLASSES: list = [2,3,5,8] # confirmed by visual control
+
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
+
+
+# Statistiche standard ImageNet
+IMAGENET_MEAN_NP = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+IMAGENET_STD_NP  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+IMAGENET_MEAN_TRANSFORM  =  [0.485, 0.456, 0.406]
+IMAGENET_STD_TRANSFORM =   [0.229, 0.224, 0.225]
