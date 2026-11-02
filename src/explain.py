@@ -47,6 +47,21 @@
 """
 
 import numpy as np
+from captum.attr import LayerGradCam
+from captum.attr import IntegratedGradients
+from captum.attr import Saliency
+from captum.attr import Occlusion
+import shap
+from lime import lime_image
+
+try:
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    _TORCH_ERROR = None
+except Exception as exc:                     # reported by check 1, not a crash
+    torch = nn = F = None
+    _TORCH_ERROR = exc
 
 # Statistiche standard ImageNet
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
@@ -62,37 +77,64 @@ def normalize_saliency_map(saliency_map: np.ndarray) -> np.ndarray:
         return np.zeros_like(saliency_map)
     return (saliency_map - min_val) / (max_val - min_val)
 
+def denormalize_imagenet(img_hwc_np):
+    """
+        This function Converts the image from ImageNet scale to a pixels view range [0, 1].
+    """
+    img_denorm = (img_hwc_np * IMAGENET_STD) + IMAGENET_MEAN
+    # Clip to be sure the range will be strictly [0, 1] for LIME
+    return np.clip(img_denorm, 0.0, 1.0)
 
+def normalize_imagenet(input_img):
+    """
+        Normalize for ImageNet from pixels view range
+    """
+    mean = torch.tensor(IMAGENET_MEAN, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
+    std = torch.tensor(IMAGENET_STD, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
 
+    return (input_img - mean) / std
 
-     
-def explain_gradcam(model, input_img, target, layer_name, relu=True):
+def black_normalized(size: int, device):
+    """
+        The black of the ORIGINAL image, expressed in the normalized space.
+    """
+    return normalize_imagenet(torch.zeros(1, 3, size, size, device=device))
+
+def grid_segments(size: int, cells: int) -> np.ndarray:
+    """
+        Segment labels of a cells x cells grid over a size x size image.
+    """
+    step = size // cells
+    rows = np.arange(size) // step
+    return (rows[:, None] * cells + rows[None, :]).astype(np.int64)
+
+def explain_gradcam(model, input_img, input_label, layer_name, relu=True):
     """
         input_img (B, C, H, W) (1,3,128,128)
         target = input_label
     """
-    from captum.attr import LayerGradCam
+    
     layer = dict(model.named_modules())[layer_name]
-    gradcam_attr = LayerGradCam(model, layer).attribute(input_img, target=int(input_label), relu_attributions=relu)
-    # SOLUZIONE1 -> return gradcam_attr[0, 0].detach().cpu().numpy()
-    # SOLUZIONE2 -> return gradcam_attr.squeeze().cpu().detach().numpy()
-    # SOLUZIONE3 -> return gradcam_attr.squeeze().detach().cpu().numpy()
+    gradcam_attr = LayerGradCam(model, layer).attribute(input_img, 
+                                                        target=int(input_label), 
+                                                        relu_attributions=relu)
     return gradcam_attr.squeeze().detach().cpu().numpy()
       
-def explain_integrated_gradients(model, input_img, input_label):
+def explain_integrated_gradients(cfg,model, input_img, input_label):
     """
         x1 = input_img (B, C, H, W) (1,3,128,128)
         target = input_label
             
-        Il parametro n_steps=50 determina la precisione dell'integrale. 
-        Per test rapidi o in fase di debug puoi scendere a n_steps=50 o 20 
-        per velocizzare l'esecuzione.
+        n_steps parameters=50 gets integral decision.s 
+        for test/debug n_steps=20 to be faster
+
+        attr->get tensor of shape (1, C, H, W))
     """
     ig = IntegratedGradients(model)
     # Baseline nera della stessa dimensione dell'input (stesso device)
     baseline = torch.zeros_like(input_img)
         
-    # Calcolo dell'attribuzione (ritorna un tensore di forma (1, C, H, W))
+    # Calcolo dell'attribuzione (ritorna un tensore di forma (1, C, H, W))attribuzione (ritorna un tensore di forma (1, C, H, W))attribuzione (ritorna un tensore di forma (1, C, H, W))
     ig_attr, delta_attr = ig.attribute( input_img, 
                                   baselines=baseline, 
                                   target=int(input_label), 
@@ -100,12 +142,12 @@ def explain_integrated_gradients(model, input_img, input_label):
                                   return_convergence_delta=True
                               )
                               
-    print(f"controllo di qualità: delta {delta_attr}"
-           "Se vicino a 0 allora l'approssimazione con n_steps è stata accurata ")
-    # 1. Prendi il valore assoluto per considerare la magnitudo dei contributi
-    # 2. Selezione dell'elemento dal batch (1, C, H, W) -> (C, H, W)
-    # 3. Somma lungo i canali per collassare a (H, W)
-    # 4. Conversion a NumPy 2D
+    print(f"check: delta {delta_attr}"
+           "if near 0 then the approssimate with n_steps was been accurate ")
+    # 1. Take abs to consider the magnitude of the element
+    # 2. Select element of the batch (1, C, H, W) -> (C, H, W)
+    # 3. Sum along the channels to reduce the shape at (H, W)
+    # 4. Convert to NumPy 2D
     attr_2d = ig_attr.abs()[0].sum(0).detach().cpu().numpy()
         
     return attr_2d
@@ -113,26 +155,27 @@ def explain_integrated_gradients(model, input_img, input_label):
     
 def explain_ig(model, input_img, input_label, cfg, steps=None):
     """
-        input_img (B, C, H, W) (1,3,128,128)
-        target = input_label
-            
-        Il parametro n_steps=50 determina la precisione dell'integrale. 
-        Per test rapidi o in fase di debug puoi scendere a n_steps=50 o 20 
-        per velocizzare l'esecuzione.
+            x1 = input_img (B, C, H, W) (1,3,128,128)
+            target = input_label
+                
+            n_steps parameters=50 gets integral decision.s 
+            for test/debug n_steps=20 to be faster
+    
+            attr->get tensor of shape (1, C, H, W))
     """
-    from captum.attr import IntegratedGradients
+
+    baseline = black_normalized(input_img.shape[-1], input_img.device)
     ig_attr ,delta_attr = IntegratedGradients(model).attribute(input_img, 
-                                                   baselines=black_normalized(input_img.shape[-1], 
-                                                                              input_img.device), 
+                                                   baselines=black_normalized, 
                                                    target=int(input_label),
                                                    n_steps=cfg.IG_STEPS, 
-                                                   # evita problemi di Out of Memory
-                                                   # procedendo x step con gradualita
-                                                   # mettere un CFG.IG_BATCH_SIZE
-                                                   internal_batch_size=50,
+                                                   # it avoid issue of Out of Memory
+                                                   # procede gradually step by step
+                                                   internal_batch_size=cfg.IG_BATCH_SIZE,
                                                    return_convergence_delta=True 
                                                    )
-    print(f"controllo di qualità: delta {delta_attr} Se vicino a 0 allora l'approssimazione con n_steps è stata accurata ")
+    print(f"check: delta {delta_attr}"
+            "if near 0 then the approssimate with n_steps was been accurate ")
     return ig_attr
 
     
@@ -141,26 +184,26 @@ def explain_saliency(model, input_img, input_label):
         input_img (B, C, H, W) (1,3,128,128)
         target = input_label
     """
-    from captum.attr import Saliency
+    
     sal_att = Saliency(model).attribute(input_img.clone().requires_grad_(True), target=int(input_label), abs=True)
-    # SOLUZIONE 1 -> return sal_att[0].sum(0).detach().cpu().numpy()       # sum over channels, >= 0
-    # SOLUZIONE 2 -> return sal_att.squeeze().detach().cpu().numpy()
-    return sal_att[0].sum(0).detach().cpu().numpy()  # sum over channels, >= 0
+    # sum over channels, >= 0
+    return sal_att[0].sum(0).detach().cpu().numpy()  
         
-def explain_occlusion(model, input_img, input_label):
+def explain_occlusion(cfg,model, input_img, input_label,device):
     """
         input_img (B, C, H, W) (1,3,128,128)
         target = input_label
             
-        Occlusion fa scorrere una finestra nera (patch) sull'immagine
-        e misura quanto crolla la probabilità della classe target quando una zona viene coperta.
+        Occlusion scroll black window (patch) over the image
+        and measure How much decrease classe target's prob 
+        when a zone is covered .
     """   
-    from captum.attr import Occlusion
+    
 
     occlusion = Occlusion(model)
         
-    o_w, o_s = CONFIG.OCCLUSION_WINDOW, CONFIG.OCCLUSION_STRIDE
-    o_size = CONFIG.DENSENET_SIZE
+    o_w, o_s = cfg.OCCLUSION_WINDOW, cfg.OCCLUSION_STRIDE
+    o_size = cfg.DENSENET_SIZE
     # ones, zeros = torch.ones(1, 3, o_size, o_size, device=device), torch.zeros(1, 3, o_size, o_size, device=device)
     zeros = torch.zeros(1, 3, o_size, o_size, device=device)
 
@@ -172,46 +215,38 @@ def explain_occlusion(model, input_img, input_label):
                                         baselines=zeros # evita problemi sul device
                                     )
         
-    # 1. Prendi il valore assoluto
-    # 2. Selezione dell'elemento dal batch -> (C, H, W)
-    # 3. Somma lungo i canali -> (H, W)
-    # 4. Conversion a NumPy 2D
+    # 1. Take abs to consider the magnitude of the element
+    # 2. Select element of the batch (1, C, H, W) -> (C, H, W)
+    # 3. Sum along the channels to reduce the shape at (H, W)
+    # 4. Convert to NumPy 2D
     attr_2d = occ_attr.abs()[0].sum(0).detach().cpu().numpy()
         
     return attr_2d
         
-        
 
-# da verificare se usare la versione con denorm o meno.
-import shap
 
-def denormalize_imagenet(img_hwc_np):
+def explain_shap_lib_with_norm(cfg,model, input_img, input_label, n_evals=200):
     """
-        Converte l'immagine da scala ImageNet a intervallo visivo [0, 1].
-    """
-    img_denorm = (img_hwc_np * IMAGENET_STD) + IMAGENET_MEAN
-    return np.clip(img_denorm, 0.0, 1.0)
-
-def explain_shap_lib_with_norm(model, input_img, input_label, n_evals=200):
-    """
-    Wrapper per SHAP con gestione corretta della denormalizzazione.
-    input_img: Tensore PyTorch (1, 3, H, W)
+    Wrapper for SHAP with manage correctly of the normalization .
+    input_img:  PyTorch Tensor (1, 3, H, W)
     """
     model.eval()
+    # take the same device of the model
     device = next(model.parameters()).device
 
-    # 1. Estraggo l'immagine in formato HWC
+    # Extract the image with shape HWC from [1,H,W,C]
     img_hwc_norm = input_img.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
 
-    # 2. DENORMALIZZAZIONE: Portiamo l'immagine nell'intervallo visivo [0, 1]
+    # DENORM: Convert the image into the pixel view range [0, 1]
     img_hwc_clean = denormalize_imagenet(img_hwc_norm)
 
-    # 3. Funzione di predizione: riceve immagini in [0, 1], applica ImageNet norm e predice
+    # Predict Function: Riceive Images in the range [0, 1],
+    #  and apply ImageNet norm e predict
     def predict_fn(np_images):
         # Ripristina la normalizzazione ImageNet per la rete: (x - mean) / std
         norm_images = (np_images - IMAGENET_MEAN) / IMAGENET_STD
         
-        # Converte in (B, C, H, W) PyTorch Tensor
+        # Convert into (B, C, H, W) PyTorch Tensor
         tensor_in = torch.tensor(norm_images, dtype=torch.float32).permute(0, 3, 1, 2).to(device)
         
         with torch.no_grad():
@@ -219,65 +254,79 @@ def explain_shap_lib_with_norm(model, input_img, input_label, n_evals=200):
             probs = F.softmax(logits, dim=1)
         return probs.cpu().numpy()
 
-    # 4. Inizializza lo Shap Explainer usando l'immagine pulita
+    # Initialize the Shap Explainer using clean image
     masker = shap.maskers.Image("inpaint_telea", img_hwc_clean.shape)
+    # Explainer is the class of the object explainer
     explainer = shap.Explainer(predict_fn, masker)
 
-    # Inseriamo il batch dell'immagine pulita (1, H, W, 3)
+    # Insert the batch of clean image (1, H, W, 3)
     img_batch = np.expand_dims(img_hwc_clean, axis=0)
 
-    # 5. Calcola gli SHAP values
-    shap_values = explainer(img_batch, max_evals=n_evals, batch_size=50)
+    # get the SHAP values
+    # as Object Explanation calling explainer .
+    # Object explanation is a struct container with
+    # data that can be slicing
+    shap_values = explainer(img_batch, max_evals=n_evals, batch_size=cfg.SHAP_BATCH_SIZE)
 
-    # 6. Estrazione della mappa 2D (magnitudo assoluta sui 3 canali)
-    attr_3d = shap_values.values[0, :, :, :, int(input_label)]
+    # Extract 2d map (abs magintude over 3 channels)
+    attr_3d = shap_values.values[0, :, :, :, int(input_label)] # pylint: disable=no-member
     attr_2d = np.abs(attr_3d).sum(axis=-1)
 
     return attr_2d
      
-def explain_shap_lib(model, input_img, input_label, n_evals=200):
+def explain_shap_lib(cfg,model, input_img, input_label, n_evals=200):
     """
-    Wrapper per SHAP usando la libreria ufficiale 'shap'.
-    input_img: Tensore PyTorch di forma (1, 3, H, W) su CPU o GPU
-    input_label: int, classe target da spiegare
+    Wrapper for SHAP using official library 'shap'.
+    input_img: PyTorch Torch of shape (1, 3, H, W) 
+    input_label: int, target class to explain
     """
     model.eval()
+    # take device from the model
     device = next(model.parameters()).device
 
-    # 1. Funzione di predizione per SHAP: accetta NumPy (B, H, W, C) e restituisce Probabilità (B, NumClasses)
-def predict_fn(np_images):
-    # Converti da (B, H, W, C) a Tensore PyTorch (B, C, H, W)
-    tensor_in = torch.tensor(np_images, dtype=torch.float32).permute(0, 3, 1, 2).to(device)
-    with torch.no_grad():
-        logits = model(tensor_in)
-        probs = F.softmax(logits, dim=1)
-        return probs.cpu().numpy()
     
-    # Da verificare se normalizzare o meno    
-    # 2. Prepara l'immagine per SHAP nel formato NHWC (1, H, W, 3)
+    def predict_fn(np_images):
+        """
+            Predict SHAP Function : 
+            input as NumPy (B, H, W, C) 
+            return Prob (B, NumClasses)
+        """
+        # Converts from (B, H, W, C) to PyTorch tensor (B, C, H, W)
+        tensor_in = torch.tensor(np_images, dtype=torch.float32).permute(0, 3, 1, 2).to(device)
+        with torch.no_grad():
+            logits = model(tensor_in)
+            probs = F.softmax(logits, dim=1)
+            return probs.cpu().numpy()
+       
+    # Prepare the image for SHAP in the format NHWC (H, W, 3)
     img_nhwc = input_img.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
     
-    # Da verificare se normalizzare o meno 
+    # add the batch size (1, H, W, 3)
     img_batch = np.expand_axis(img_nhwc, axis=0) # (1, H, W, 3)
 
-    # 3. Inizializza lo Shap Explainer (con masker neutrale nero per le perturbazioni)
+    # 3. Initialize the Shap Explainer 
+    # # (con masker neutral black for the perturbation)
     masker = shap.maskers.Image("inpaint_telea", img_nhwc.shape)
     explainer = shap.Explainer(predict_fn, masker)
 
-    # 4. Calcola gli SHAP values
-    shap_values = explainer(img_batch, max_evals=n_evals, batch_size=50)
+    # 4. get the SHAP values
+    # get the SHAP values
+    # as Object Explanation calling explainer .
+    # Object explanation is a struct container with
+    # data that can be slicing
+    shap_values = explainer(img_batch, max_evals=n_evals, batch_size=cfg.SHAP_BATCH_SIZE)
 
-    # shap_values.values ha forma: (1, H, W, C, NumClasses)
-    # Selezioniamo la spiegazione per la classe target: (H, W, C)
-    attr_3d = shap_values.values[0, :, :, :, int(input_label)]
+    # shap_values.values has format: (1, H, W, C, NumClasses)
+    # Select explain for the target class: (H, W, C)
+    attr_3d = shap_values.values[0, :, :, :, int(input_label)] # pylint: disable=no-member
 
-    # 5. Valore assoluto e somma lungo i 3 canali di colore -> 2D (H, W)
+    # abs value and sum along 3 channels of color -> 2D (H, W)
     attr_2d = np.abs(attr_3d).sum(axis=-1)
 
     return attr_2d
     
     
-def _pick_shap_target(sv, target, num_classes):
+def pick_shap_target(sv, target, num_classes):
     """
         shap returns a list per class (older) or an array with classes last (newer).
     """
@@ -294,65 +343,58 @@ def _pick_shap_target(sv, target, num_classes):
     return arr[0].sum(axis=0)
 
 
-def explain_shap_pkg(model, x1, target, background, cfg):
-    import shap
+def explain_shap_pkg(model, input_img, input_label, background, cfg):
     np.random.seed(cfg.SEED)
     torch.manual_seed(cfg.SEED)
-    sv = shap.GradientExplainer(model, background).shap_values(x1, nsamples=cfg.SHAP_NUM_SAMPLES)
-    return _pick_shap_target(sv, int(target), cfg.NUM_CLASSES)
+    explainer = shap.GradientExplainer(model, background)
     
-from lime import lime_image
-
-# Valori standard di ImageNet usati per la normalizzazione iniziale
-# IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-# IMAGENET_STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-
-def denormalize_imagenet(img_hwc_np):
-    """
-    Riconverte un'immagine da formato normalizzato ImageNet a intervallo [0, 1].
-    img_hwc_np: array NumPy con forma (H, W, 3)
-    """
-    # x = (x_norm * std) + mean
-    img_denorm = (img_hwc_np * IMAGENET_STD) + IMAGENET_MEAN
-    # Clip per garantire che l'intervallo sia strettamente [0, 1] per LIME
-    return np.clip(img_denorm, 0.0, 1.0)
+    sv = explainer.shap_values(input_img, nsamples=cfg.SHAP_NUM_SAMPLES)
+    return pick_shap_target(sv, int(input_label), cfg.NUM_CLASSES)
+    
 
 def explain_lime_lib(model, input_img, input_label, num_samples=500):
     model.eval()
+    # take device from the model
     device = next(model.parameters()).device
 
-    # 1. Estraggo l'immagine NumPy in formato (H, W, 3)
+    # Extract NumPy Image in the format (H, W, 3)
     img_hwc_norm = input_img.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
 
-    # 2. DENORMALIZZAZIONE: Portiamo l'immagine nell'intervallo visivo [0, 1] per i superpixel di LIME
+    # DENORM: Take the image in the pixel view range [0, 1] for LIME superpixel
     img_hwc_clean = denormalize_imagenet(img_hwc_norm)
 
-# 3. Funzione di predizione per LIME:
-# Riceve le immagini perturbate da LIME (in [0, 1]), applica la normalizzazione ImageNet e le passa a DenseNet
-def predict_fn(np_images):
-    # Ripristina la normalizzazione ImageNet per la rete: (x - mean) / std
-    norm_images = (np_images - IMAGENET_MEAN) / IMAGENET_STD
-        
-    # Permuta in (B, C, H, W) e invia al device
-    tensor_in = torch.tensor(norm_images, dtype=torch.float32).permute(0, 3, 1, 2).to(device)
-        
-    with torch.no_grad():
-        logits = model(tensor_in)
-        probs = F.softmax(logits, dim=1)
-        return probs.cpu().numpy()
-
-    # 4. Inizializza LIME ed esegui la spiegazione sull'immagine denormalizzata
-    explainer = lime_image.LimeImageExplainer()
     
-    explanation = explainer.explain_instance(image=img_hwc_clean.astype(np.float64), # LIME riceve l'immagine visibile pulita [0, 1]
-                                            classifier_fn=predict_fn,
-                                            top_labels=None,
-                                            labels=(int(input_label),),
-                                            hide_color=0,
-                                            num_samples=num_samples
+    def predict_fn(np_images):
+        """
+            Predict Function for LIME:
+            Receive perturbate images from LIME (in [0, 1]), 
+            and apply ImageNet norm before pass the image to DenseNet
+        """
+       
+        # Rollback to the ImageNet normalize for the cnn net : (x - mean) / std
+        norm_images = (np_images - IMAGENET_MEAN) / IMAGENET_STD
+        
+        # Permute into (B, C, H, W) and send to device
+        tensor_in = torch.tensor(norm_images, dtype=torch.float32).permute(0, 3, 1, 2).to(device)
+        
+        with torch.no_grad():
+            logits = model(tensor_in)
+            probs = F.softmax(logits, dim=1)
+            return probs.cpu().numpy()
+
+    # 4. Initialize LIME and run explainer on denorm image
+    explainer = lime_image.LimeImageExplainer()
+
+    # LIME receive a visibile and clean image[0, 1]
+    explanation = explainer.explain_instance(image=img_hwc_clean.astype(np.float64),                                       
+                                             classifier_fn=predict_fn,
+                                             top_labels=None,
+                                             labels=(int(input_label),),
+                                             hide_color=0,
+                                             num_samples=num_samples
                                         )
 
-    # 5. Estrazione della mappa dei pesi dei superpixel
+    # Extract the weights map of lime superpixel 
     image, mask = explanation.get_image_and_mask(label=int(input_label),
                                                 positive_only=False,
                                                 hide_rest=False,
@@ -367,14 +409,14 @@ def predict_fn(np_images):
 
     return attr_2d
 
-def explain_lime_pkg(model, x1, target, cfg, device):
-    from lime import lime_image
-    S = x1.shape[-1]
-    img = denormalize(x1)[0].permute(1, 2, 0).clamp(0, 1).cpu().numpy().astype(np.float64)
-    segments = grid_segments(S, cfg.LIME_GRID_CELLS)
+def explain_lime_pkg(model, input_img, input_label, cfg, device):
+    
+    shape_last_size = input_img.shape[-1]
+    img = denormalize_imagenet(input_img)[0].permute(1, 2, 0).clamp(0, 1).cpu().numpy().astype(np.float64)
+    segments = grid_segments(shape_last_size, cfg.LIME_GRID_CELLS)
 
     def classifier_fn(batch):
-        t = normalize(torch.from_numpy(batch).float().permute(0, 3, 1, 2)).to(device)
+        t = normalize_imagenet(torch.from_numpy(batch).float().permute(0, 3, 1, 2)).to(device)
         probs = []
         with torch.no_grad():
             for i in range(0, len(t), 64):
@@ -383,13 +425,13 @@ def explain_lime_pkg(model, x1, target, cfg, device):
 
     import inspect
     explainer = lime_image.LimeImageExplainer(random_state=cfg.SEED)
-    kwargs = dict(labels=(int(target),), top_labels=None, hide_color=0,
+    kwargs = dict(labels=(int(input_label),), top_labels=None, hide_color=0,
                   num_samples=cfg.LIME_NUM_SAMPLES, batch_size=64,
                   segmentation_fn=lambda im: segments, random_seed=cfg.SEED)
     if "progress_bar" in inspect.signature(explainer.explain_instance).parameters:
         kwargs["progress_bar"] = False            # absent in lime 0.2.0.1
     expl = explainer.explain_instance(img, classifier_fn, **kwargs)
-    out = np.zeros((S, S))
-    for seg, weight in dict(expl.local_exp[int(target)]).items():
+    out = np.zeros((shape_last_size, shape_last_size))
+    for seg, weight in dict(expl.local_exp[int(input_label)]).items():
         out[segments == seg] = weight
     return out

@@ -83,23 +83,31 @@ class ConfigConstantsDefault:
 
     # XAI techniques
     # LIME and SHAP always use the reference packages `lime` and `shap` (E24): no backend switch.
-    IG_STEPS: int = 200                  # phase 0, check 4: 3.0 % completeness error (50 steps: 20 %)
+    IG_STEPS: int = 200 
+    IG_BATCH_SIZE : int = 50                # phase 0, check 4: 3.0 % completeness error (50 steps: 20 %)
     OCCLUSION_WINDOW: int = 16
     OCCLUSION_STRIDE: int = 8
     LIME_NUM_SAMPLES: int = 1000
-    LIME_GRID_CELLS: int = 8             # 8x8 grid segmentation (to check visually)
+    # 8x8 grid segmentation (to check visually)
+    LIME_GRID_CELLS: int = 8             
     SHAP_NUM_BACKGROUND: int = 50
-    SHAP_NUM_SAMPLES: int = 100          # gradient samples of Gradient SHAP; phase 0: rho 0.78 vs 0.80 at 200, half the time
+    # gradient samples of Gradient SHAP;
+    SHAP_NUM_SAMPLES: int = 100     
+    SHAP_BATCH_SIZE : int = 50           
 
     # Sampling
     GALLERY_SIZE: int = 24
     N_QUANT: int = 100                   # quantitative sample; fixed after timing in phase zero
 
     # Comparison
-    COMPUTE_AGREEMENT: bool = True       # Spearman and IoU
-    SIGN_MODE: str = "absolute"          # "absolute" | "positive"
-    MASK_MODE: str = "digit"             # "digit" | "full"
-    MASK_THRESHOLD: float = 0.1          # intensity above which a pixel belongs to the digit
+    # Spearman and IoU
+    COMPUTE_AGREEMENT: bool = True  
+    # could be "absolute" or "positive"     
+    SIGN_MODE: str = "absolute"   
+    # could be "digit" or "full"      
+    MASK_MODE: str = "digit"   
+    # intensity above which a pixel belongs to the digit          
+    MASK_THRESHOLD: float = 0.1          
     MASK_DILATION: int = 1
     TOPK_FRACTION: float = 0.2
     COMPUTE_FAITHFULNESS: bool = False   # deletion curves
