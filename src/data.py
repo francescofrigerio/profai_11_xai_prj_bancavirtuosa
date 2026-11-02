@@ -51,6 +51,20 @@ class TransformedDataset(Dataset):
             image = self.transform(image)
 
         return image, label
+
+class IndexedDataset(torch.utils.data.Dataset):
+    """
+            Here we wrap Dataset to save index of the images
+    """
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        x, y = self.dataset[idx]
+        return x, y, idx
     
 def load_datasets(cfg=CONFIG,logger=LOGGER):
     """
@@ -150,8 +164,11 @@ def data_to_input_lr( dataloader_ ,
                 dtype=torch.float32)
     y_input = torch.empty((len(dataloader_.dataset),),
                 dtype=torch.int64)
+    idx_list = []
+
     start = 0
-    for images, labels in dataloader_:
+    # for images, labels in dataloader_:
+    for images, labels, idx in dataloader_:
         # images shape (64, 1, 28, 28) -> X
         # labels shape (64,)           -> y
         n = images.size(0)
@@ -164,6 +181,7 @@ def data_to_input_lr( dataloader_ ,
         
         X_input[start:start+n].copy_(images)
         y_input[start:start+n].copy_(labels)
+        idx_list.append(idx)
 
         start += n
 
@@ -177,8 +195,9 @@ def data_to_input_lr( dataloader_ ,
     X_input = X_input.reshape(X_input
                               .shape[0], -1).numpy()
     y_input = y_input.numpy()
+    idx = torch.cat(idx_list, dim=0)
     
-    return X_input , y_input
+    return X_input , y_input , idx
 
 def get_images_labels(dataset_,flag_data_loader=True,idx_dataset=0,
                       cfg=CONFIG,logger=LOGGER):

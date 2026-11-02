@@ -199,7 +199,7 @@ def run_create_list_images( logger,
             # cast to int else json.write not work
             dict_curr_ok = {  "class": int(id_class),
                               "id_dataset": int(i),
-                              "image": img_to_save.tolist() ,
+                              # "image": img_to_save.tolist() ,
                               "y_true": int(y_test_[i]) if not hasattr(y_test_[i], 'item') else y_test_[i].item(),
                               "y_pred": int(y_pred_[i]) if not hasattr(y_pred_[i], 'item') else y_pred_[i].item()
                             }
@@ -219,7 +219,7 @@ def run_create_list_images( logger,
             # cast to int else json.write not work
             dict_curr_ko = {  "class": int(id_class),
                               "id_dataset": int(i),
-                              "image": img_to_save.tolist() ,
+                              # "image": img_to_save.tolist() ,
                               "y_true": int(y_test_[i]) if not hasattr(y_test_[i], 'item') else y_test_[i].item(),
                               "y_pred": int(y_pred_[i]) if not hasattr(y_pred_[i], 'item') else y_pred_[i].item()
                             }
