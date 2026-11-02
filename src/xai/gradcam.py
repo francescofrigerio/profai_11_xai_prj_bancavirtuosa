@@ -10,6 +10,7 @@ class GradCamCaptum(Explainer):
         get Captum GradCam map
     """
     name = "gradcam"
+    # never negative for Relu
     signed = False                      # relu_attributions=True: only what pushes the class UP
 
     def __init__(self, model, cfg, layer_name=None):

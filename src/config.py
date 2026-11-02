@@ -87,7 +87,10 @@ class ConfigConstantsDefault:
     IG_BATCH_SIZE : int = 50                # phase 0, check 4: 3.0 % completeness error (50 steps: 20 %)
     OCCLUSION_WINDOW: int = 16
     OCCLUSION_STRIDE: int = 8
-    LIME_NUM_SAMPLES: int = 1000
+    LIME_NUM_SAMPLES: int = 100 # or 1000
+    LIME_BATCH_SIZE : int = 64 
+    # LIME_METHOD: str = "quickshift"
+    LIME_METHOD: str = "grid"
     # 8x8 grid segmentation (to check visually)
     LIME_GRID_CELLS: int = 8             
     SHAP_NUM_BACKGROUND: int = 50

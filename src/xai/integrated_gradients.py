@@ -64,7 +64,7 @@ class IntegratedGradientsCaptum(Explainer):
         # 4. detach from compute graph
         # 5. Convert to NumPy 2D
         # return ig_attr[0].sum(0).detach().cpu().numpy()
-        return ig_attr.abs()[0].sum(0).detach().cpu().numpy()
+        return ig_attr[0].sum(0).detach().cpu().numpy()
 
     def meta(self, input_img, input_label):
         """

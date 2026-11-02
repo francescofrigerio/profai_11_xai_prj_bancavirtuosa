@@ -46,6 +46,7 @@
     and negative contributions before computing IoU.
 """
 
+import inspect
 import numpy as np
 from captum.attr import LayerGradCam
 from captum.attr import IntegratedGradients
@@ -65,16 +66,6 @@ try:
 except Exception as exc:                     # reported by check 1, not a crash
     torch = nn = F = None
     _TORCH_ERROR = exc
-
-
-
-def grid_segments(size: int, cells: int) -> np.ndarray:
-    """
-        Segment labels of a cells x cells grid over a size x size image.
-    """
-    step = size // cells
-    rows = np.arange(size) // step
-    return (rows[:, None] * cells + rows[None, :]).astype(np.int64)
 
 def explain_gradcam(model, input_img, input_label, layer_name, relu=True):
     """
@@ -116,7 +107,7 @@ def explain_integrated_gradients(cfg,model, input_img, input_label):
     # 2. Select element of the batch (1, C, H, W) -> (C, H, W)
     # 3. Sum along the channels to reduce the shape at (H, W)
     # 4. Convert to NumPy 2D
-    attr_2d = ig_attr.abs()[0].sum(0).detach().cpu().numpy()
+    attr_2d = ig_attr[0].sum(0).detach().cpu().numpy()
         
     return attr_2d
     
@@ -148,7 +139,7 @@ def explain_ig(model, input_img, input_label, cfg, steps=None):
     # 2. Select element of the batch (1, C, H, W) -> (C, H, W)
     # 3. Sum along the channels to reduce the shape at (H, W)
     # 4. Convert to NumPy 2D
-    attr_2d = ig_attr.abs()[0].sum(0).detach().cpu().numpy()
+    attr_2d = ig_attr[0].sum(0).detach().cpu().numpy()
 
     return attr_2d
 
@@ -193,13 +184,13 @@ def explain_occlusion(cfg,model, input_img, input_label,device):
     # 2. Select element of the batch (1, C, H, W) -> (C, H, W)
     # 3. Sum along the channels to reduce the shape at (H, W)
     # 4. Convert to NumPy 2D
-    attr_2d = occ_attr.abs()[0].sum(0).detach().cpu().numpy()
+    attr_2d = occ_attr[0].sum(0).detach().cpu().numpy()
         
     return attr_2d
         
 
 
-def explain_shap_lib_with_norm(cfg,model, input_img, input_label, n_evals=200):
+def explain_shap_lib(cfg,model, input_img, input_label, n_evals=200):
     """
     Wrapper for SHAP with manage correctly of the normalization .
     input_img:  PyTorch Tensor (1, 3, H, W)
@@ -301,18 +292,18 @@ def explain_shap_lib(cfg,model, input_img, input_label, n_evals=200):
     return attr_2d
     
     
-def pick_shap_target(sv, target, num_classes):
+def pick_shap_target(sv, input_label, num_classes):
     """
         shap returns a list per class (older) or an array with classes last (newer).
     """
     if isinstance(sv, list):
-        arr = np.asarray(sv[target])
+        arr = np.asarray(sv[input_label])
     else:
         arr = np.asarray(sv)
         if arr.ndim == 5 and arr.shape[-1] == num_classes:
-            arr = arr[..., target]
+            arr = arr[..., input_label]
         elif arr.ndim == 5 and arr.shape[0] == num_classes:
-            arr = arr[target]
+            arr = arr[input_label]
         else:
             raise ValueError(f"unexpected shap output shape {arr.shape}")
     return arr[0].sum(axis=0)
@@ -327,23 +318,39 @@ def explain_shap_pkg(model, input_img, input_label, background, cfg):
     return pick_shap_target(sv, int(input_label), cfg.NUM_CLASSES)
     
 
-def explain_lime_lib(model, input_img, input_label, num_samples=500):
+def grid_segments(size: int, cells: int) -> np.ndarray:
+    """
+        Segment labels of a cells x cells grid over a size x size image.
+    """
+    step = size // cells
+    rows = np.arange(size) // step
+    return (rows[:, None] * cells + rows[None, :]).astype(np.int64)
+
+def explain_lime_auto(cfg,model, input_img, input_label, num_samples=500):
+    """
+        This function run lime with Automatic Segmentation 
+        input_img shape (1, 3, H, W)  # batch, channels, h, w
+    """
     model.eval()
     # take device from the model
     device = next(model.parameters()).device
 
-    # Extract NumPy Image in the format (H, W, 3)
+    # Extract NumPy Image in the format (H, W, CHANNELS)
     img_hwc_norm = input_img.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
 
     # DENORM: Take the image in the pixel view range [0, 1] for LIME superpixel
+    # denorm LIME works on visibile image with  pixel range [0, 1], 
+    # LIME not work on image norm for ImageNet.
     img_hwc_clean = denormalize_imagenet(img_hwc_norm)
 
-    
     def predict_fn(np_images):
         """
-            Predict Function for LIME:
-            Receive perturbate images from LIME (in [0, 1]), 
-            and apply ImageNet norm before pass the image to DenseNet
+            Predict Function acts as an adapter for LIME:
+            1. It receives the perturbed images from LIME([0, 1]).
+            2. It normalizes them according to ImageNet standards.
+            3. It converts the format from NHWC to NCHW.
+            4. It passes them to DenseNet.
+            5. It returns the probabilities for each class.
         """
        
         # Rollback to the ImageNet normalize for the cnn net : (x - mean) / std
@@ -362,6 +369,15 @@ def explain_lime_lib(model, input_img, input_label, num_samples=500):
     explainer = lime_image.LimeImageExplainer()
 
     # LIME receive a visibile and clean image[0, 1]
+    # LIME uses probabilities return from predict_fn
+    # to build the interpretable local model.
+
+    # default segemnt based on Quickshift to generate superpixel.
+    # generate num_samples sample perturbet .
+    # labels=(input_label,): explain selected class.
+    # hide_color=0: superpixel disable will be sostitute with 0=black 
+    # (zero in the visible image).   
+    # top_labels=None: not work with top classes. We work with single class, 
     explanation = explainer.explain_instance(image=img_hwc_clean.astype(np.float64),                                       
                                              classifier_fn=predict_fn,
                                              top_labels=None,
@@ -371,43 +387,70 @@ def explain_lime_lib(model, input_img, input_label, num_samples=500):
                                         )
 
     # Extract the weights map of lime superpixel 
+    # This function selects the most important superpixels from the local explanation.
+    # positive_only=False: considers both positive and negative contributions.
+    # hide_rest=False: keeps all pixels visible.
+    # num_features allows for up to n superpixels in the visualization.
     image, mask = explanation.get_image_and_mask(label=int(input_label),
                                                 positive_only=False,
                                                 hide_rest=False,
-                                                num_features=100
+                                                num_features=cfg.LIME_NUM_SAMPLES
                                             )
 
     dict_exp = dict(explanation.local_exp[int(input_label)])
     attr_2d = np.zeros_like(mask, dtype=np.float32)
-    
+
+    # For each segment:
+    # segment_id is the superpixel ID.
+    # weight is the local contribution estimated by LIME’s linear model.
     for segment_id, weight in dict_exp.items():
+        # Assign the absolute value of the weight to all pixels within the segment.
         attr_2d[mask == segment_id] = abs(weight)
 
     return attr_2d
 
-def explain_lime_pkg(model, input_img, input_label, cfg, device):
-    
+def explain_lime_man(model, input_img, input_label, cfg, device):
+    """
+         This function run lime with Manual Segmentation 
+    """
+    # denorm image 
     shape_last_size = input_img.shape[-1]
     img = denormalize_imagenet(input_img)[0].permute(1, 2, 0).clamp(0, 1).cpu().numpy().astype(np.float64)
+    # build the grid with 64(8x8) regular segments.
     segments = grid_segments(shape_last_size, cfg.LIME_GRID_CELLS)
 
     def classifier_fn(batch):
+        """
+            Predict Function acts as an adapter for LIME:
+            1. It receives the perturbed images from LIME([0, 1]).
+            2. It normalizes them according to ImageNet standards.
+            3. It converts the format from NHWC to NCHW.
+            4. It passes them to DenseNet.
+            5. It returns the probabilities for each class.
+        """
         t = normalize_imagenet(torch.from_numpy(batch).float().permute(0, 3, 1, 2)).to(device)
         probs = []
         with torch.no_grad():
-            for i in range(0, len(t), 64):
-                probs.append(F.softmax(model(t[i:i + 64]), dim=1).cpu())
+            # process the sample with BATCH_SIZE
+            for i in range(0, len(t), cfg.LIME_BATCH_SIZE):
+                probs.append(F.softmax(model(t[i:i + cfg.LIME_BATCH_SIZE]), dim=1).cpu())
             return torch.cat(probs).numpy()
 
-    import inspect
+    
     explainer = lime_image.LimeImageExplainer(random_state=cfg.SEED)
+    # segmentation_fn : function that receive the image and return a segments matrix.
     kwargs = dict(labels=(int(input_label),), top_labels=None, hide_color=0,
-                  num_samples=cfg.LIME_NUM_SAMPLES, batch_size=64,
+                  num_samples=cfg.LIME_NUM_SAMPLES, batch_size=cfg.LIME_BATCH_SIZE,
                   segmentation_fn=lambda im: segments, random_seed=cfg.SEED)
     if "progress_bar" in inspect.signature(explainer.explain_instance).parameters:
-        kwargs["progress_bar"] = False            # absent in lime 0.2.0.1
+        kwargs["progress_bar"] = False            
+
+    # run explainer
     expl = explainer.explain_instance(img, classifier_fn, **kwargs)
+    # get the weights
     out = np.zeros((shape_last_size, shape_last_size))
     for seg, weight in dict(expl.local_exp[int(input_label)]).items():
+        # positive weight → the segment favors the class;
+        # negative weight → the segment disfavors the class.
         out[segments == seg] = weight
     return out

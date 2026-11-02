@@ -53,4 +53,4 @@ class OcclusionCaptum(Explainer):
         # 4. detach from compute graph
         # 5. force on cpu
         # 6. Convert to NumPy 2D
-        return occ_attr.abs()[0].sum(0).detach().cpu().numpy()
+        return occ_attr[0].sum(0).detach().cpu().numpy()

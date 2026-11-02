@@ -61,6 +61,27 @@ def denormalize_imagenet_np(x_data: np.ndarray) -> np.ndarray:
     std = np.asarray(IMAGENET_STD, dtype=np.float64).reshape(1, 3, 1, 1)
     return np.asarray(x_data, dtype=np.float64) * std + mean
 
+def to_densenet_input(input_img, size: int):
+    """
+        input_img (N, 1, 28, 28) in [0, 1] 
+        
+        Interpolate resize Images from 28 x 28 to size x size.
+        "Bilinear" refers to the interpolation method used to calculate the new pixels.
+
+        repeat replicates the tensor along the specified dimensions
+        from (N, 1, 224, 224) to → (N, 3, 224, 224)
+
+        Final normalize for ImageNet.
+        The shape of output obect is (N, 3, size, size) normalized.
+
+        The same grayscale image is copied into the three RGB channels
+        because DenseNet, when pre-trained on ImageNet, expects three channels.
+    """
+    import torch.nn.functional as F
+    x = F.interpolate(input_img, size=(size, size), mode="bilinear", align_corners=False)
+    x = x.repeat(1, 3, 1, 1)
+    return normalize_imagenet(x)
+
 def ls_dir(str_dir):
 
     print(f"Comando ls {str_dir} ")
