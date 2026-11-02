@@ -18,9 +18,11 @@ class GradCam(Explainer):
             raise ValueError(f"Grad-CAM layer {self.layer_name} is not a module of the model")
         self.layer = modules[self.layer_name]
 
-    def attribute(self, x_data, target):
+    def attribute(self, input_img, input_label):
         """
+            Using hook on the feature map and gradients of the model.
         """
-        att = LayerGradCam(self.model, 
-                           self.layer).attribute(x_data, target=target, relu_attributions=True)
-        return att[0, 0].detach().cpu().numpy()
+        gd_attr = LayerGradCam(self.model, 
+                           self.layer).attribute(input_img, target=input_label, relu_attributions=True)
+
+        return gd_attr[0, 0].detach().cpu().numpy()

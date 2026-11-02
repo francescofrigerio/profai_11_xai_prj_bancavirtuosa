@@ -53,25 +53,25 @@ class Explainer:
         """
         raise NotImplementedError
 
-    def meta(self, x_data, target: int) -> dict:     
+    def meta(self, input_img, input_label: int) -> dict:     
         """
             implemented on derived class                 
-            as optional diagnostics
+            as optional diagnostics to valid the map
         """
         return {}
     
-    def explain(self, x_data, target: int) -> AttributionResult:
-        assert_densenet_input(x_data, self.cfg)
-        if x_data.shape[0] != 1:
+    def explain(self, input_img, input_label: int) -> AttributionResult:
+        assert_densenet_input(input_img, self.cfg)
+        if input_img.shape[0] != 1:
             raise CheckErrors(f"{self.name}: explains ONE image at a time, got a batch of {x_data.shape[0]}")
-        if not (0 <= int(target) < self.cfg.NUM_CLASSES):
-            raise CheckErrors(f"{self.name}: target {target} is not a class of the model")
+        if not (0 <= int(input_label) < self.cfg.NUM_CLASSES):
+            raise CheckErrors(f"{self.name}: target {input_label} is not a class of the model")
         if self.model.training:
             raise CheckErrors(f"{self.name}: the model must be in eval mode (BatchNorm would corrupt the explanation)")
-        device = x_data.device
+        device = input_img.device
         sync(device)
         t0 = time.perf_counter()
-        raw = self._attribute(x_data, int(target))
+        raw = self._attribute(input_img, int(input_label))
         sync(device)
         seconds = time.perf_counter() - t0
         map = np.asarray(raw, dtype=np.float64)

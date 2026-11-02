@@ -54,6 +54,9 @@ from captum.attr import Occlusion
 import shap
 from lime import lime_image
 
+from utility import normalize_saliency_map ,  normalize_imagenet
+from utility import denormalize_imagenet , black_normalized
+
 try:
     import torch
     import torch.nn as nn
@@ -63,42 +66,7 @@ except Exception as exc:                     # reported by check 1, not a crash
     torch = nn = F = None
     _TORCH_ERROR = exc
 
-# Statistiche standard ImageNet
-IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-IMAGENET_STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
-def normalize_saliency_map(saliency_map: np.ndarray) -> np.ndarray:
-    """
-        Normalize a 2d array in the range [0, 1].
-    """
-    min_val = saliency_map.min()
-    max_val = saliency_map.max()
-    if max_val - min_val == 0:
-        return np.zeros_like(saliency_map)
-    return (saliency_map - min_val) / (max_val - min_val)
-
-def denormalize_imagenet(img_hwc_np):
-    """
-        This function Converts the image from ImageNet scale to a pixels view range [0, 1].
-    """
-    img_denorm = (img_hwc_np * IMAGENET_STD) + IMAGENET_MEAN
-    # Clip to be sure the range will be strictly [0, 1] for LIME
-    return np.clip(img_denorm, 0.0, 1.0)
-
-def normalize_imagenet(input_img):
-    """
-        Normalize for ImageNet from pixels view range
-    """
-    mean = torch.tensor(IMAGENET_MEAN, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
-    std = torch.tensor(IMAGENET_STD, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
-
-    return (input_img - mean) / std
-
-def black_normalized(size: int, device):
-    """
-        The black of the ORIGINAL image, expressed in the normalized space.
-    """
-    return normalize_imagenet(torch.zeros(1, 3, size, size, device=device))
 
 def grid_segments(size: int, cells: int) -> np.ndarray:
     """
@@ -176,7 +144,13 @@ def explain_ig(model, input_img, input_label, cfg, steps=None):
                                                    )
     print(f"check: delta {delta_attr}"
             "if near 0 then the approssimate with n_steps was been accurate ")
-    return ig_attr
+    # 1. Take abs to consider the magnitude of the element
+    # 2. Select element of the batch (1, C, H, W) -> (C, H, W)
+    # 3. Sum along the channels to reduce the shape at (H, W)
+    # 4. Convert to NumPy 2D
+    attr_2d = ig_attr.abs()[0].sum(0).detach().cpu().numpy()
+
+    return attr_2d
 
     
 def explain_saliency(model, input_img, input_label):

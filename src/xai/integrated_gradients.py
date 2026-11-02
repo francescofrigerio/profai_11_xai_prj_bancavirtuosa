@@ -7,9 +7,9 @@
 from __future__ import annotations
 import torch
 
-from data import black_normalized
+from utility import black_normalized
 from xai import Explainer
-from captum.attr import IntegratedGradients as CaptumIG
+from captum.attr import IntegratedGradients as ig
 
 class IntegratedGradients(Explainer):
     """
@@ -17,19 +17,62 @@ class IntegratedGradients(Explainer):
     """
     name = "integrated_gradients"
     signed = True
+    # if near 0 then the approssimate with n_steps was been accurate
+    conv_delta = 0.0
+    last_sum = 0.0
 
-    def attribute(self, x_data, target):
+    def attribute(self, input_img, input_label):
         """
-        """
-        att = CaptumIG(self.model).attribute(
-            x_data, baselines=black_normalized(self.cfg.DENSENET_SIZE, x1.device), target=target,
-            n_steps=self.cfg.IG_STEPS, internal_batch_size=50)
-        self._last_sum = att.sum().item()
-        return att[0].sum(0).detach().cpu().numpy()
+            Computes Integrated Gradients and stores the convergence delta.
+            get Integrated Gradients and returns :
+            - ig_attr: pixels attributions.
+            - self.conv_delta: How much Integrated Gradients approssimate
+                               satisfies the completeness property.
 
-    def meta(self, x_data, target):
-        base = black_normalized(self.cfg.DENSENET_SIZE, x1.device)
+            How Much ΣIG_i(x) approximates F(x)-F(x')
+            where:
+            - (x) image to explain
+            - (x') baseline here blach and  normalized image;
+            - (F(x)) logit of target class 
+            - (IG_i(x)) attribution of element i.
+
+            convergence delta of Captum measure 
+            error delta approximates between the attribution sum and the difference
+            between the model's output on input img F(x) and baseline F(x')  .
+
+            Captum provides the convergence delta to diagnose 
+            the numerical approximation of Integrated Gradients (IG); 
+            
+            meta() function calculates the difference between the model output 
+            and the sum of the attributions.
+            These are two complementary checks for the same theoretical property.
+        """
+        ig_attr, self.conv_delta = ig(self.model).attribute(input_img, baselines=black_normalized(self.cfg.DENSENET_SIZE, 
+                                                                                    input_img.device), 
+                                        target=input_label,
+                                        n_steps=self.cfg.IG_STEPS, 
+                                        internal_batch_size=self.cfg.IG_BATCH_SIZE,
+                                        return_convergence_delta=True )
+        
+        self.last_sum = ig_attr.sum().item()
+        # 1. Take abs to consider the magnitude of the element
+        # 2. Select element of the batch 
+        # 3. Sum along the channels to reduce the shape at (H, W)
+        # 4. detach from compute graph
+        # 5. Convert to NumPy 2D
+        # return ig_attr[0].sum(0).detach().cpu().numpy()
+        return ig_attr.abs()[0].sum(0).detach().cpu().numpy()
+
+    def meta(self, input_img, input_label):
+        """
+            This function is used to valid the map
+            differenza effettiva tra il logit dell'immagine originale e quello del baseline.
+
+            delta is the benchmark to check the attribution completness
+        """
+        base = black_normalized(self.cfg.DENSENET_SIZE, input_img.device)
         with torch.no_grad():
-            delta = (self.model(x_data)[0, target] - self.model(base)[0, target]).item()
+            delta = (self.model(input_img)[0, input_label] - self.model(base)[0, input_label]).item()
+        # error relative and norm
         error = abs(self._last_sum - delta) / max(abs(delta), 1e-6)
         return {"completeness_error": error, "f_x_minus_f_baseline": delta, "steps": self.cfg.IG_STEPS}

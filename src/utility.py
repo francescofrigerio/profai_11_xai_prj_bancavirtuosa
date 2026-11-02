@@ -1,11 +1,69 @@
-
 """
-    Commont utility for Model Cnn and Logistic Regression
+    Commont utility for Normalization , Model Cnn and Logistic Regression
 """
 
 from pathlib import Path
 import numpy as np
 import torch
+
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
+
+IMAGENET_MEAN_TRANSFORM  =  [0.485, 0.456, 0.406]
+IMAGENET_STD_TRANSFORM =   [0.229, 0.224, 0.225]
+
+# Statistiche standard ImageNet
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+IMAGENET_STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+def normalize_saliency_map(saliency_map: np.ndarray) -> np.ndarray:
+    """
+        Normalize a 2d array in the range [0, 1].
+    """
+    min_val = saliency_map.min()
+    max_val = saliency_map.max()
+    if max_val - min_val == 0:
+        return np.zeros_like(saliency_map)
+    return (saliency_map - min_val) / (max_val - min_val)
+
+def denormalize_imagenet(img_hwc_np):
+    """
+        Rollback from image net Normalize value
+        This function Converts the image from ImageNet scale to a pixels view range [0, 1].
+    """
+    img_denorm = (img_hwc_np * IMAGENET_STD) + IMAGENET_MEAN
+    # Clip to be sure the range will be strictly [0, 1] for LIME
+    return np.clip(img_denorm, 0.0, 1.0)
+
+def normalize_imagenet(input_img):
+    """
+        Normalize for ImageNet from pixels view range
+        
+        this normalize is mandatory  
+        before send the image to the model DenseNet. 
+        This net expect pixels has distribuited  
+        with this specific mean and std to get correctly the logits
+        and the gradients.
+       
+    """
+    mean = torch.tensor(IMAGENET_MEAN, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
+    std = torch.tensor(IMAGENET_STD, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
+
+    return (input_img - mean) / std
+
+def black_normalized(size: int, device):
+    """
+        The black of the ORIGINAL image, expressed in the normalized space.
+    """
+    return normalize_imagenet(torch.zeros(1, 3, size, size, device=device))
+
+def denormalize_imagenet_np(x_data: np.ndarray) -> np.ndarray:
+    """
+        numpy version of denormalize image net, for the contract checks (no torch needed).
+    """
+    mean = np.asarray(IMAGENET_MEAN, dtype=np.float64).reshape(1, 3, 1, 1)
+    std = np.asarray(IMAGENET_STD, dtype=np.float64).reshape(1, 3, 1, 1)
+    return np.asarray(x_data, dtype=np.float64) * std + mean
 
 def ls_dir(str_dir):
 

@@ -27,44 +27,7 @@ from sklearn.model_selection import train_test_split
 from config import CONFIG
 from logger import LOGGER
 
-IMAGENET_MEAN = (0.485, 0.456, 0.406)
-IMAGENET_STD = (0.229, 0.224, 0.225)
 
-IMAGENET_MEAN_TRANSFORM  =  [0.485, 0.456, 0.406]
-IMAGENET_STD_TRANSFORM =   [0.229, 0.224, 0.225]
-
-def image_net_stats(like):
-    """
-        DenseNet view
-    """
-    mean = torch.tensor(IMAGENET_MEAN, dtype=like.dtype, device=like.device).view(1, 3, 1, 1)
-    std = torch.tensor(IMAGENET_STD, dtype=like.dtype, device=like.device).view(1, 3, 1, 1)
-    return mean, std
-
-
-def normalize(x_data):
-    """
-        Image Net Normalize
-    """
-    mean, std = image_net_stats(x_data)
-    return (x_data - mean) / std
-
-
-def denormalize(x_data):
-    """
-        Rollback from image net Normalize value
-    """
-    mean, std = image_net_stats(x_data)
-    return x_data * std + mean
-
-
-def denormalize_np(x_data: np.ndarray) -> np.ndarray:
-    """
-        numpy version of denormalize, for the contract checks (no torch needed).
-    """
-    mean = np.asarray(IMAGENET_MEAN, dtype=np.float64).reshape(1, 3, 1, 1)
-    std = np.asarray(IMAGENET_STD, dtype=np.float64).reshape(1, 3, 1, 1)
-    return np.asarray(x_data, dtype=np.float64) * std + mean
 
 class TransformedDataset(Dataset):
     """
