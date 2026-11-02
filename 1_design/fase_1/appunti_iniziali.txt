@@ -18,7 +18,7 @@ except Exception as exc:                     # reported by check 1, not a crash
     torch = nn = F = None
     _TORCH_ERROR = exc
     
-from config import CONFIG  # noqa: E402
+from config import CONFIG  
 
 IN_NOTEBOOK = "ipykernel" in sys.modules
 
