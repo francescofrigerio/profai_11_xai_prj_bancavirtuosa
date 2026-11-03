@@ -1,0 +1,342 @@
+{
+  "model": {
+    "action": "train",
+    "reason": "no checkpoint at checkpoints/densenet121_mnist.pt",
+    "sha256": "b503dddb4071a5dcc53f77d2c0458554d103ff8cab36648ac71ac87719b61083",
+    "device": "cuda"
+  },
+  "median_seconds_per_image": {
+    "gradcam": 0.016959301999918353,
+    "integrated_gradients": 0.5072290270001076,
+    "occlusion": 0.26007734550000805,
+    "saliency": 0.040970026999957554,
+    "lime": 3.196269009499929,
+    "shap": 3.3619690415000605
+  },
+  "ig_completeness_errors": [
+    0.0023667339742664264,
+    0.020170389195200845,
+    0.027005835446130805,
+    0.017362823859206258,
+    0.005480369373409298,
+    0.00038427028263019803,
+    0.02009898960793191,
+    0.01769547357739167,
+    0.011946691320231937,
+    0.009975357371693635
+  ],
+  "images": [
+    {
+      "index": 56715,
+      "true": 0,
+      "pred": 0,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "index": 58886,
+      "true": 1,
+      "pred": 1,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "index": 5885,
+      "true": 2,
+      "pred": 2,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "index": 48551,
+      "true": 3,
+      "pred": 3,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "index": 2888,
+      "true": 4,
+      "pred": 4,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "index": 31891,
+      "true": 5,
+      "pred": 5,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "index": 35206,
+      "true": 6,
+      "pred": 6,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "index": 26528,
+      "true": 7,
+      "pred": 7,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "index": 26496,
+      "true": 8,
+      "pred": 8,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "index": 22875,
+      "true": 9,
+      "pred": 9,
+      "native_shapes": {
+        "gradcam": [
+          4,
+          4
+        ],
+        "integrated_gradients": [
+          128,
+          128
+        ],
+        "occlusion": [
+          128,
+          128
+        ],
+        "saliency": [
+          128,
+          128
+        ],
+        "lime": [
+          128,
+          128
+        ],
+        "shap": [
+          128,
+          128
+        ]
+      }
+    }
+  ],
+  "per_image_all_techniques_seconds": 7.383473752499981,
+  "total_seconds": 488.2630000114441
+}

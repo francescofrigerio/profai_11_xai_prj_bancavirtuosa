@@ -1,0 +1,52 @@
+Il test che fallisce è proprio uno di quelli “che devono poter fallire”, quindi lo guardo con attenzione prima di dare la colpa a SHAP. Riproduco in locale la scelta dello sfondo del test (usa solo numpy e sklearn).
+
+Continua
+
+Tappa 2: quasi chiusa, manca solo il rilancio di pytest
+
+Il run reale è tutto PASS. Dei 79 test uno è fallito, ma per un difetto del test e non delle tecniche.
+
+Il test fallito
+
+test_lime_and_shap_are_reproducible_and_really_use_the_seed diceva che il seed di SHAP non ha effetto. Ho riprodotto in locale la scelta dello sfondo del test: sulle 8 immagini campionate una sola ha inchiostro nel quadrante che il rilevatore 0 osserva. Quindi l’unico effetto che il seed può avere è quante volte quell’immagine viene pescata nei 20 campioni, e due seed possono pescarla lo stesso numero di volte. Il test era cieco per costruzione (E36). Sul modello vero SHAP rispetta il seed: la stabilità tra seed in fase zero era 0,78–0,80 e shap is reproducible passa.
+
+Ho corretto in tests/test_xai.py: lo sfondo del giocattolo ha inchiostro ovunque, e c’è un test a parte che verifica che make_background sia fisso per seed (stesso seed ? stesso sfondo, altro seed ? altro sfondo). Ho ricontrollato i 54 test senza torch (verdi); i 7 con torch li esegui tu.
+
+Cosa dice il run reale
+Tecnica	Tempo mediano per immagine
+Grad-CAM	0,02 s
+Saliency	0,04 s
+Occlusion	0,26 s
+Integrated Gradients (200 passi)	0,51 s
+LIME	3,20 s
+SHAP (100 campioni)	3,36 s
+Sei tecniche	7,4 s (in fase zero 10,9 s con SHAP a 200 campioni)
+Tempi: con questi numeri “Esegui tutto” costa circa 20 minuti in load e 26 in train (limiti 30 e 45), con un margine molto meglio di prima.
+Completezza di IG: errore massimo 2,70% su 10 immagini.
+Riproducibilità: LIME e SHAP sono riproducibili.
+ReLU in-place: equivalente sul modello addestrato (differenze = 2,5e-7).
+Saliency: il 32% della massa cade sulla cifra, contro il 33% di una mappa casuale.
+Cosa mostra la griglia di mappe
+
+È la prima vista d’insieme, e già racconta la storia del progetto:
+
+La LR locale (w·x) è la mappa più nitida: è esatta, e sulle cifre si leggono i tratti rossi (a favore) e blu (contro).
+Integrated Gradients segue bene il profilo della cifra (è zero sullo sfondo per costruzione), con rumore rosso/blu lungo i tratti.
+Occlusion dà macchie lisce sulle zone importanti. Un caso da guardare: sul 5 è prevalentemente blu, cioè coprire il tratto alza il logit del 5, il contrario delle altre cifre.
+Grad-CAM a 4×4 mostra spesso un blob centrale simile per cifre diverse.
+LIME è a celle grosse e con pesi positivi anche sullo sfondo per le predizioni molto sicure. Probabile effetto del kernel di distanza, che correla le celle accese: la tabella “fuori dalla cifra” sarà alta per LIME.
+SHAP è a grana fine e rumoroso, come da stabilità 0,78–0,80.
+Saliency è quasi invisibile con la scala lineare e ha picchi sui bordi dell’immagine. Nelle figure finali servirà una scala per percentile. La mappa conferma quanto aveva misurato la fase zero (mappa dispersa).
+
+Queste cautele sono in errata come E37, da riportare nel report della tappa 4.
+
+Due cose pratiche
+Il checkpoint non è stato trovato in fase_2 (MODE: train), quindi il driver ha riaddestrato (488 s invece di ~2 minuti). Copia densenet121_mnist.pt in fase_2/checkpoints/ (il file committato è quello con SHA 4598054c…).
+Le immagini di debug outputs/stage2/debug/gradcam_debug_epoch1.png e …epoch5.png sono state generate, ma non le ho viste. Sono la verifica visiva della funzione D09: se me le mandi controllo che la prima epoca sia “casuale” e l’ultima segua le cifre.
+Cosa serve per chiudere
+Rilancia solo !python -m pytest tests -q con lo zip aggiornato. Mi aspetto 79 passati.
+Le due immagini di debug (non bloccante, ma è il modo di verificare la funzione).
+
+Poi passiamo alla tappa 3: campionamento (campione quantitativo e galleria da 24, 
+con le regole che abbiamo approvato) e confronto (Spearman e IoU nella maschera, 
+tabella fuori dalla cifra, riferimento casuale, deletion dietro flag). In quella tappa useremo ancora i test con segnale piantato e il controllo dei valori attesi: random ? Spearman ˜ 0 e IoU ˜ 0,111.
