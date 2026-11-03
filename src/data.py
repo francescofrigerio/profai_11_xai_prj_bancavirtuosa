@@ -1,21 +1,11 @@
 """
      Here we load dataset and dataloader
 """
-import numpy as np
-
 # pytorch
-
 import torch
-# 
-# import torch.nn as nn
-# import torch.nn.functional as F
-# import time
 
 # computer vision with pytorch
-# import torchvision
 from torch.utils.data import DataLoader
-# import torchvision.models as models
-# from torchvision.models import DenseNet121_Weights, densenet121
 
 # preprocessd dataset with pytorch
 import torchvision.datasets as datasets
@@ -32,6 +22,7 @@ from config import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 class TransformedDataset(Dataset):
     """
         Here we Transform Data for DataLoader
+        and wrap Dataset to save index of the images
     """
     def __init__(self, dataset, transform=None):
         self.dataset = dataset
@@ -50,7 +41,7 @@ class TransformedDataset(Dataset):
         if self.transform is not None:
             image = self.transform(image)
 
-        return image, label
+        return image, label , idx
 
 class IndexedDataset(torch.utils.data.Dataset):
     """
@@ -158,6 +149,7 @@ def data_to_input_lr( dataloader_ ,
                       cfg=CONFIG,
                       logger=LOGGER ):
     """
+        load data from dataset to input struct for lr
     """
     # Alloc tensors 1, 28, 28
     X_input = torch.empty((len(dataloader_.dataset),  channels , w , h),
@@ -202,6 +194,7 @@ def data_to_input_lr( dataloader_ ,
 def get_images_labels(dataset_,flag_data_loader=True,idx_dataset=0,
                       cfg=CONFIG,logger=LOGGER):
     """
+         load image from idx
     """
     if flag_data_loader:
         # once

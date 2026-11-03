@@ -117,10 +117,11 @@ def get_evaluate_model( cfg,
     y_pred_=[]
     y_true_=[]
     X_test_=[]
+    idx_list_ = []
 
     with torch.no_grad():
         # for i, (images, labels) in enumerate(test_loader_):
-        for images, labels in test_loader_:
+        for images, labels , idx in test_loader_:
             images, labels = images.to(device_), labels.to(device_)
 
             # print images gid with relative prevision and ground truth
@@ -135,13 +136,15 @@ def get_evaluate_model( cfg,
             X_test_.append(images)
             y_true_.append(labels)
             y_pred_.append(predicted)
+            idx_list_.append(idx)
 
     # Concatena tutto l'intero dataset
     X_test_ = torch.cat(X_test_).cpu().numpy()
     y_true_ = torch.cat(y_true_).cpu().numpy()
     y_pred_ = torch.cat(y_pred_).cpu().numpy()
+    idx_list_ = torch.cat(idx_list_).cpu().numpy()
 
-    return X_test_ , y_true_ , y_pred_
+    return X_test_ , y_true_ , y_pred_ , idx_list_
 
 def evaluate_model( model_ ,
                     dataset_,

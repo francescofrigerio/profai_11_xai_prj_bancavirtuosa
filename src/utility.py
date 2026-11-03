@@ -113,6 +113,7 @@ def run_create_list_images( logger,
                             X_test_ , 
                             y_test_,
                             y_pred_ , 
+                            idx_dataset_,
                             list_class_, 
                             n_images_=50,
                             # n_images_=100,
@@ -197,8 +198,11 @@ def run_create_list_images( logger,
                 img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
 
             # cast to int else json.write not work
+            # i=Posizione nella sequenza delle predizioni
+            # idx_dataset_[i] Indice dell'immagine nel Dataset
             dict_curr_ok = {  "class": int(id_class),
-                              "id_dataset": int(i),
+                              # "id_dataset": int(i), 
+                              "id_dataset": int(idx_dataset_[i]),
                               # "image": img_to_save.tolist() ,
                               "y_true": int(y_test_[i]) if not hasattr(y_test_[i], 'item') else y_test_[i].item(),
                               "y_pred": int(y_pred_[i]) if not hasattr(y_pred_[i], 'item') else y_pred_[i].item()
@@ -218,7 +222,8 @@ def run_create_list_images( logger,
 
             # cast to int else json.write not work
             dict_curr_ko = {  "class": int(id_class),
-                              "id_dataset": int(i),
+                              # "id_dataset": int(i),
+                             "id_dataset": int(idx_dataset_[i]),
                               # "image": img_to_save.tolist() ,
                               "y_true": int(y_test_[i]) if not hasattr(y_test_[i], 'item') else y_test_[i].item(),
                               "y_pred": int(y_pred_[i]) if not hasattr(y_pred_[i], 'item') else y_pred_[i].item()

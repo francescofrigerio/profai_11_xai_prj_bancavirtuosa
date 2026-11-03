@@ -80,3 +80,37 @@ Via flag
 Analisi e comprensione 
 
 
+Grafico fase 2 
+
+                  PHASE 1
+                     │
+          ┌──────────┴──────────┐
+          │                     │
+      DataLoader LR        DataLoader CNN
+          │                     │
+          └──────────┬──────────┘
+                     │
+            X_test, y_test,
+             y_pred, idx_test
+                     │
+                     ▼
+           run_create_list_images
+                     │
+                     ▼
+              JSON leggero
+       id_dataset, y_true, y_pred,
+           class, status
+                     │
+                     ▼
+                  PHASE 3
+                     │
+                     ▼
+           dataset_test[idx]
+                     │
+                     ▼
+           to_densenet_input
+                     │
+                     ▼
+             Explainer.explain
+
+

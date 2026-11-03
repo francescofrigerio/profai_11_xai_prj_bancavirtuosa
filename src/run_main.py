@@ -60,7 +60,7 @@ def phase_1_2( cfg,
     # per classe: ne utilizzi al massimo 9, non 10.
     # START LOAD DATA
     datasets_dict , loaders_dict = load_datasets()
-    test_datasets = datasets_dict["test"]
+    # test_datasets = datasets_dict["test"]
         
     # Load tensor for train and test baseline
     train_loader_lr = loaders_dict["lr"]["train"]
@@ -72,10 +72,10 @@ def phase_1_2( cfg,
     # val_loader_cnn = loaders_dict["cnn"]["val"]
     test_loader_cnn = loaders_dict["cnn"]["test"]
             
-    X_train , y_train = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
-    X_val , y_val = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_train , y_train , _ = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_val , y_val , _ = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
 
-    X_test , y_test = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_test , y_test , idx_dataset = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
     # END LOAD DATA
 
     # START PROCESS LR MODEL
@@ -93,7 +93,8 @@ def phase_1_2( cfg,
     list_images_lr_ok , list_images_lr_ko  = run_create_list_images( logger,
                                                                      X_test,
                                                                      y_test,
-                                                                     y_pred ,
+                                                                     y_pred,
+                                                                     idx_dataset,
                                                                      cfg_list_class,
                                                                      n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                                      flag_before_ko=True)
@@ -102,6 +103,7 @@ def phase_1_2( cfg,
                                                         X_test,
                                                         y_test,
                                                         y_pred ,
+                                                        idx_dataset,
                                                         cfg_list_class,
                                                         n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                         flag_before_ko=False)
@@ -110,7 +112,7 @@ def phase_1_2( cfg,
     # END PROCESS LR MODEL
     
     # START PROCESS CNN MODEL 
-    X_test , y_test , y_pred = get_evaluate_model( cfg,
+    X_test , y_test , y_pred , idx_dataset = get_evaluate_model( cfg,
                                                    logger,
                                                    flag_pretrained,
                                                    test_loader_cnn,
@@ -127,7 +129,8 @@ def phase_1_2( cfg,
     list_images_cnn_ok , list_images_cnn_ko  = run_create_list_images(  logger,
                                                                         X_test,
                                                                         y_test,
-                                                                        y_pred ,
+                                                                        y_pred,
+                                                                        idx_dataset,
                                                                         cfg_list_class,
                                                                         n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                                         flag_before_ko=True)
@@ -135,7 +138,8 @@ def phase_1_2( cfg,
             list_images_cnn_ok , _  = run_create_list_images( logger,
                                                               X_test,
                                                               y_test,
-                                                              y_pred ,
+                                                              y_pred,
+                                                              idx_dataset,
                                                               cfg_list_class,
                                                               n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                               flag_before_ko=False)
