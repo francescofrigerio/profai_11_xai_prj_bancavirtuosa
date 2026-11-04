@@ -20,13 +20,41 @@ from data import data_to_input_lr, load_datasets
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
 from training import get_device, get_trained_model ,get_evaluate_model
-from output import plot_logistic_graph , plot_predict_info , save_dict_to_json , load_dict_from_json
+from output import plot_logistic_graph , plot_predict_info 
+from output import save_dict_to_json , load_images_by_class
 from utility import run_create_list_images , run_check_class_ok_ko , ls_dir
 
 # Configurazione dei Warnings (spostata DOPO tutti gli import) ---
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
 warnings.filterwarnings('ignore', category=FutureWarning)
 
+
+def phase_2( cfg,
+             cfg_list_class,
+             logger,
+             out_path ) -> None :
+    """
+        Run xai Explainer
+    """
+
+    if len(cfg_list_class) == 0 :
+        raise ValueError("list_class non può essere vuota")
+    else:
+        n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(cfg_list_class))
+
+    logger.debug(f"Immagini per classe: {n_for_class}")
+    device, warning = get_device(cfg)
+    if warning:
+        logger.debug("WARNING:", warning)
+
+    # load 10 images for ok lr
+    list_images_lr_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_OK)
+    list_images_lr_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
+
+    # load 10 images for ok cnn
+    list_images_cnn_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
+    list_images_cnn_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+    
 def phase_1_2( cfg,
              cfg_list_class,
              logger,
@@ -147,10 +175,16 @@ def phase_1_2( cfg,
     # END PROCESS LR MODEL
 
     # Save files for phase 3
-    save_dict_to_json(out_path / "images_lr_ok.json" , list_images_lr_ok)
-    save_dict_to_json(out_path / "images_lr_ko.json" , list_images_lr_ko)
-    save_dict_to_json(out_path / "images_cnn_ok.json" , list_images_cnn_ok)
-    save_dict_to_json(out_path / "images_cnn_ko.json" , list_images_cnn_ko)
+    # save_dict_to_json(out_path / "images_lr_ok.json" , list_images_lr_ok)
+    # save_dict_to_json(out_path / "images_lr_ko.json" , list_images_lr_ko)
+    # save_dict_to_json(out_path / "images_cnn_ok.json" , list_images_cnn_ok)
+    # save_dict_to_json(out_path / "images_cnn_ko.json" , list_images_cnn_ko)
+
+    save_dict_to_json(out_path / cfg.FILE_IMG_LR_OK , list_images_lr_ok)
+    save_dict_to_json(out_path / cfg.FILE_IMG_LR_KO , list_images_lr_ko)
+    save_dict_to_json(out_path / cfg.FILE_IMG_CNN_OK , list_images_cnn_ok)
+    save_dict_to_json(out_path / cfg.FILE_IMG_CNN_KO , list_images_cnn_ko)
+    
 
 def phase_1_1(cfg,
               logger,
@@ -287,17 +321,6 @@ def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
         Main Function Of the project
     """
 
-    # ROOT_DIR = Path(__file__).resolve().parent.parent
-    # print("CWD corrente:", os.getcwd())
-    # ls_dir(ROOT_DIR)
-    # print("CWD corrente:", ROOT_DIR)
-    # print("Percorso assoluto del checkpoint:", Path(cfg.CHECKPOINT_PATH).resolve())
-        
-    # path_pt = Path(cfg.CHECKPOINT_DIR)
-    # ls_dir(path_pt)
-    # assert path_pt.exists(), f"Checkpoint non trovato al percorso: {path_pt}"
-    # raise ValueError("Mi Fermo per debug")
-
     # Initialize the parser
     parser = argparse.ArgumentParser(description="Xai per Classificazione di Cifre in ambito Finance")
 
@@ -335,6 +358,8 @@ def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
         phase_1_1(cfg,logger,out,flag_pretrained)
     else:
         phase_1_2(cfg,cfg_list_class,logger,out,flag_pretrained)
+
+    phase_2(cfg,cfg_list_class,logger,out)
 
     logger.debug("Programma Terminato")
 

@@ -15,6 +15,60 @@ from logger import LOGGER
 from utility import ls_dir
 import torch
 
+def test_dir_from_main(cfg=CONFIG, logger=LOGGER):
+    ROOT_DIR = Path(__file__).resolve().parent.parent
+    print("CWD corrente:", os.getcwd())
+    ls_dir(ROOT_DIR)
+    print("CWD corrente:", ROOT_DIR)
+    print("Percorso assoluto del checkpoint:", Path(cfg.CHECKPOINT_PATH).resolve())
+            
+    path_pt = Path(cfg.CHECKPOINT_DIR)
+    ls_dir(path_pt)
+    assert path_pt.exists(), f"Checkpoint non trovato al percorso: {path_pt}"
+
+def test_dataloader_batch_structure(dataloader_):
+    """
+    Verifica che il batch restituito dal DataLoader
+    contenga immagini, label e indici con forme e tipi attesi.
+    """
+
+    batch = next(iter(dataloader_))
+
+    # Verifica struttura del batch
+    assert len(batch) == 3, (
+        f"Attesi 3 elementi (images, labels, idx), "
+        f"ricevuti {len(batch)}"
+    )
+
+    assert isinstance(batch, (list, tuple)), (
+        f"Tipo batch inatteso: {type(batch)}"
+    )
+
+    images, labels, idx = batch
+
+    # Verifica tipo dei tensori
+    assert isinstance(images, torch.Tensor)
+    assert isinstance(labels, torch.Tensor)
+    assert isinstance(idx, torch.Tensor)
+
+    # Verifica shape
+    assert images.shape == (64, 3, 128, 128), (
+        f"Shape immagini inattesa: {images.shape}"
+    )
+
+    assert labels.shape == (64,), (
+        f"Shape labels inattesa: {labels.shape}"
+    )
+
+    assert idx.shape == (64,), (
+        f"Shape indici inattesa: {idx.shape}"
+    )
+
+    # Verifica dtype
+    assert images.dtype == torch.float32
+    assert labels.dtype == torch.int64
+    assert idx.dtype == torch.int64
+
 def test_load_checkpoint_field(cfg=CONFIG, logger=LOGGER):
     """
     Verifica i campi del checkpoint e la compatibilità con weights_only=True.

@@ -122,6 +122,12 @@ class ConfigConstantsDefault:
     # Execution and outputs ALWAIS on Codespace github
     # RUN_CNN_MAN: bool = False
     OUTPUT_DIR: str = ROOT_DIR / "outputs"
+
+    FILE_IMG_LR_OK: str = "images_lr_ok.json" 
+    FILE_IMG_LR_KO: str = "images_lr_ko.json" 
+    FILE_IMG_CNN_OK: str = "images_cnn_ok.json" 
+    FILE_IMG_CNN_OK: str = "images_cnn_ko.json" 
+    
     IN_NOTEBOOK = "ipykernel" in sys.modules
 
     THRESHOLDS = { 

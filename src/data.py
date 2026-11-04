@@ -57,7 +57,14 @@ class IndexedDataset(torch.utils.data.Dataset):
         x, y = self.dataset[idx]
         return x, y, idx
 
-def debug_dataloader(dataloader_):
+def debug_iter_dataloader(dataloader_):
+    """
+        Number elements batch: 3
+        Type batch: <class 'list'>
+        Element 0: shape=torch.Size([64, 3, 128, 128]), dtype=torch.float32
+        Element 1: shape=torch.Size([64]), dtype=torch.int64
+        Element 2: shape=torch.Size([64]), dtype=torch.int64
+    """
     batch = next(iter(dataloader_))
             
     print("Numero elementi nel batch:", len(batch))
