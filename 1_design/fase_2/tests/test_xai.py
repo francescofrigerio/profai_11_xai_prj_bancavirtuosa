@@ -66,7 +66,11 @@ def toy_world():
     x28[0, 0, 18:23, 18:23] = 1.0      # bottom-right block
     x1 = to_densenet_input(x28, S)
     data = synthetic_data_bundle(CFG)
-    background = make_background(data.X_trainval, data.split.idx_train, CFG, torch.device("cpu"))
+    # A background with ink EVERYWHERE: every baseline draw changes the SHAP estimate. With sparse
+    # backgrounds (one image inking the observed quadrant) two seeds can draw the same counts and
+    # the test would be unable to see the seed (first Colab run, E36).
+    generator = torch.Generator().manual_seed(0)
+    background = to_densenet_input(torch.rand(CFG.SHAP_NUM_BACKGROUND, 1, 28, 28, generator=generator), S)
     return model, x1, background, data
 
 
@@ -128,6 +132,15 @@ def test_lime_and_shap_are_reproducible_and_really_use_the_seed():
         c = build_techniques(model, other_cfg, background, names=(name,))[name].explain(x1, 0).map
         assert np.allclose(a, b, rtol=1e-3, atol=1e-6 * np.abs(a).max()), f"{name}: same seed, different map"
         assert not np.allclose(a, c, rtol=1e-3, atol=1e-6 * np.abs(a).max()), f"{name}: the seed has no effect"
+
+
+def test_shap_background_is_fixed_by_the_seed():
+    data, cpu = synthetic_data_bundle(CFG), torch.device("cpu")
+    a = make_background(data.X_trainval, data.split.idx_train, CFG, cpu)
+    b = make_background(data.X_trainval, data.split.idx_train, CFG, cpu)
+    c = make_background(data.X_trainval, data.split.idx_train, tiny_cfg(SHAP_NUM_BACKGROUND=8, SEED=CFG.SEED + 1), cpu)
+    assert a.shape == (CFG.SHAP_NUM_BACKGROUND, 3, S, S)
+    assert torch.equal(a, b) and not torch.equal(a, c)
 
 
 def test_registry_is_strict():

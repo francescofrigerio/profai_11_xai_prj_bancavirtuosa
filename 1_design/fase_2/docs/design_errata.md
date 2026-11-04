@@ -186,3 +186,24 @@ Tutte le 13 verifiche della tabella sono PASS. I numeri riproducono quelli della
 | E33 | Contratto comune | Ogni tecnica spiega **una** immagine e **una** classe e restituisce una mappa 2D alla sua risoluzione nativa, con `signed`, `output_space` (LIME: probabilità, le altre: logit), tempo e metadati. Il contratto **rifiuta** input non normalizzati, batch, classi inesistenti e un modello in `train` (la BatchNorm corromperebbe la spiegazione). |
 | E34 | Integrated Gradients | Riporta nei metadati l'errore di completezza di ogni singola spiegazione. |
 | E35 | Test del segnale piantato | Modello giocattolo con due "rilevatori" (quadrante in alto a sinistra → classe 0, in basso a destra → classe 1): ogni tecnica deve trovare la regione e **seguire la classe richiesta** (se ignorasse il target, il test fallirebbe). |
+
+## Tappa 2: primo run reale (Colab, T4)
+
+Test: 78 passati e 1 fallito su 79. Il fallimento (`shap: the seed has no effect`) era un difetto del **test**, non di SHAP (E36). Run reale: tutte le verifiche PASS.
+
+| Tecnica | Tempo mediano per immagine |
+|---|---|
+| Grad-CAM | 0,02 s |
+| Saliency | 0,04 s |
+| Occlusion | 0,26 s |
+| Integrated Gradients (200 passi) | 0,51 s |
+| LIME (1000 campioni) | 3,20 s |
+| SHAP (100 campioni) | 3,36 s |
+| **Sei tecniche** | **7,4 s** (fase zero, SHAP a 200: 10,9 s) |
+
+Stima di "Esegui tutto" con questi numeri: ~20 minuti in `load`, ~26 in `train` (limiti 30 e 45). Completezza di IG: errore massimo 2,70 % su 10 immagini. LIME e SHAP riproducibili; ReLU in-place equivalente sul modello addestrato (differenze ≤ 2,5e-7). Saliency: 32 % della massa sulla cifra contro il 33 % di una mappa casuale.
+
+| ID | Punto | Decisione |
+|---|---|---|
+| E36 | Il test del seed di SHAP usava uno sfondo con una sola immagine "inchiostrata" nella regione osservata: due seed potevano pescarla lo stesso numero di volte | Lo sfondo del modello giocattolo ha inchiostro ovunque; test separato per `make_background` (stesso seed → stesso sfondo, altro seed → altro sfondo). |
+| E37 | Cautele di lettura emerse dalla griglia di mappe (da riportare nel report) | **LIME** assegna pesi positivi anche a celle di sfondo per le predizioni molto sicure (probabile effetto del kernel di distanza, che correla le celle accese): la tabella "fuori dalla cifra" sarà alta per LIME. **Saliency** è quasi invisibile con la scala lineare e ha picchi sui bordi dell'immagine: nelle figure servirà una scala per percentile. **Occlusion** sull'immagine del 5 è prevalentemente negativa (coprire il tratto *alza* il logit del 5): caso da guardare nel dettaglio in tappa 3. **Grad-CAM** a 4×4 mostra spesso un blob centrale simile per cifre diverse. **LR locale** è la mappa più nitida (è esatta). |
