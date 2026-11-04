@@ -56,13 +56,32 @@ class IndexedDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         x, y = self.dataset[idx]
         return x, y, idx
-    
+
+def debug_dataloader(dataloader_):
+    batch = next(iter(dataloader_))
+            
+    print("Numero elementi nel batch:", len(batch))
+    print("Tipo batch:", type(batch))
+            
+    for i, item in enumerate(batch):
+        print(f"Elemento {i}: shape={item.shape}, dtype={item.dtype}")
+
 def load_datasets(cfg=CONFIG,logger=LOGGER):
     """
        The transform (x - mean) / std (mean and std of ImageNet) is mandatory 
        to pass images at DenseNet model . 
        DenseNet expect pixels are passed  
        with this specify media/std to calc correctly logit and gradients.
+       
+       return idx on DataLoader
+       For test_lr and test_cnn, idx corresponds to the original index from `test_base`, 
+       because both use `test_base` directly, without a `Subset`.
+
+       For train_lr, val_lr, `train_cnn`, and `val_cnn`, however, `idx` 
+       is relative to the `Subset`. If you wish to save the original indices 
+       for the training and validation sets as well, we will need 
+       to handle this case separately.
+
        """
     transform_lr = transforms.Compose([ transforms.Grayscale(num_output_channels=1),
                                         # Transform to tensor

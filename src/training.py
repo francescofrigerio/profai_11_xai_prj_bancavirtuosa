@@ -217,13 +217,13 @@ def train_model(cfg,
         running_loss = 0.0
         sync(device_)
 
-        batch = next(iter(dataloader_train_))
+        # batch = next(iter(dataloader_train_))
 
-        print("Numero elementi nel batch:", len(batch))
-        print("Tipo batch:", type(batch))
+        # print("Numero elementi nel batch:", len(batch))
+        # print("Tipo batch:", type(batch))
 
-        for i, item in enumerate(batch):
-            print(f"Elemento {i}: shape={item.shape}, dtype={item.dtype}")
+        # for i, item in enumerate(batch):
+        #     print(f"Elemento {i}: shape={item.shape}, dtype={item.dtype}")
 
         # t0 = time.time()
         t0 = time.perf_counter()
