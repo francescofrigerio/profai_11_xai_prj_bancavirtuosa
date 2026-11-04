@@ -185,10 +185,10 @@ def phase_1_1(cfg,
     val_loader_cnn = loaders_dict["cnn"]["val"]
     test_loader_cnn = loaders_dict["cnn"]["test"]
         
-    X_train , y_train = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
-    X_val , y_val = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_train , y_train , _  = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_val , y_val , _ = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
         
-    X_test , y_test = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_test , y_test , _ = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
         
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
