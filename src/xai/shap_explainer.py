@@ -17,7 +17,7 @@ def make_background(input_img, idx_train, cfg, device):
         This background is a benchmark distribution 
         against which SHAP evaluates how much the image being explained 
         contributes to the prediction.
-        SHAP_NUM_BACKGROUND training images, always the same for a given seed.
+        SHAP_NUM_BACKGROUND images, always the same for a given seed.
     """
     
     rng = np.random.RandomState(cfg.SEED) # pylint: disable=no-member
@@ -69,6 +69,5 @@ class Shap(Explainer):
         set_seed(self.cfg.SEED) 
         # shap draws with numpy AND torch                       
         values = shap.GradientExplainer(self.model, 
-                                        self.background).shap_values(input_img, 
-                                                                     nsamples=self.cfg.SHAP_NUM_SAMPLES)
+                                        self.background).shap_values(input_img, nsamples=self.cfg.SHAP_NUM_SAMPLES)
         return pick_shap_target(values, input_label, self.cfg.NUM_CLASSES)

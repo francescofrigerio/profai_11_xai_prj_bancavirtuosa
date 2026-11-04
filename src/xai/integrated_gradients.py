@@ -12,7 +12,7 @@ from utility import black_normalized
 from xai import Explainer
 
 
-class IntegratedGradientsCaptum(Explainer):
+class IntegratedGradients(Explainer):
     """
             get Captum IntegratedGradients map
     """
