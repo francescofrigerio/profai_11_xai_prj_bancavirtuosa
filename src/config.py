@@ -18,6 +18,7 @@
     needs the model and lives in model.py.
 """
 
+import numpy as np
 from dataclasses import dataclass
 
 import sys
