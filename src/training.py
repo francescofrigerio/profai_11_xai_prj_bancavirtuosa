@@ -163,7 +163,7 @@ def evaluate_model( model_ ,
     y_pred_desc_=[]
     y_true_desc_=[]
     with torch.no_grad():
-        for i, (images, labels) in enumerate(dataloader_):
+        for i, (images, labels , _ ) in enumerate(dataloader_):
             images, labels = images.to(device_), labels.to(device_)
 
             # print images gid with relative prevision and ground truth
@@ -219,7 +219,7 @@ def train_model(cfg,
         
         # t0 = time.time()
         t0 = time.perf_counter()
-        for i, (inputs, labels) in enumerate(dataloader_train_):
+        for i, (inputs, labels , _) in enumerate(dataloader_train_):
             inputs, labels = inputs.to(device_), labels.to(device_)
 
             optimizer.zero_grad()
