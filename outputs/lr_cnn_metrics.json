@@ -1,0 +1,67 @@
+{
+  "densenet": {
+    "val_acc": 0.9693333333333334,
+    "test_acc": 0.9703,
+    "test_macro_f1": 0.9697966008894676,
+    "train_sec_cnn": 460.83986167599994,
+    "val_sec_cnn": 51.50990105099993
+  },
+  "lr": {
+    "val_acc": 0.922,
+    "test_acc": 0.9241,
+    "test_macro_f1": 0.92296361592536,
+    "fit_seconds": 83.75894267099997,
+    "n_iter": 255
+  },
+  "quadrants": {
+    "both_correct": 9061,
+    "only_densenet": 642,
+    "only_lr": 180,
+    "both_wrong": 117
+  },
+  "gap_test_points": 4.620000000000002,
+  "model": {
+    "action": "train",
+    "reason": "MODEL_MODE=train",
+    "path": "/content/profai_11_xai_prj_bancavirtuosa/checkpoints/densenet121_mnist.pt",
+    "device": "cuda"
+  },
+  "history": [
+    {
+      "epoch": 0,
+      "train_loss": 0.27124202251434326,
+      "val_acc": 0.948,
+      "train_seconds": 92.45645034,
+      "val_seconds": 10.202000888999976
+    },
+    {
+      "epoch": 1,
+      "train_loss": 0.07110244780778885,
+      "val_acc": 0.9603333333333334,
+      "train_seconds": 94.23226168299999,
+      "val_seconds": 10.580224332
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.23051492869853973,
+      "val_acc": 0.964,
+      "train_seconds": 90.80421374599996,
+      "val_seconds": 10.246340872000019
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.033643122762441635,
+      "val_acc": 0.9658333333333333,
+      "train_seconds": 93.51134663200003,
+      "val_seconds": 10.506524163999984
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.0857788547873497,
+      "val_acc": 0.9693333333333334,
+      "train_seconds": 89.83558927499996,
+      "val_seconds": 9.97481079399995
+    }
+  ],
+  "total_seconds": 630.047358751297
+}
