@@ -197,8 +197,9 @@ def phase_1_1(cfg,
     test_accuracy_lr = accuracy(y_test, lr.predict(X_test))
     print(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
     print(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
-    
-    plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
+
+    # bella ma non sembra molto utile alla comprensione
+    # plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
         
     # y_pred_val_lr = lr.predict(X_val)
     y_pred_test_lr = lr.predict(X_test)

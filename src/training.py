@@ -216,10 +216,18 @@ def train_model(cfg,
         enter_train_mode(model_,cfg)
         running_loss = 0.0
         sync(device_)
-        
+
+        batch = next(iter(dataloader_train_))
+
+        print("Numero elementi nel batch:", len(batch))
+        print("Tipo batch:", type(batch))
+
+        for i, item in enumerate(batch):
+            print(f"Elemento {i}: shape={item.shape}, dtype={item.dtype}")
+
         # t0 = time.time()
         t0 = time.perf_counter()
-        for i, (inputs, labels , _) in enumerate(dataloader_train_):
+        for i, ( inputs, labels , _ ) in enumerate(dataloader_train_):
             inputs, labels = inputs.to(device_), labels.to(device_)
 
             optimizer.zero_grad()

@@ -45,7 +45,7 @@ class TransformedDataset(Dataset):
 
 class IndexedDataset(torch.utils.data.Dataset):
     """
-            Here we wrap Dataset to save index of the images
+           Not Used
     """
     def __init__(self, dataset):
         self.dataset = dataset
