@@ -1,7 +1,6 @@
 
 import numpy as np
 import pandas as pd
-import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -11,43 +10,6 @@ import torch
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
-
-def save_dict_to_json(file_images , data_dict):
-    with open(file_images, "w", encoding="utf-8") as f:
-        json.dump(data_dict, f, indent=4)
-
-def load_dict_from_json(logger,path: Path):
-    with open(path, "r", encoding="utf-8") as f:
-        list_load_dict = json.load(f)
-
-    logger.info(f"Caricati {len(list_load_dict)} elementi con successo!")
-    logger.info("Primo elemento:", list_load_dict[0])
-    return list_load_dict
-
-def load_images_by_class( logger , path: Path, n_images_for_class: int = 1 ) -> dict:
-
-    with open(path, "r", encoding="utf-8") as f:
-        list_load_dict = json.load(f)
-
-    images_by_class = {}
-
-    for item in list_load_dict:
-
-        id_class = item["class"]
-
-        if id_class not in images_by_class:
-            images_by_class[id_class] = []
-
-        # Avoid to select more images for the same classes
-        if len(images_by_class[id_class]) >= n_images_for_class:
-            continue
-
-        images_by_class[id_class].append({ "id_dataset": item["id_dataset"],
-                                            "y_true": item["y_true"],
-                                            "y_pred": item["y_pred"]
-                                        })
-
-    return images_by_class
 
 
 def save_fig(fig, cfg, path: Path) -> None:

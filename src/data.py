@@ -4,6 +4,9 @@
 # pytorch
 import torch
 
+import json
+from pathlib import Path
+
 # computer vision with pytorch
 from torch.utils.data import DataLoader
 
@@ -42,20 +45,6 @@ class TransformedDataset(Dataset):
             image = self.transform(image)
 
         return image, label , idx
-
-class IndexedDataset(torch.utils.data.Dataset):
-    """
-           Not Used
-    """
-    def __init__(self, dataset):
-        self.dataset = dataset
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, idx):
-        x, y = self.dataset[idx]
-        return x, y, idx
 
 def debug_iter_dataloader(dataloader_):
     """
@@ -150,6 +139,8 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
     # DataLoader distinti
     datasets_dict = { "trainval": trainval_base,
                       "test": test_base,
+                      "train_idx": train_idx,
+                      "val_idx": val_idx,
                     }
     loaders_dict = { "lr": {
                 "train": DataLoader(train_lr, batch_size=cfg.BATCH_SIZE, shuffle=True),
@@ -238,4 +229,38 @@ def get_images_labels(dataset_,flag_data_loader=True,idx_dataset=0,
         # builds a new tensor starting by list
         labels_ = torch.tensor([label])
     return images_, labels_
+
+
+def save_dict_to_json(file_images , data_dict):
+    with open(file_images, "w", encoding="utf-8") as f:
+        json.dump(data_dict, f, indent=4)
+
+def load_dict_from_json(logger,path: Path):
+    with open(path, "r", encoding="utf-8") as f:
+        list_load_dict = json.load(f)
+
+    logger.info(f"Caricati {len(list_load_dict)} elementi con successo!")
+    logger.info("Primo elemento:", list_load_dict[0])
+    return list_load_dict
+
+def load_one_image_by_class(logger,json_path: str | Path) -> dict:
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        list_load_dict = json.load(f)
+
+    images_by_class = {}
+
+    for item in list_load_dict:
+        id_class = item["class"]
+
+        if id_class not in images_by_class:
+            images_by_class[id_class] = { "id_dataset": item["id_dataset"],
+                                            "y_true": item["y_true"],
+                                            "y_pred": item["y_pred"]
+                                        }
+    return images_by_class
+
+
+
+
 

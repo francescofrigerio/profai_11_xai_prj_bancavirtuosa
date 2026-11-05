@@ -55,6 +55,14 @@ def resolve_mode(cfg,pretrained: bool , ckpt_exists: bool) -> tuple:
     
     return "load", "MODEL_MODE=load"
 
+def debug_epochs(num_epochs: int, mode: str = "first_last") -> tuple:
+    """
+        Epochs after which the debug callback runs: the first and the last (once if equal).
+    """
+    if mode != "first_last":
+        raise ValueError(f"unknown debug mode {mode!r}")
+    return tuple(sorted({1, num_epochs}))
+
 def save_checkpoint(path, model, cfg, history) -> str:
     """
         Saves weights + history + version. 
@@ -194,7 +202,8 @@ def train_model(cfg,
                 dataloader_train_ ,
                 dataloader_val_ ,
                 device_ ,
-                num_epochs_):
+                num_epochs_,
+                epoch_callback_ ):
     """
             Train the model with train val dataset
     """
@@ -211,6 +220,8 @@ def train_model(cfg,
     train_loss = 0 
 
     val_accuracy = 0
+
+    callback_epochs = debug_epochs(cfg.NUM_EPOCHS, cfg.GRADCAM_DEBUG_EPOCHS)
     # Training loop
     for epoch in range(num_epochs_):
         enter_train_mode(model_,cfg)
@@ -274,14 +285,14 @@ def train_model(cfg,
                     "train_seconds": train_seconds,
                     "val_seconds": val_seconds})
         
-    
+        if epoch_callback_ is not None and epoch in callback_epochs:
+                epoch_callback_(model_, epoch)
+
     cnn_train_seconds = sum(item["train_seconds"] for item in history)
     cnn_val_seconds = sum(item["val_seconds"] for item in history)
 
     logger.debug('Train finisched')
     return history , cnn_train_seconds , cnn_val_seconds
-
-
 
 def get_trained_model(cfg,
                       logger,
@@ -290,16 +301,14 @@ def get_trained_model(cfg,
                       val_loader_cnn,
                       test_loader_cnn, 
                       device, 
-                      pretrained=False) -> tuple:
+                      pretrained=False,
+                      epoch_callback=None ) -> tuple:
     """
         Builds the model according to MODEL_MODE. 
         pretrained=False` exists for the tests only (no ImageNet download)
         Returns (model in eval mode, info dict).
     """
-    
 
-
-    
     path = Path(cfg.CHECKPOINT_PATH)
     saved = read_checkpoint(path) if path.exists() else None
     action, reason = resolve_mode(cfg,pretrained, saved is not None)
@@ -328,7 +337,8 @@ def get_trained_model(cfg,
                                                             train_loader_cnn ,
                                                             val_loader_cnn ,
                                                             device ,
-                                                            cfg.NUM_EPOCHS)
+                                                            cfg.NUM_EPOCHS,
+                                                            epoch_callback)
         
         logger.debug(f"before Save Model")
         save_checkpoint(path, model, cfg, history)
@@ -355,5 +365,7 @@ def get_trained_model(cfg,
         "device": str(device),
     }
     return info
+
+
 
     

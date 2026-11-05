@@ -17,11 +17,14 @@ import numpy as np
 from baseline import fit_baseline
 from config import CONFIG , CONFIG_CHECK_CLASSES
 from data import data_to_input_lr, load_datasets
+from data import save_dict_to_json 
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
-from training import get_device, get_trained_model ,get_evaluate_model
 from output import plot_logistic_graph , plot_predict_info 
-from output import save_dict_to_json , load_images_by_class
+from training import get_device, get_trained_model ,get_trained_model_callback
+from training import get_evaluate_model
+from xai import TECHNIQUE_NAMES, build_techniques
+
 from utility import run_create_list_images , run_check_class_ok_ko , ls_dir
 from xai.gradcam import make_gradcam_debug_callback
 from xai.shap_explainer import make_background
@@ -30,7 +33,7 @@ from xai.shap_explainer import make_background
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-def phase_2( cfg,
+def phase_2_old( cfg,
              cfg_list_class,
              logger,
              out_path ) -> None :
@@ -132,31 +135,66 @@ def phase_2( cfg,
     print(f"all six techniques: {sum(median.values()):.1f}s per image | worst status: {v.worst()} | total {time.time() - t_start:.0f}s")
     return results, v
 
-def phase_2_old( cfg,
+def phase_2( cfg,
              cfg_list_class,
              logger,
              out_path ) -> None :
     """
         Run xai Explainer
     """
-
     if len(cfg_list_class) == 0 :
         raise ValueError("list_class non può essere vuota")
     else:
         n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(cfg_list_class))
 
+    t_start = time.time()
+    
     logger.debug(f"Immagini per classe: {n_for_class}")
     device, warning = get_device(cfg)
     if warning:
         logger.debug("WARNING:", warning)
 
-    # load 10 images for ok lr
-    list_images_lr_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_OK)
-    list_images_lr_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
+    datasets_dict , loaders_dict = load_datasets()
+    trainval_dataset = datasets_dict["trainval"]
+    test_datasets = datasets_dict["test"]
+    train_idx = datasets_dict["train_idx"]
 
-    # load 10 images for ok cnn
-    list_images_cnn_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
-    list_images_cnn_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+    train_loader_cnn = loaders_dict["cnn"]["train"]
+    val_loader_cnn = loaders_dict["cnn"]["val"]
+    test_loader_cnn = loaders_dict["cnn"]["test"]
+
+    callback_lr_ok = make_gradcam_debug_callback(cfg,logger,test_datasets, device, out_path , cfg.FILE_IMG_LR_OK)
+    # callbac_lr_ko = make_gradcam_debug_callback(cfg,logger,test_datasets, device, out_path , cfg.FILE_IMG_LR_KO)
+    # callback_cnn_ok = make_gradcam_debug_callback(cfg,logger,test_datasets, device, out_path , cfg.FILE_IMG_CNN_OK)
+    # callback_cnn_ko = make_gradcam_debug_callback(cfg,logger,test_datasets, device, out_path , cfg.FILE_IMG_CNN_KO)
+
+    model , info = get_trained_model(cfg,
+                                    logger, 
+                                    test_datasets,
+                                    train_loader_cnn,
+                                    val_loader_cnn,
+                                    test_loader_cnn, 
+                                    device,
+                                    pretrained=True,
+                                    epoch_callback=callback_lr_ok )
+
+    background = make_background(trainval_dataset,train_idx, cfg, device)
+    techniques = build_techniques(model, cfg, background)
+
+    # Load tensor for train and test baseline
+    train_loader_lr = loaders_dict["lr"]["train"]
+    val_loader_lr = loaders_dict["lr"]["val"]
+          
+    X_train , y_train , _  = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_val , y_val , _ = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+                        
+    # Logistic regression (train indices only)
+    lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
+    
+
+    
+    
+   
     
 def phase_1_2( cfg,
              cfg_list_class,
@@ -187,20 +225,15 @@ def phase_1_2( cfg,
     if warning:
         logger.debug("WARNING:", warning)
 
-    # con n_images = 10 e 3 classi, la divisione intera assegna 3 posti
-    # per classe: ne utilizzi al massimo 9, non 10.
     # START LOAD DATA
     datasets_dict , loaders_dict = load_datasets()
-    # test_datasets = datasets_dict["test"]
-        
+    
     # Load tensor for train and test baseline
     train_loader_lr = loaders_dict["lr"]["train"]
     val_loader_lr = loaders_dict["lr"]["val"]
     test_loader_lr = loaders_dict["lr"]["test"]
         
     # Load tensor for train and test cnn
-    # train_loader_cnn = loaders_dict["cnn"]["train"]
-    # val_loader_cnn = loaders_dict["cnn"]["val"]
     test_loader_cnn = loaders_dict["cnn"]["test"]
             
     X_train , y_train , _ = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
@@ -278,11 +311,6 @@ def phase_1_2( cfg,
     # END PROCESS LR MODEL
 
     # Save files for phase 3
-    # save_dict_to_json(out_path / "images_lr_ok.json" , list_images_lr_ok)
-    # save_dict_to_json(out_path / "images_lr_ko.json" , list_images_lr_ko)
-    # save_dict_to_json(out_path / "images_cnn_ok.json" , list_images_cnn_ok)
-    # save_dict_to_json(out_path / "images_cnn_ko.json" , list_images_cnn_ko)
-
     save_dict_to_json(out_path / cfg.FILE_IMG_LR_OK , list_images_lr_ok)
     save_dict_to_json(out_path / cfg.FILE_IMG_LR_KO , list_images_lr_ko)
     save_dict_to_json(out_path / cfg.FILE_IMG_CNN_OK , list_images_cnn_ok)

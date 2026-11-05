@@ -10,7 +10,7 @@ from training import set_seed
 from xai import Explainer
 from utility import to_densenet_input
 
-def make_background(input_img, idx_train, cfg, device):
+def make_background(input_images, idx_train, cfg, device):
     """
         This function select the SHAP background
         because GradientExplainer needs background dataset.
@@ -18,12 +18,16 @@ def make_background(input_img, idx_train, cfg, device):
         against which SHAP evaluates how much the image being explained 
         contributes to the prediction.
         SHAP_NUM_BACKGROUND images, always the same for a given seed.
+
+        input_images	Tutte le immagini trainval, shape (N, 1, 28, 28)
+        idx_train	Indici del training set all'interno di trainval
+
     """
     
     rng = np.random.RandomState(cfg.SEED) # pylint: disable=no-member
     
     pick = rng.choice(np.asarray(idx_train), cfg.SHAP_NUM_BACKGROUND, replace=False)
-    return to_densenet_input(input_img[torch.as_tensor(pick)], cfg.DENSENET_SIZE).to(device)
+    return to_densenet_input(input_images[torch.as_tensor(pick)], cfg.DENSENET_SIZE).to(device)
 
 
 def pick_shap_target(shap_values, input_label: int, num_classes: int) -> np.ndarray:
