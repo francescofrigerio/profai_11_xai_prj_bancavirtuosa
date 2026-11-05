@@ -4,11 +4,11 @@
 from pathlib import Path
 import numpy as np
 
-from data import to_densenet_input , load_images_by_class
+from data import to_densenet_input
 from captum.attr import LayerGradCam
 from xai.explainer import Explainer
 
-def make_gradcam_debug_callback_new(cfg,logger,dataset, device, out_path , input_file):
+def make_gradcam_debug_callback(cfg,logger,dataset, device, out_path , list_images):
     """
         Grad-CAM debug images of the first and last training epoch.
         The callback explains the PREDICTED class of the 10 fixed validation images (one per class), so a
@@ -20,8 +20,7 @@ def make_gradcam_debug_callback_new(cfg,logger,dataset, device, out_path , input
     from data import to_densenet_input
     from xai.gradcam import GradCam
 
-    list_images = load_images_by_class(logger,out_path / input_file)
-    
+    # list_images = load_images_by_class(logger,out_path / input_file)
     
     def callback(model, epoch):
            model.eval()
@@ -34,12 +33,12 @@ def make_gradcam_debug_callback_new(cfg,logger,dataset, device, out_path , input
                
                item = list_images[id_class]
                idx_dataset = item["id_dataset"]
-
+               
                # The function to_densenet_input() has to receive a batch with 4 dim. 
                # So we add the size batch here 
                # Original Image MNIST: (1, 28, 28)
                input_image, input_label = dataset[idx_dataset]
-
+               
                # Add size of the batch: (1, 1, 28, 28) to the input
                x28 = input_image.unsqueeze(0)
 

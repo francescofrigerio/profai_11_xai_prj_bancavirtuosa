@@ -18,7 +18,9 @@ import torch
 from baseline import fit_baseline
 from config import CONFIG , CONFIG_CHECK_CLASSES , TITLES
 from data import data_to_input_lr, load_datasets
-from data import save_dict_to_json 
+from data import save_dict_to_json , load_images_by_class
+from data import to_densenet_input
+
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
 from output import plot_logistic_graph , plot_predict_info 
@@ -36,35 +38,75 @@ from matplotlib.figure import Figure
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
 warnings.filterwarnings('ignore', category=FutureWarning)
 
+# Da verificare
+def digit_mask(img28, threshold, dilation):
+    from scipy.ndimage import binary_dilation
+    mask = np.asarray(img28) > threshold
+    return binary_dilation(mask, structure=np.ones((3, 3), bool), iterations=dilation) if dilation else mask
+
+
+def to_grid28(map2d, size, side=28):
+    import torch
+    import torch.nn.functional as F
+    t = torch.as_tensor(np.asarray(map2d), dtype=torch.float32)[None, None]
+    if t.shape[-1] < size:
+        t = F.interpolate(t, size=(size, size), mode="bilinear", align_corners=False)
+    return F.interpolate(t, size=(side, side), mode="area")[0, 0].numpy()
+# Da verificare
+
 def phase_2_xai( cfg,
                  logger,
+                 dataset,
                  t_start,
                  techniques,
                  model,
                  lr,
                  device,
                  info,
-                 out_path ) -> None :
+                 out_path,
+                 list_images ) -> None :
     
     
     rows, ig_errors = [], []
-    for i in picks:
-        x1 = to_densenet_input(data.X_trainval[i:i + 1], cfg.DENSENET_SIZE).to(device)
+    n_images = len(list_images)
+
+    # for i in picks:
+    for i, id_class in enumerate(sorted(list_images.keys())):
+
+        item = list_images[id_class]
+        idx_dataset = item["id_dataset"]
+                       
+        # The function to_densenet_input() has to receive a batch with 4 dim. 
+        # So we add the size batch here 
+        # Original Image MNIST: (1, 28, 28)
+        input_image, input_label = dataset[idx_dataset]
+                       
+        # Add size of the batch: (1, 1, 28, 28) to the input
+        x28 = input_image.unsqueeze(0)
+        
+        # Convert to Input DenseNet: (1, 3, 128, 128)
+        # x1 = to_densenet_input(data.X_trainval[i:i + 1], cfg.DENSENET_SIZE).to(device)
+        input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
+        
         with torch.no_grad():
-            pred = int(model(x1).argmax(1))
+            pred = int(model(input_img).argmax(1))
         maps = {}
         for name, technique in techniques.items():
-            result = technique.explain(x1, pred)
+            result = technique.explain(input_img, pred)
             maps[name] = result
             
             if name == "integrated_gradients":
                 ig_errors.append(result.meta["completeness_error"])
-        rows.append({"index": int(i), "true": int(y[i]), "pred": pred, "maps": maps,
+       
+        rows.append({"index": int(i), 
+                     "true": int(y[i]), 
+                     "pred": pred, 
+                     "maps": maps,
                      "lr_map": lr.local_map(X_flat[i], pred)})
         print(f"image {i} (true {y[i]}, predicted {pred}): ")
 
-    
-    first = torch.as_tensor(to_densenet_input(data.X_trainval[picks[0]:picks[0] + 1], cfg.DENSENET_SIZE)).to(device)
+    first = torch.as_tensor(to_densenet_input(data.X_trainval[picks[0]:picks[0] + 1], 
+                                              cfg.DENSENET_SIZE)).to(device)
     for name in ("lime", "shap"):
         again = techniques[name].explain(first, rows[0]["pred"]).map
         ref = rows[0]["maps"][name].map
@@ -82,7 +124,7 @@ def phase_2_xai( cfg,
         g = to_grid28(np.abs(row["maps"]["saliency"].map), cfg.DENSENET_SIZE)
         shares.append((float(g[mask].sum() / g.sum()), float(mask.mean())))
     
-    # ---- figure
+    # figure
     names = list(techniques)
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(rows)))
     axes = fig.subplots(len(rows), len(names) + 2)
@@ -115,9 +157,8 @@ def phase_2_xai( cfg,
     }
     (out_path / "stage2_results.json").write_text(json.dumps(results, indent=2))
     
-    
     print(f"all tecniques total time {time.time() - t_start:.0f}s")
-    return results, v
+    return results
 
 def phase_2_main( cfg,
                   cfg_list_class,
@@ -147,7 +188,18 @@ def phase_2_main( cfg,
     val_loader_cnn = loaders_dict["cnn"]["val"]
     test_loader_cnn = loaders_dict["cnn"]["test"]
 
-    callback_lr_ok = make_gradcam_debug_callback(cfg,logger,test_datasets, device, out_path , cfg.FILE_IMG_LR_OK)
+    # Load tensor for train and test baseline
+    train_loader_lr = loaders_dict["lr"]["train"]
+    val_loader_lr = loaders_dict["lr"]["val"]
+              
+    X_train , y_train , _  = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_val , y_val , _ = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+                            
+    # Logistic regression (train indices only)
+    lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
+    
+    list_images_sample = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_OK)
+    callback = make_gradcam_debug_callback(cfg,logger,test_datasets, device, out_path , list_images_sample)
     # callbac_lr_ko = make_gradcam_debug_callback(cfg,logger,test_datasets, device, out_path , cfg.FILE_IMG_LR_KO)
     # callback_cnn_ok = make_gradcam_debug_callback(cfg,logger,test_datasets, device, out_path , cfg.FILE_IMG_CNN_OK)
     # callback_cnn_ko = make_gradcam_debug_callback(cfg,logger,test_datasets, device, out_path , cfg.FILE_IMG_CNN_KO)
@@ -160,22 +212,12 @@ def phase_2_main( cfg,
                                     test_loader_cnn, 
                                     device,
                                     pretrained=True,
-                                    epoch_callback=callback_lr_ok )
+                                    epoch_callback=callback )
 
     background = make_background(trainval_dataset,train_idx, cfg, device)
     techniques = build_techniques(model, cfg, background)
 
-    # Load tensor for train and test baseline
-    train_loader_lr = loaders_dict["lr"]["train"]
-    val_loader_lr = loaders_dict["lr"]["val"]
-          
-    X_train , y_train , _  = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
-    X_val , y_val , _ = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
-                        
-    # Logistic regression (train indices only)
-    lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
-
-    phase_2_xai( cfg, logger, t_start, techniques, model, lr, device, info, out_path ) 
+    phase_2_xai( cfg, logger, t_start, techniques, model, lr, device, info, out_path , list_images_sample ) 
     
 
     
