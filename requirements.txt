@@ -13,10 +13,7 @@ shap==0.54.1
 pytest
 ruff
 pylint
-# da verificare
-# accelerate
 datasets
-# evaluate
 numpy
 pandas
 scikit-learn
@@ -24,4 +21,4 @@ torch
 torchvision
 matplotlib
 seaborn
-
+ipython

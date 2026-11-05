@@ -13,9 +13,10 @@ import time
 import warnings
 
 import numpy as np
+import torch
 
 from baseline import fit_baseline
-from config import CONFIG , CONFIG_CHECK_CLASSES
+from config import CONFIG , CONFIG_CHECK_CLASSES , TITLES
 from data import data_to_input_lr, load_datasets
 from data import save_dict_to_json 
 from logger import LOGGER
@@ -29,39 +30,24 @@ from utility import run_create_list_images , run_check_class_ok_ko , ls_dir
 from xai.gradcam import make_gradcam_debug_callback
 from xai.shap_explainer import make_background
 
+from matplotlib.figure import Figure
+
 # Configurazione dei Warnings (spostata DOPO tutti gli import) ---
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-def phase_2_old( cfg,
-             cfg_list_class,
-             logger,
-             out_path ) -> None :
+def phase_2_xai( cfg,
+                 logger,
+                 t_start,
+                 techniques,
+                 model,
+                 lr,
+                 device,
+                 info,
+                 out_path ) -> None :
     
     
-    out = Path(cfg.OUTPUT_DIR) / "stage2"
-    out.mkdir(parents=True, exist_ok=True)
-    
-    t_start = time.time()
-
-    device, warning = pick_device(cfg)
-    if warning:
-        print("WARNING:", warning)
-        
-    data = load_mnist(cfg)
-    split = data.split
-    callback = make_gradcam_debug_callback(data, cfg, device, out_path)
-    model, info = get_trained_model(cfg, data, device, epoch_callback=callback)
-    
-    background = make_background(data.X_trainval, split.idx_train, cfg, device)
-    techniques = build_techniques(model, cfg, background)
-
-    y = data.y_trainval.numpy()
-    X_flat = to_lr_input(data.X_trainval)
-    lr = fit_baseline(X_flat, y, split.idx_train, cfg)
-    picks = debug_indices(y, split.idx_val, cfg.NUM_DEBUG_IMAGES)
-
-    rows, seconds, ig_errors = [], {n: [] for n in techniques}, []
+    rows, ig_errors = [], []
     for i in picks:
         x1 = to_densenet_input(data.X_trainval[i:i + 1], cfg.DENSENET_SIZE).to(device)
         with torch.no_grad():
@@ -70,20 +56,19 @@ def phase_2_old( cfg,
         for name, technique in techniques.items():
             result = technique.explain(x1, pred)
             maps[name] = result
-            seconds[name].append(result.seconds)
+            
             if name == "integrated_gradients":
                 ig_errors.append(result.meta["completeness_error"])
         rows.append({"index": int(i), "true": int(y[i]), "pred": pred, "maps": maps,
                      "lr_map": lr.local_map(X_flat[i], pred)})
-        print(f"image {i} (true {y[i]}, predicted {pred}): " +
-              ", ".join(f"{n} {maps[n].seconds:.2f}s" for n in maps))
+        print(f"image {i} (true {y[i]}, predicted {pred}): ")
 
+    
     first = torch.as_tensor(to_densenet_input(data.X_trainval[picks[0]:picks[0] + 1], cfg.DENSENET_SIZE)).to(device)
     for name in ("lime", "shap"):
         again = techniques[name].explain(first, rows[0]["pred"]).map
         ref = rows[0]["maps"][name].map
-        v.expect(f"{name} is reproducible", bool(np.allclose(ref, again, rtol=1e-3, atol=1e-4 * np.abs(ref).max())),
-                 "same seed, same map on the first image")
+       
    
     patched = SafeDenseNet(copy.deepcopy(model)).eval()
     for name in ("gradcam", "integrated_gradients", "saliency"):
@@ -114,31 +99,30 @@ def phase_2_old( cfg,
             axes[r, c].set_yticks([])
     for c, title in enumerate(["image"] + [TITLES[n] for n in names] + ["LR local\n(w * x)"]):
         axes[0, c].set_title(title, fontsize=9)
-    fig.savefig(out / "maps_grid.png", dpi=90, bbox_inches="tight")
+    fig.savefig(out_path / "maps_grid.png", dpi=90, bbox_inches="tight")
     try:
         from IPython.display import Image, display
-        display(Image(str(out / "maps_grid.png")))
+        display(Image(str(out_path / "maps_grid.png")))
     except Exception:
         pass
 
     results = {
         "model": {k: info[k] for k in ("action", "reason", "sha256", "device")},
-        "median_seconds_per_image": median, "ig_completeness_errors": ig_errors,
+        "ig_completeness_errors": ig_errors,
         "images": [{"index": r["index"], "true": r["true"], "pred": r["pred"],
                     "native_shapes": {n: list(r["maps"][n].map.shape) for n in names}} for r in rows],
-        "per_image_all_techniques_seconds": float(sum(median.values())), "total_seconds": time.time() - t_start,
+        "total_seconds": time.time() - t_start,
     }
-    (out / "stage2_results.json").write_text(json.dumps(results, indent=2))
-    (out / "verifications.md").write_text(v.to_markdown() + "\n")
-    print("\n" + v.to_markdown())
-    print(f"\nmedian seconds per image: " + ", ".join(f"{n} {m:.2f}" for n, m in median.items()))
-    print(f"all six techniques: {sum(median.values()):.1f}s per image | worst status: {v.worst()} | total {time.time() - t_start:.0f}s")
+    (out_path / "stage2_results.json").write_text(json.dumps(results, indent=2))
+    
+    
+    print(f"all tecniques total time {time.time() - t_start:.0f}s")
     return results, v
 
-def phase_2( cfg,
-             cfg_list_class,
-             logger,
-             out_path ) -> None :
+def phase_2_main( cfg,
+                  cfg_list_class,
+                  logger,
+                  out_path ) -> None :
     """
         Run xai Explainer
     """
@@ -190,17 +174,19 @@ def phase_2( cfg,
                         
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
+
+    phase_2_xai( cfg, logger, t_start, techniques, model, lr, device, info, out_path ) 
     
 
     
     
    
     
-def phase_1_2( cfg,
-             cfg_list_class,
-             logger,
-             out_path,
-             flag_pretrained = True ) -> None :
+def phase_1_load( cfg,
+                cfg_list_class,
+                logger,
+                out_path,
+                flag_pretrained = True ) -> None :
     """
         Evaluate Logistic Regression
         with n_images = 50/100 e list_class = [2, 3, 5, 8],
@@ -317,10 +303,10 @@ def phase_1_2( cfg,
     save_dict_to_json(out_path / cfg.FILE_IMG_CNN_KO , list_images_cnn_ko)
     
 
-def phase_1_1(cfg,
-              logger,
-              out_path,
-              flag_pretrained = False):
+def phase_1_train(cfg,
+                logger,
+                out_path,
+                flag_pretrained = False):
     """
         This is the first run.
         - TO begin with loads data , train and test the models lr and cnn.
@@ -486,11 +472,11 @@ def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
     out.mkdir(parents=True, exist_ok=True)
 
     if flag_pretrained is False :
-        phase_1_1(cfg,logger,out,flag_pretrained)
+        phase_1_train(cfg,logger,out,flag_pretrained)
     else:
-        phase_1_2(cfg,cfg_list_class,logger,out,flag_pretrained)
+        phase_1_load(cfg,cfg_list_class,logger,out,flag_pretrained)
 
-    phase_2(cfg,cfg_list_class,logger,out)
+    phase_2_main(cfg,cfg_list_class,logger,out)
 
     logger.debug("Programma Terminato")
 
