@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from data import denormalize_imagenet_np
+from utility import denormalize_imagenet_np
 
 
 class CheckErrors(AssertionError):
