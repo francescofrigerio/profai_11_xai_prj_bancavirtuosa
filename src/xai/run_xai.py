@@ -1,25 +1,23 @@
 """
+     This module implement run function with Xai code
 """
 
 # import os
 import json
 import time
-from pathlib import Path
-
-
+import copy
 
 import torch
 import torch.nn.functional as F
-import copy
+
 import numpy as np
 from matplotlib.figure import Figure
+from scipy.ndimage import binary_dilation
+from IPython.display import Image, display
 
-from config import CONFIG , CONFIG_CHECK_CLASSES , TITLES
-from logger import LOGGER
-
-from xai import GradCam
-from xai import TECHNIQUE_NAMES, build_techniques
+from config import TITLES
 from utility import to_densenet_input
+from xai import GradCam , build_techniques
 
 def digit_mask(input_img28, threshold, dilation):
     """
@@ -42,7 +40,6 @@ def digit_mask(input_img28, threshold, dilation):
         If the images are normalized or standardized, 
         the threshold must be chosen accordingly.
     """
-    from scipy.ndimage import binary_dilation
     mask = np.asarray(input_img28) > threshold
 
     # expands the mask, slightly enlarging the identified area.
@@ -84,7 +81,7 @@ def to_grid28(map2d, size, side=28):
                          size=(side, side), 
                          mode="area")[0, 0].numpy()
 
-def make_gradcam_debug_callback(cfg,logger,dataset, device, out_path , list_images):
+def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
     """
         Grad-CAM debug images of the first and last training epoch.
         The callback explains the PREDICTED class of the 10 fixed validation images (one per class), so a
@@ -92,66 +89,54 @@ def make_gradcam_debug_callback(cfg,logger,dataset, device, out_path , list_imag
         is visible at a glance.
     """
     def callback(model, epoch):
-           model.eval()
-           explainer = GradCam(model, cfg)
+        model.eval()
+        explainer = GradCam(model, cfg)
 
-           n_images = len(list_images)
-           fig = Figure(figsize=(2 * n_images, 4.4))
-           axes = fig.subplots(2, n_images)
-           for i, id_class in enumerate(sorted(list_images.keys())):
+        n_images = len(list_images)
+        fig = Figure(figsize=(2 * n_images, 4.4))
+        axes = fig.subplots(2, n_images)
+        for i, id_class in enumerate(sorted(list_images.keys())):     
+            item = list_images[id_class]
+            idx_dataset = item["id_dataset"]
                
-               item = list_images[id_class]
-               idx_dataset = item["id_dataset"]
+            # The function to_densenet_input() has to receive a batch with 4 dim. 
+            # So we add the size batch here 
+            # Original Image MNIST: (1, 28, 28)
+            input_image, input_label = dataset[idx_dataset]
                
-               # The function to_densenet_input() has to receive a batch with 4 dim. 
-               # So we add the size batch here 
-               # Original Image MNIST: (1, 28, 28)
-               input_image, input_label = dataset[idx_dataset]
-               
-               # Add size of the batch: (1, 1, 28, 28) to the input
-               x28 = input_image.unsqueeze(0)
+            # Add size of the batch: (1, 1, 28, 28) to the input
+            x28 = input_image.unsqueeze(0)
 
-               # Convert to Input DenseNet: (1, 3, 128, 128)
-               input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
+            # Convert to Input DenseNet: (1, 3, 128, 128)
+            input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
 
-               with torch.no_grad():
-                   # pred = int(model(input_img).argmax(1))
-                   pred = int(model(input_img).argmax(dim=1).item())
+            with torch.no_grad():
+                # pred = int(model(input_img).argmax(1))
+                pred = int(model(input_img).argmax(dim=1).item())
                
-               result = explainer.explain(input_img, pred)
+            result = explainer.explain(input_img, pred)
                
-               # Original Image
-               axes[0, i].imshow(input_image.squeeze(0),cmap="gray")
-               axes[0, i].set_title(f"true {input_label} / pred {pred}",fontsize=8)
+            # Original Image
+            axes[0, i].imshow(input_image.squeeze(0),cmap="gray")
+            axes[0, i].set_title(f"true {input_label} / pred {pred}",fontsize=8)
                
-               # Grad-CAM
-               axes[1, i].imshow(result.map, cmap="viridis", interpolation="bilinear")
+            # Grad-CAM
+            # pylint: disable=no-member
+            axes[1, i].imshow(result.map, cmap="viridis", interpolation="bilinear")
                
-               for row in (0, 1):
-                   axes[row, i].axis("off")
+            for row in (0, 1):
+                axes[row, i].axis("off")
            
-           fig.suptitle(f"Grad-CAM debug, epoch {epoch}")
-           out_path.mkdir(parents=True, exist_ok=True)
-           path = out_path / f"gradcam_debug_epoch{epoch}.png"
-           fig.savefig(path, dpi=100, bbox_inches="tight")
-           logger(f"debug Grad-CAM saved: {path}")
+        fig.suptitle(f"Grad-CAM debug, epoch {epoch}")
+        out_path.mkdir(parents=True, exist_ok=True)
+        path = out_path / f"gradcam_debug_epoch{epoch}.png"
+        fig.savefig(path, dpi=100, bbox_inches="tight")
+        print(f"debug Grad-CAM saved: {path}")
 
     return callback
 
-
-def run_xai_techniques( cfg,
-                        logger,
-                        dataset,
-                        t_start,
-                        techniques,
-                        model,
-                        lr,
-                        X_t,
-                        y_t,
-                        device,
-                        info,
-                        out_path,
-                        list_img ) -> None :
+# pylint: disable=too-many-arguments, too-many-positional-arguments
+def run_exp( cfg,logger,dataset,t_start,techniques,model,lr,X_data,y_data,device,info,out_path,list_img ) -> None :
     """
     This function implements Hook that are a tool 
     for observing the internal 
@@ -171,7 +156,7 @@ def run_xai_techniques( cfg,
     """
     
     rows, ig_errors = [], []
-    n_images = len(list_img)
+    # n_images = len(list_img)
 
     # for i in picks:
     for i, id_class in enumerate(sorted(list_img.keys())):
@@ -184,13 +169,12 @@ def run_xai_techniques( cfg,
         # The function to_densenet_input() has to receive a batch with 4 dim. 
         # So we add the size batch here 
         # Original Image MNIST: (1, 28, 28)
-        input_image, input_label = dataset[idx_dataset]
+        input_image, _ = dataset[idx_dataset]
                        
         # Add size of the batch: (1, 1, 28, 28) to the input
         x28 = input_image.unsqueeze(0)
         
         # Convert to Input DenseNet: (1, 3, 128, 128)
-        # x1 = to_densenet_input(data.X_trainval[i:i + 1], cfg.DENSENET_SIZE).to(device)
         input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
         
         with torch.no_grad():
@@ -209,12 +193,12 @@ def run_xai_techniques( cfg,
 
         # sostituzione i con idx_dataset
         rows.append({"index": int(idx_dataset), 
-                     "true": int(y_t[idx_dataset]), 
+                     "true": int(y_data[idx_dataset]), 
                      "pred": pred, 
                      "maps": maps,
-                     "lr_map": lr.local_map(X_t[idx_dataset], pred)})
+                     "lr_map": lr.local_map(X_data[idx_dataset], pred)})
         
-        logger.info(f"End Loop {i} image {idx_dataset} (true {y_t[idx_dataset]}, predicted {pred}): ")
+        logger.info(f"End Loop {i} image {idx_dataset} (true {y_data[idx_dataset]}, predicted {pred}): ")
 
     # This selects the first index to
     # compare explanation getting from 
@@ -238,9 +222,9 @@ def run_xai_techniques( cfg,
         diff = float(np.abs(again - ref).max())
         
         logger.info(f"{name} Check Difference {diff <= cfg.RELU_MAX_REF_DIFF}", 
-                            f"max difference {diff:.2e}")
+                    f"max difference {diff:.2e}")
         
-        logger.info(f"End Again Calculate Xai {name} {technique}")
+        logger.info(f"End Again Calculate Xai {name} {techniques[name]}")
        
     # This model's independent copy is used to perform checks 
     # without affecting the original trained model
@@ -278,7 +262,7 @@ def run_xai_techniques( cfg,
          
     shares = []
 
-    # this section calculating two values ​​for each image:
+    # Here we calculate two values
     # 1) It represents the proportion 
     # of the total saliency that falls within the digit mask.
     # If first value = 0.85, 
@@ -291,7 +275,7 @@ def run_xai_techniques( cfg,
     # shares contains a pair of indicators for each image, 
     # rather than the maps themselves.
     for row in rows:
-        mask = digit_mask(X_t[row["index"], 0].numpy(), 
+        mask = digit_mask(X_data[row["index"], 0].numpy(), 
                           cfg.MASK_THRESHOLD, 
                           cfg.MASK_DILATION)
         
@@ -310,7 +294,7 @@ def run_xai_techniques( cfg,
     axes = fig.subplots(len(rows), len(names) + 2)
     for r, row in enumerate(rows):
         # original image
-        axes[r, 0].imshow(X_t[row["index"], 0], cmap="gray")
+        axes[r, 0].imshow(X_data[row["index"], 0], cmap="gray")
         axes[r, 0].set_ylabel(f"true {row['true']}\npred {row['pred']}", fontsize=8)
         # Prepare the cell's maps for visualization:
         # col1 original map
@@ -342,7 +326,7 @@ def run_xai_techniques( cfg,
     fig.savefig(out_path / "maps_grid.png", 
                 dpi=90, bbox_inches="tight")
     try:
-        from IPython.display import Image, display
+        # from IPython.display import Image, display
         display(Image(str(out_path / "maps_grid.png")))
     except Exception:
         pass
@@ -352,7 +336,8 @@ def run_xai_techniques( cfg,
         "model": {k: info[k] for k in ("action", "reason", "sha256", "device")},
         "ig_completeness_errors": ig_errors,
         "images": [{"index": r["index"], "true": r["true"], "pred": r["pred"],
-                    "native_shapes": {n: list(r["maps"][n].map.shape) for n in names}} for r in rows],
+                    "native_shapes": {n: list(r["maps"][n].map.shape) 
+                                      for n in names}} for r in rows],
         "total_seconds": time.time() - t_start,
     }
     (out_path / "stage2_results.json").write_text(json.dumps(results, indent=2))

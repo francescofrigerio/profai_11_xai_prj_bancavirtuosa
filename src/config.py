@@ -123,6 +123,8 @@ class ConfigConstantsDefault:
     # RUN_CNN_MAN: bool = False
     OUTPUT_DIR: str = ROOT_DIR / "outputs"
 
+    # found and confirmed by visual control
+    CHECK_CLASSES: list = [2,3,5,8] 
     FILE_IMG_LR_OK: str = "images_lr_ok.json" 
     FILE_IMG_LR_KO: str = "images_lr_ko.json" 
     FILE_IMG_CNN_OK: str = "images_cnn_ok.json" 
@@ -216,7 +218,7 @@ class ConfigConstantsDefault:
                 "N_QUANT must be a multiple of NUM_CLASSES (stratified by predicted class)")
     
 CONFIG = ConfigConstantsDefault()
-CONFIG_CHECK_CLASSES: list = [2,3,5,8] # confirmed by visual control
+
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)

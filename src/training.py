@@ -364,7 +364,7 @@ def get_trained_model(cfg,
         "val_seconds": val_sec_cnn,
         "device": str(device),
     }
-    return info
+    return model, info
 
 
 

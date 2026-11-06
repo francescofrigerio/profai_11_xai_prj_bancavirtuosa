@@ -6,17 +6,17 @@
     %run run_main.py
 """ 
 import argparse
-import os
 import json
 from pathlib import Path
 import time
 import warnings
-
-import numpy as np
 import torch
 
+import numpy as np
+
 from baseline import fit_baseline
-from config import CONFIG , CONFIG_CHECK_CLASSES , TITLES
+from config import CONFIG 
+
 from data import data_to_input_lr, load_datasets
 from data import save_dict_to_json , load_images_by_class
 # from utility import to_densenet_input
@@ -30,19 +30,16 @@ from training import get_evaluate_model
 
 from utility import run_create_list_images , run_check_class_ok_ko , verify_output_files_exist
 from xai.shap_explainer import make_background
-from xai import TECHNIQUE_NAMES, build_techniques
-from xai.run_xai import run_xai_techniques , make_gradcam_debug_callback
+from xai import build_techniques
+from xai.run_xai import run_exp , make_gradcam_callback
 
 
-# from matplotlib.figure import Figure
-
-# Configurazione dei Warnings (spostata DOPO tutti gli import) ---
+# Configuration Warnings 
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-def phase_2_main( cfg,
-                  cfg_list_class,
-                  logger,
+def phase_2_xai( cfg,
+                 logger,
                   out_path ) -> None :
     """
         Run xai Explainer
@@ -58,10 +55,10 @@ def phase_2_main( cfg,
 
 
     """
-    if len(cfg_list_class) == 0 :
-        raise ValueError("list_class non può essere vuota")
+    if len(cfg.CHECK_CLASSES) == 0 :
+        raise ValueError("list_class mancante {len(cfg.CHECK_CLASSES)} ")
     else:
-        n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(cfg_list_class))
+        n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(cfg.CHECK_CLASSES))
 
     t_start = time.time()
     
@@ -84,28 +81,37 @@ def phase_2_main( cfg,
     val_loader_lr = loaders_dict["lr"]["val"]
     test_loader_lr = loaders_dict["lr"]["test"]
        
-    X_train , y_train , _  = data_to_input_lr(train_loader_lr,
+    X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,
                                               1, 
                                               CONFIG.IMAGE_SIZE,
                                               CONFIG.IMAGE_SIZE)
-    X_val , y_val , _ = data_to_input_lr(val_loader_lr,
+    X_val_lr , y_val_lr , _ = data_to_input_lr(val_loader_lr,
                                          1,
                                          CONFIG.IMAGE_SIZE,
                                          CONFIG.IMAGE_SIZE)
 
-    # Since `test_loader_lr` has shuffle=False 
+    # test_loader_lr has shuffle=False 
     # and uses datasettest_base directly, test_idx
     # corresponds to the original idx of the test set.
-    X_test, y_test, test_idx = data_to_input_lr(test_loader_lr,
+    X_test_lr, y_test_lr, test_idx_lr = data_to_input_lr(test_loader_lr,
                                                 1,
                                                 CONFIG.IMAGE_SIZE,
                                                 CONFIG.IMAGE_SIZE
                                                 )
-                         
+
+    expected_idx = torch.arange(len(test_idx_lr))
+
+    assert torch.equal(test_idx_lr, expected_idx), ( "Errore: test_idx_lr non contiene gli indici consecutivi "
+                                                    "da 0 a len(test_idx_lr)-1 nell'ordine previsto."
+                                                )
+
+    logger.info("Controllo test_idx superato.")
+
     # Logistic regression (train indices only)
-    lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
+    lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
 
     list_img = []
+    # It could be pass an input value
     if cfg.LIST_IMAGES_SEL == cfg.LIST_IMAGES_SEL_LR_OK:
         list_img = load_images_by_class(logger,                                 
                                         out_path / cfg.FILE_IMG_LR_OK)
@@ -115,52 +121,46 @@ def phase_2_main( cfg,
     elif cfg.LIST_IMAGES_SEL == cfg.LIST_IMAGES_SEL_CNN_OK:
         list_img = load_images_by_class(logger,                              out_path / cfg.FILE_IMG_CNN_OK)
     elif cfg.LIST_IMAGES_SEL == cfg.LIST_IMAGES_SEL_CNN_KO:
-            list_img = load_images_by_class(logger,
-                                            out_path / cfg.FILE_IMG_CNN_KO)
+        list_img = load_images_by_class(logger,
+                                        out_path / cfg.FILE_IMG_CNN_KO)
     else:
-         list_img = load_images_by_class(logger,
+        list_img = load_images_by_class(logger,
                                         out_path / cfg.FILE_IMG_CNN_KO)
 
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
-    
-    callback = make_gradcam_debug_callback(cfg,
-                                           logger,
-                                           test_datasets, 
-                                           device, 
-                                           out_path , 
-                                           list_img)
 
-    model , info = get_trained_model(cfg,
-                                    logger, 
-                                    test_datasets,
-                                    train_loader_cnn,
-                                    val_loader_cnn,
-                                    test_loader_cnn, 
-                                    device,
-                                    pretrained=True,    
-                                    epoch_callback=callback )
+    callback = make_gradcam_callback(cfg,logger,test_datasets, device, out_path , list_img)
+
+    model, info = get_trained_model(cfg,
+                            logger, 
+                            test_datasets,
+                            train_loader_cnn,
+                            val_loader_cnn,
+                            test_loader_cnn, 
+                            device,
+                            pretrained=True,    
+                            epoch_callback=callback )
 
     background = make_background(trainval_dataset,train_idx, cfg, device)
 
     techniques = build_techniques(model, cfg, background)
 
-    results = run_xai_techniques( cfg, 
-                                  logger, 
-                                  test_datasets,
-                                  t_start, 
-                                  techniques, 
-                                  model, 
-                                  lr, 
-                                  X_test,
-                                  y_test,
-                                  device, 
-                                  info, 
-                                  out_path , 
-                                  list_img ) 
+    results = run_exp( cfg, logger, 
+                       test_datasets,
+                       t_start, 
+                       techniques, 
+                       model, 
+                       lr, 
+                        X_test_lr,
+                        y_test_lr,
+                        device, 
+                        info, 
+                        out_path , 
+                        list_img ) 
+    return results
        
 def phase_1_load( cfg,
-                cfg_list_class,
                 logger,
                 out_path,
                 flag_pretrained = True ) -> None :
@@ -178,10 +178,11 @@ def phase_1_load( cfg,
      
     
     
-    if len(cfg_list_class) == 0 :
-        raise ValueError("list_class non può essere vuota")
-    else:
-        n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(cfg_list_class))
+    
+    if len(cfg.CHECK_CLASSES) == 0 :
+        raise ValueError(f"La lista di classi da controllare mancante {cfg.CHECK_CLASSES}")
+    
+    n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(cfg.CHECK_CLASSES))
 
     logger.debug(f"Immagini per classe: {n_for_class}")
     device, warning = get_device(cfg)
@@ -189,7 +190,7 @@ def phase_1_load( cfg,
         logger.debug("WARNING:", warning)
 
     # START LOAD DATA
-    datasets_dict , loaders_dict = load_datasets()
+    _ , loaders_dict = load_datasets()
     
     # Load tensor for train and test baseline
     train_loader_lr = loaders_dict["lr"]["train"]
@@ -214,17 +215,17 @@ def phase_1_load( cfg,
     num_ok , num_ko = run_check_class_ok_ko( logger, 
                             y_test,
                             y_pred , 
-                            cfg_list_class,
+                            cfg.CHECK_CLASSES,
                             "LR")
     if num_ok == 0 or num_ko == 0 :
-            raise ValueError(f"num ok o ko non possono essere {num_ok} {num_ko} per LR")
+        raise ValueError(f"num ok o ko non possono essere {num_ok} {num_ko} per LR")
 
     list_images_lr_ok , list_images_lr_ko  = run_create_list_images( logger,
                                                                      X_test,
                                                                      y_test,
                                                                      y_pred,
                                                                      idx_dataset,
-                                                                     cfg_list_class,
+                                                                     cfg.CHECK_CLASSES,
                                                                      n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                                      flag_before_ko=True)
     if (len(list_images_lr_ok) < cfg.NUM_IMAGES_MIN_OK ):
@@ -233,7 +234,7 @@ def phase_1_load( cfg,
                                                         y_test,
                                                         y_pred ,
                                                         idx_dataset,
-                                                        cfg_list_class,
+                                                        cfg.CHECK_CLASSES,
                                                         n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                         flag_before_ko=False)
 
@@ -252,26 +253,26 @@ def phase_1_load( cfg,
     num_ok , num_ko = run_check_class_ok_ko( logger, 
                             y_test,
                             y_pred , 
-                            cfg_list_class,
+                            cfg.CHECK_CLASSES,
                             "CNN")
     if num_ok == 0 or num_ko == 0 :
-            raise ValueError(f"num ok o ko non possono essere {num_ok} {num_ko} per CNN")
+        raise ValueError(f"num ok o ko non possono essere {num_ok} {num_ko} per CNN")
 
     list_images_cnn_ok , list_images_cnn_ko  = run_create_list_images(  logger,
                                                                         X_test,
                                                                         y_test,
                                                                         y_pred,
                                                                         idx_dataset,
-                                                                        cfg_list_class,
+                                                                        cfg.CHECK_CLASSES,
                                                                         n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                                         flag_before_ko=True)
     if (len(list_images_cnn_ok) < cfg.NUM_IMAGES_MIN_OK ):
-            list_images_cnn_ok , _  = run_create_list_images( logger,
+        list_images_cnn_ok , _  = run_create_list_images( logger,
                                                               X_test,
                                                               y_test,
                                                               y_pred,
                                                               idx_dataset,
-                                                              cfg_list_class,
+                                                              cfg.CHECK_CLASSES,
                                                               n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                               flag_before_ko=False)
     logger.debug(f"Risultato Finale CNN: {len(list_images_cnn_ko)} {len(list_images_cnn_ok)}")
@@ -318,22 +319,22 @@ def phase_1_train(cfg,
     val_loader_cnn = loaders_dict["cnn"]["val"]
     test_loader_cnn = loaders_dict["cnn"]["test"]
         
-    X_train , y_train , _  = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
-    X_val , y_val , _ = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_val_lr , y_val_lr , _ = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
         
-    X_test , y_test , _ = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_test_lr , y_test_lr , _ = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
         
     # Logistic regression (train indices only)
-    lr = fit_baseline(X_train, y_train, X_val, y_val,cfg,logger)
+    lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
     
-    val_accuracy_lr = accuracy(y_val, lr.predict(X_val))
-    test_accuracy_lr = accuracy(y_test, lr.predict(X_test))
+    val_accuracy_lr = accuracy(y_val_lr, lr.predict(X_val_lr))
+    test_accuracy_lr = accuracy(y_test_lr, lr.predict(X_test_lr))
     print(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
     print(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
 
     # plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-    y_pred_test_lr = lr.predict(X_test)
-    plot_predict_info(y_test, 
+    y_pred_test_lr = lr.predict(X_test_lr)
+    plot_predict_info(y_test_lr, 
                       y_pred_test_lr,
                       "CLASSIFIER LR ON MNIST DATASET " , 
                       "TEST",
@@ -348,7 +349,7 @@ def phase_1_train(cfg,
 
     if flag_run_cnn is True:
         # Cnn DenseNet
-        info_cnn = get_trained_model(cfg,
+        _ , info_cnn = get_trained_model(cfg,
                                         logger, 
                                         test_datasets,
                                         train_loader_cnn,
@@ -374,18 +375,18 @@ def phase_1_train(cfg,
         
         gap = test_accuracy_cnn - test_accuracy_lr
        
-        q = quadrants(y_test, y_pred_cnn, y_pred_test_lr)
+        q = quadrants(y_test_lr, y_pred_cnn, y_pred_test_lr)
         
     
         metrics = {  "densenet": {
                          "val_acc": val_acc_cnn, 
                          "test_acc": test_accuracy_cnn, 
-                         "test_macro_f1": macro_f1(y_test, y_pred_cnn, cfg.NUM_CLASSES),
+                         "test_macro_f1": macro_f1(y_test_lr, y_pred_cnn, cfg.NUM_CLASSES),
                          "train_sec_cnn": train_sec_cnn,
                          "val_sec_cnn": val_sec_cnn},
                          "lr": {"val_acc": val_accuracy_lr, 
                          "test_acc": test_accuracy_lr, 
-                         "test_macro_f1": macro_f1(y_test, y_pred_test_lr, cfg.NUM_CLASSES),
+                         "test_macro_f1": macro_f1(y_test_lr, y_pred_test_lr, cfg.NUM_CLASSES),
                          "fit_seconds": train_sec_lr, 
                          "n_iter": lr.diagnostics["n_iter"]},
                          "quadrants": q, "gap_test_points": gap * 100,
@@ -396,8 +397,8 @@ def phase_1_train(cfg,
         # default=str converte gli oggetti Path in str
         (out_path / "lr_cnn_metrics.json").write_text(json.dumps(metrics, indent=2, default=str))
             
-        np.savetxt(out_path / "confusion_densenet.csv", confusion(y_test, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
-        np.savetxt(out_path / "confusion_lr.csv", confusion(y_test, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
+        np.savetxt(out_path / "confusion_densenet.csv", confusion(y_test_lr, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
+        np.savetxt(out_path / "confusion_lr.csv", confusion(y_test_lr, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
         
         print(f"\nDenseNet: val {val_acc_cnn:.4f}   | " \
                   f"test {test_accuracy_cnn:.4f} | " \
@@ -412,7 +413,7 @@ def phase_1_train(cfg,
         print(f"checkpoint: {info_cnn['path']}\n | total {time.perf_counter() - t_start:.0f}s")
         return metrics
     
-def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
+def main(cfg=CONFIG,logger=LOGGER):
     """
         Main Function Of the project
     """
@@ -428,7 +429,7 @@ def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
                         help="Modalità di esecuzione (default: PROD)"
                     )
 
-    # Definisci l'argomento (--cnn, accettando solo True o False)
+    # arg --cnn only True o False
     parser.add_argument( '--cnn',
                             type=bool,
                             choices=[True,False],
@@ -436,26 +437,25 @@ def main(cfg=CONFIG,cfg_list_class=CONFIG_CHECK_CLASSES,logger=LOGGER):
                             help="Modalità di esecuzione (default: PROD)"
                         )
     
-    # Effettua il parse degli argomenti lanciati da terminale
+    # parse args
     args = parser.parse_args()
 
     flag_pretrained = False
-    # Assegna la configurazione globale corretta in base all'input
     
     if args.mode == 'load':
         flag_pretrained = True
         logger.info("Training avviato in modalità: LOAD")
    
-    # definizione/creazione dir e file di di output
+    # dir and file output
     out = Path(cfg.OUTPUT_DIR) 
     out.mkdir(parents=True, exist_ok=True)
 
     if flag_pretrained is False :
         phase_1_train(cfg,logger,out,flag_pretrained)
-    else:
-        phase_1_load(cfg,cfg_list_class,logger,out,flag_pretrained)
+    
+    phase_1_load(cfg,logger,out,flag_pretrained)
 
-    phase_2_main(cfg,cfg_list_class,logger,out)
+    phase_2_xai(cfg,logger,out)
 
     logger.debug("Programma Terminato")
 
