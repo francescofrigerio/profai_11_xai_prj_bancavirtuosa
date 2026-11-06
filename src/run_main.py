@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 import time
 import warnings
-
+import copy
 import numpy as np
 import torch
 
@@ -61,6 +61,8 @@ def phase_2_xai( cfg,
                  techniques,
                  model,
                  lr,
+                 X_train,
+                 y_train,
                  device,
                  info,
                  out_path,
@@ -75,7 +77,9 @@ def phase_2_xai( cfg,
 
         item = list_images[id_class]
         idx_dataset = item["id_dataset"]
-                       
+
+        logger.info(f"Start Loop {i} {idx_dataset}")
+
         # The function to_densenet_input() has to receive a batch with 4 dim. 
         # So we add the size batch here 
         # Original Image MNIST: (1, 28, 28)
@@ -89,47 +93,104 @@ def phase_2_xai( cfg,
         input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
         
         with torch.no_grad():
-            pred = int(model(input_img).argmax(1))
+            # pred = int(model(input_img).argmax(1))
+            pred = int(model(input_img).argmax(dim=1).item())
+
         maps = {}
         for name, technique in techniques.items():
+            logger.info(f"Start Xai {name} {technique}")
             result = technique.explain(input_img, pred)
             maps[name] = result
             
             if name == "integrated_gradients":
                 ig_errors.append(result.meta["completeness_error"])
-       
-        rows.append({"index": int(i), 
-                     "true": int(y[i]), 
+            logger.info(f"End Xai {name} {technique}")
+
+        # sostituzione i con idx_dataset
+        rows.append({"index": int(idx_dataset), 
+                     "true": int(y_train[idx_dataset]), 
                      "pred": pred, 
                      "maps": maps,
-                     "lr_map": lr.local_map(X_flat[i], pred)})
-        print(f"image {i} (true {y[i]}, predicted {pred}): ")
+                     "lr_map": lr.local_map(X_train[idx_dataset], pred)})
+        
+        logger.info(f"End Loop {i} image {idx_dataset} (true {y_train[idx_dataset]}, predicted {pred}): ")
 
-    first = torch.as_tensor(to_densenet_input(data.X_trainval[picks[0]:picks[0] + 1], 
+    # Attenzione!! unico problema non risolto a livello di sintassi
+    # Non capisco l'indice da passare nella seguente riga(vedere il codice vecchio 
+    # che genera pick)
+    # sono le prime due immagini dentro X_train ? 
+    first = torch.as_tensor(to_densenet_input(X_train[picks[0]:picks[0] + 1], 
                                               cfg.DENSENET_SIZE)).to(device)
+        
+    # Non capisco perchè serve un'altra
+    # spiegazione per lime e shap                                      
     for name in ("lime", "shap"):
+        logger.info(f"Start Again Xai {name} {technique}")
         again = techniques[name].explain(first, rows[0]["pred"]).map
         ref = rows[0]["maps"][name].map
+        logger.info(f"End Again Xai {name} {technique}")
        
-   
-    patched = SafeDenseNet(copy.deepcopy(model)).eval()
+
+    # Da verificare la relu il layer aggiunto 
+    # nel metodo forward alla classe SafeDenseNet 
+    # a cosa serve meglio aggiungerla
+    # Io l'ho tolto perchè non m'interessa
+    # gestire il caso in cui FLAG_RELU_INPLACE=False
+    # Ci sono altre cose nella classe che non gestisco ?
+    # Passare la struttura della classe e i miei metodi
+    # check_model_params
+    # build_densenet
+    # count_inplace_relu
+    # validate_layers
+    # freeze_backbone
+    # set_batchnorm_eval
+    # enter_train_mode
+    # trainable_parameters
+    # make_optimizer
+    # patched = SafeDenseNet(copy.deepcopy(model)).eval()
+    patched = copy.deepcopy(model).eval()
+
+    # Il seguente commento in inglese è chiaro
+    # Saliency Map Normalization (Min-Max [0, 1]):
+    # in order to make the maps generated 
+    # by different techniques
+    # homogeneous and directly comparable 
+    # (e.g., Grad-CAM and Integrated Gradients
+    #     can produce raw attribution values 
+    #     on very different scales).
+
+    # Eventualmente poi tolgo saliency
+    # Non capisco fino in fondo il controllo
+    # della differenza delle mappa a e b 
+    # a è quella salvata nel ciclo principale
+    # b è quella eseguita sulla variabile first 
+    # tutta da capire
     for name in ("gradcam", "integrated_gradients", "saliency"):
         a = rows[0]["maps"][name].map
         b = build_techniques(patched, cfg, names=(name,))[name].explain(first, rows[0]["pred"]).map
         diff = float(np.abs(a - b).max() / max(np.abs(b).max(), 1e-12))
-        
+        logger.info(f"{name} Check the name map on the trained model {diff <= cfg.RELU_MAX_REL_DIFF}", 
+                    f"relative difference {diff:.1e}")
+         
     shares = []
+    # Non capisco il metodo digit_mask
+    # e il metodo to_grid28
+    # non capisco salva in shares tutte le mappe di salienza ?
     for row in rows:
-        mask = digit_mask(data.X_trainval[row["index"], 0].numpy(), cfg.MASK_THRESHOLD, cfg.MASK_DILATION)
-        g = to_grid28(np.abs(row["maps"]["saliency"].map), cfg.DENSENET_SIZE)
+        mask = digit_mask(X_train[row["index"], 0].numpy(), 
+                          cfg.MASK_THRESHOLD, 
+                          cfg.MASK_DILATION)
+        
+        g = to_grid28(np.abs(row["maps"]["saliency"].map), 
+                      cfg.DENSENET_SIZE)
         shares.append((float(g[mask].sum() / g.sum()), float(mask.mean())))
     
-    # figure
+    # figure plot for all techniques
     names = list(techniques)
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(rows)))
     axes = fig.subplots(len(rows), len(names) + 2)
     for r, row in enumerate(rows):
-        axes[r, 0].imshow(data.X_trainval[row["index"], 0], cmap="gray")
+        axes[r, 0].imshow(X_train[row["index"], 0], cmap="gray")
         axes[r, 0].set_ylabel(f"true {row['true']}\npred {row['pred']}", fontsize=8)
         cells = [(row["maps"][n].map, row["maps"][n].signed) for n in names] + [(row["lr_map"], True)]
         for c, (m, signed) in enumerate(cells, start=1):
@@ -148,6 +209,7 @@ def phase_2_xai( cfg,
     except Exception:
         pass
 
+    # save result to json file
     results = {
         "model": {k: info[k] for k in ("action", "reason", "sha256", "device")},
         "ig_completeness_errors": ig_errors,
@@ -157,7 +219,7 @@ def phase_2_xai( cfg,
     }
     (out_path / "stage2_results.json").write_text(json.dumps(results, indent=2))
     
-    print(f"all tecniques total time {time.time() - t_start:.0f}s")
+    logger.info(f"all tecniques total time {time.time() - t_start:.0f}s")
     return results
 
 def phase_2_main( cfg,
@@ -211,13 +273,24 @@ def phase_2_main( cfg,
                                     val_loader_cnn,
                                     test_loader_cnn, 
                                     device,
-                                    pretrained=True,
+                                    pretrained=True,    
                                     epoch_callback=callback )
 
     background = make_background(trainval_dataset,train_idx, cfg, device)
     techniques = build_techniques(model, cfg, background)
 
-    phase_2_xai( cfg, logger, t_start, techniques, model, lr, device, info, out_path , list_images_sample ) 
+    phase_2_xai( cfg, 
+                logger, 
+                t_start, 
+                techniques, 
+                model, 
+                lr, 
+                X_train,
+                y_train,
+                device, 
+                info, 
+                out_path , 
+                list_images_sample ) 
     
 
     

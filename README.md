@@ -114,3 +114,30 @@ Grafico fase 2
              Explainer.explain
 
 
+
+
+Cosa mostra la griglia di mappe
+
+È la prima vista d’insieme, e già racconta la storia del progetto:
+
+La LR locale (w·x) è la mappa più nitida: è esatta, e sulle cifre si leggono 
+i tratti rossi (a favore) e blu (contro).
+
+Integrated Gradients segue bene il profilo della cifra (è zero sullo sfondo per costruzione), con rumore rosso/blu lungo i tratti.
+
+Occlusion dà macchie lisce sulle zone importanti. Un caso da guardare: sul 5 è prevalentemente blu, cioè coprire il tratto 
+alza il logit del 5, il contrario delle altre cifre.
+
+Grad-CAM a 4×4 mostra spesso un blob centrale simile per cifre diverse.
+
+LIME è a celle grosse e con pesi positivi anche sullo sfondo per le predizioni molto sicure. 
+Probabile effetto del kernel di distanza, che correla le celle accese: la tabella “fuori dalla cifra” sarà alta per LIME.
+
+SHAP è a grana fine e rumoroso, come da stabilità 0,78–0,80.
+
+Saliency è quasi invisibile con la scala lineare e ha picchi sui bordi dell’immagine. 
+Nelle figure finali servirà una scala per percentile. La mappa conferma quanto aveva misurato 
+la fase zero (mappa dispersa).
+ 
+
+

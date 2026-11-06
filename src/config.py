@@ -127,7 +127,10 @@ class ConfigConstantsDefault:
     FILE_IMG_LR_KO: str = "images_lr_ko.json" 
     FILE_IMG_CNN_OK: str = "images_cnn_ok.json" 
     FILE_IMG_CNN_OK: str = "images_cnn_ko.json" 
-    
+
+    IG_COMPLETENESS_MAX = 0.05
+    RELU_MAX_REL_DIFF = 1e-3
+
     IN_NOTEBOOK = "ipykernel" in sys.modules
 
     THRESHOLDS = { 
