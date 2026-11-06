@@ -11,6 +11,14 @@
     2. FLAG_RELU_INPLACE: True keeps torchvision's in-place ReLU (less VRAM), False 
     replaces them with a patched model. 
     Test: Grad-CAM, IG, Saliency and SHAP give the same maps in both cases.
+
+    This module implements the model's management:
+    - Load a pretrained DenseNet121 with standard weights;
+    - keep the original architecture;
+    - set the BatchNorm layers to evaluation mode;
+    - initially freeze all parameters;
+    - replace the final classifier with one suitable 
+      for the classes.
 """
 from torchvision.models import DenseNet121_Weights, densenet121
 
@@ -59,7 +67,15 @@ def build_densenet(cfg,logger):
     return model
 
 def count_inplace_relu(model: nn.Module) -> int:
-    return sum(1 for m in model.modules() if isinstance(m, nn.ReLU) and m.inplace)
+    """
+        is useful for checking modular ReLUs, 
+        but it does not detect the final functional ReLU 
+        present in the standard `forward` pass of DenseNet121. 
+        Therefore, a count of zero would not prove 
+        that all executed ReLUs are non-in-place.
+    """
+    return sum(1 for m in model.modules() 
+               if isinstance(m, nn.ReLU) and m.inplace)
 
 def validate_layers(model: nn.Module, cfg) -> None:
     """

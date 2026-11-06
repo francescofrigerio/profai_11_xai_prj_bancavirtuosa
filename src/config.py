@@ -130,6 +130,7 @@ class ConfigConstantsDefault:
 
     IG_COMPLETENESS_MAX = 0.05
     RELU_MAX_REL_DIFF = 1e-3
+    RELU_MAX_REF_DIFF = 1e-3
 
     IN_NOTEBOOK = "ipykernel" in sys.modules
 

@@ -14,6 +14,7 @@ import warnings
 import copy
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from baseline import fit_baseline
 from config import CONFIG , CONFIG_CHECK_CLASSES , TITLES
@@ -38,21 +39,69 @@ from matplotlib.figure import Figure
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-# Da verificare
-def digit_mask(img28, threshold, dilation):
+def digit_mask(input_img28, threshold, dilation):
+    """
+        This function creates a binary mask of the image.
+
+        It compares each pixel with a threshold:
+        - pixel above the threshold: True;
+        - pixel at or below the threshold: False.
+        In this way, it approximately identifies 
+        the pixels belonging to the digit,
+        and so identify the area occupied by the digit
+
+        In the short:
+        This function is used to distinguish the digit area 
+        from the background, potentially including 
+        a small margin around the strokes(tratti).
+
+        Limits:THRESHOLD` must be consistent 
+        with the pixel values ​​in X_train. 
+        If the images are normalized or standardized, 
+        the threshold must be chosen accordingly.
+    """
     from scipy.ndimage import binary_dilation
-    mask = np.asarray(img28) > threshold
-    return binary_dilation(mask, structure=np.ones((3, 3), bool), iterations=dilation) if dilation else mask
+    mask = np.asarray(input_img28) > threshold
+
+    # expands the mask, slightly enlarging the identified area.
+    # The dilation parameter determines how many times 
+    # this expansion is performed. If it is set to zero, 
+    # the mask remains unchanged.
+    return binary_dilation(mask, 
+                           structure=np.ones((3, 3), bool), 
+                           iterations=dilation
+                           ) if dilation else mask
 
 
 def to_grid28(map2d, size, side=28):
-    import torch
-    import torch.nn.functional as F
-    t = torch.as_tensor(np.asarray(map2d), dtype=torch.float32)[None, None]
+    """
+        This Function convert XAI 2dmap 
+        to mnist risolution 28x28 to compare
+        xai map with the digit mask
+
+        This is the step:
+    """
+
+    # - Convert map2d to tensor and Adds two dimensions—batch 
+    # and channel—resulting 
+    # in the shape (1, 1, H, W).
+    t = torch.as_tensor(np.asarray(map2d), 
+                        dtype=torch.float32)[None, None]
     if t.shape[-1] < size:
-        t = F.interpolate(t, size=(size, size), mode="bilinear", align_corners=False)
-    return F.interpolate(t, size=(side, side), mode="area")[0, 0].numpy()
-# Da verificare
+        # If the map is smaller than the specified size, 
+        # it scales it up to size × size.
+        t = F.interpolate(t, 
+                          size=(size, size), 
+                          mode="bilinear", 
+                          align_corners=False)
+
+    # Resizes it to 28 × 28 using area interpolation.
+    # and removes the batch and channel dimensions 
+    # and returns a NumPy array.  
+    return F.interpolate(t, 
+                         size=(side, side), 
+                         mode="area")[0, 0].numpy()
+
 
 def phase_2_xai( cfg,
                  logger,
@@ -67,7 +116,23 @@ def phase_2_xai( cfg,
                  info,
                  out_path,
                  list_images ) -> None :
+    """
+    This function implements Hook that are a tool 
+    for observing the internal 
+    workings of a network during processing.
     
+    A hook is a function that allows you to attach 
+    to a specific point during the execution 
+    of a PyTorch model, enabling you to intercept 
+    and observe information—such as during the 
+    forward or backward pass—without 
+    having to directly modify the model's code.
+
+    In the context of XAI (Explainable AI), 
+    hooks are primarily used to retrieve layer 
+    activations and their corresponding gradients, 
+    which are necessary for calculating explanations.
+    """
     
     rows, ig_errors = [], []
     n_images = len(list_images)
@@ -115,42 +180,36 @@ def phase_2_xai( cfg,
         
         logger.info(f"End Loop {i} image {idx_dataset} (true {y_train[idx_dataset]}, predicted {pred}): ")
 
-    # Attenzione!! unico problema non risolto a livello di sintassi
-    # Non capisco l'indice da passare nella seguente riga(vedere il codice vecchio 
-    # che genera pick)
-    # sono le prime due immagini dentro X_train ? 
-    first = torch.as_tensor(to_densenet_input(X_train[picks[0]:picks[0] + 1], 
-                                              cfg.DENSENET_SIZE)).to(device)
-        
-    # Non capisco perchè serve un'altra
-    # spiegazione per lime e shap                                      
-    for name in ("lime", "shap"):
-        logger.info(f"Start Again Xai {name} {technique}")
-        again = techniques[name].explain(first, rows[0]["pred"]).map
-        ref = rows[0]["maps"][name].map
-        logger.info(f"End Again Xai {name} {technique}")
-       
+    # This selects the first index to
+    # compare explanation getting from 
+    # this first with that already in rows[0] 
+    first_idx = rows[0]["index"]
+    # These select and transform the first image
+    first_image, _ = dataset[first_idx]
+    first = to_densenet_input(first_image.unsqueeze(0),
+                              cfg.DENSENET_SIZE
+                              ).to(device)
 
-    # Da verificare la relu il layer aggiunto 
-    # nel metodo forward alla classe SafeDenseNet 
-    # a cosa serve meglio aggiungerla
-    # Io l'ho tolto perchè non m'interessa
-    # gestire il caso in cui FLAG_RELU_INPLACE=False
-    # Ci sono altre cose nella classe che non gestisco ?
-    # Passare la struttura della classe e i miei metodi
-    # check_model_params
-    # build_densenet
-    # count_inplace_relu
-    # validate_layers
-    # freeze_backbone
-    # set_batchnorm_eval
-    # enter_train_mode
-    # trainable_parameters
-    # make_optimizer
-    # patched = SafeDenseNet(copy.deepcopy(model)).eval()
+    # LIME and SHAP can have stochastic components: 
+    # a new execution might produce a slightly different map.                         
+    for name in ("lime", "shap"):
+        logger.info(f"Start Again Calculate Xai {name} {techniques[name]}")
+        # This gets the new calculated map;
+        again = techniques[name].explain(first, rows[0]["pred"]).map
+        # This gest the previously saved calculated map, 
+        ref = rows[0]["maps"][name].map
+
+        diff = float(np.abs(again - ref).max())
+        
+        logger.info(f"{name} Check Difference {diff <= cfg.RELU_MAX_REF_DIFF}", 
+                            f"max difference {diff:.2e}")
+        
+        logger.info(f"End Again Calculate Xai {name} {technique}")
+       
+    # This model's independent copy is used to perform checks 
+    # without affecting the original trained model
     patched = copy.deepcopy(model).eval()
 
-    # Il seguente commento in inglese è chiaro
     # Saliency Map Normalization (Min-Max [0, 1]):
     # in order to make the maps generated 
     # by different techniques
@@ -159,23 +218,42 @@ def phase_2_xai( cfg,
     #     can produce raw attribution values 
     #     on very different scales).
 
-    # Eventualmente poi tolgo saliency
-    # Non capisco fino in fondo il controllo
-    # della differenza delle mappa a e b 
-    # a è quella salvata nel ciclo principale
-    # b è quella eseguita sulla variabile first 
-    # tutta da capire
+    # Just verify that the recalculation using the copy 
+    # of the model produces results sufficiently close 
+    # to the original ones.
+    # it is a consistency check
+    # We can cancel this test to have a more simple code
     for name in ("gradcam", "integrated_gradients", "saliency"):
+        # getting the map calculate in the main loop
         a = rows[0]["maps"][name].map
+        # getting the map recalculated on the same image, 
+        # using the copied model.
         b = build_techniques(patched, cfg, names=(name,))[name].explain(first, rows[0]["pred"]).map
+        
+        # it measures the maximum absolute difference 
+        # between the two maps, normalized by the 
+        # maximum absolute value of the second map.
         diff = float(np.abs(a - b).max() / max(np.abs(b).max(), 1e-12))
-        logger.info(f"{name} Check the name map on the trained model {diff <= cfg.RELU_MAX_REL_DIFF}", 
-                    f"relative difference {diff:.1e}")
+        
+        logger.info(f"{name} Check on trained model: "
+                    f"{diff <= cfg.RELU_MAX_REL_DIFF}, "
+                    f"relative difference {diff:.1e}"
+                    )
          
     shares = []
-    # Non capisco il metodo digit_mask
-    # e il metodo to_grid28
-    # non capisco salva in shares tutte le mappe di salienza ?
+
+    # this section calculating two values ​​for each image:
+    # 1) It represents the proportion 
+    # of the total saliency that falls within the digit mask.
+    # If first value = 0.85, 
+    # it would mean that 85% of the total saliency 
+    # under consideration falls within the area 
+    # identified as the digit.
+
+    # 2) It represents the fraction of the 
+    # image occupied by the mask space digit.
+    # shares contains a pair of indicators for each image, 
+    # rather than the maps themselves.
     for row in rows:
         mask = digit_mask(X_train[row["index"], 0].numpy(), 
                           cfg.MASK_THRESHOLD, 
@@ -183,26 +261,50 @@ def phase_2_xai( cfg,
         
         g = to_grid28(np.abs(row["maps"]["saliency"].map), 
                       cfg.DENSENET_SIZE)
-        shares.append((float(g[mask].sum() / g.sum()), float(mask.mean())))
+
+        # shares.append((float(g[mask].sum() / g.sum()), 
+        #                       float(mask.mean() )))
+        share = float(g[mask].sum() / max(g.sum(), 1e-12))
+        shares.append(share,float(mask.mean())
+        
     
     # figure plot for all techniques
     names = list(techniques)
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(rows)))
     axes = fig.subplots(len(rows), len(names) + 2)
     for r, row in enumerate(rows):
+        # original image
         axes[r, 0].imshow(X_train[row["index"], 0], cmap="gray")
         axes[r, 0].set_ylabel(f"true {row['true']}\npred {row['pred']}", fontsize=8)
-        cells = [(row["maps"][n].map, row["maps"][n].signed) for n in names] + [(row["lr_map"], True)]
+        # Prepare the cell's maps for visualization:
+        # col1 original map
+        # col2 for each XAI technique;
+        # col3 for the local map of the Logistic Regression
+        cells = [(row["maps"][n].map, 
+                  row["maps"][n].signed) for n in names] + [(row["lr_map"], True)]
+
         for c, (m, signed) in enumerate(cells, start=1):
+            # Graphical normalization is performed using 
+            # the maximum absolute value of each individual map. 
+            # This makes the maps easier to read, 
+            # but be careful: it does not mean that 
+            # the colors can be directly compared 
+            # in quantitative terms across different techniques.
             a = float(np.abs(m).max()) or 1.0
-            axes[r, c].imshow(m, cmap="seismic" if signed else "viridis", vmin=-a if signed else 0, vmax=a,
+            
+            # seismic for maps with both positive and negative value
+            # viridis for those that are non-negative.
+            axes[r, c].imshow(m, cmap="seismic" if signed else "viridis", 
+                              vmin=-a if signed else 0, 
+                              vmax=a,
                               interpolation="nearest" if m.shape[0] <= 8 else "bilinear")
         for c in range(len(names) + 2):
             axes[r, c].set_xticks([])
             axes[r, c].set_yticks([])
     for c, title in enumerate(["image"] + [TITLES[n] for n in names] + ["LR local\n(w * x)"]):
         axes[0, c].set_title(title, fontsize=9)
-    fig.savefig(out_path / "maps_grid.png", dpi=90, bbox_inches="tight")
+    fig.savefig(out_path / "maps_grid.png", 
+                dpi=90, bbox_inches="tight")
     try:
         from IPython.display import Image, display
         display(Image(str(out_path / "maps_grid.png")))
@@ -228,6 +330,17 @@ def phase_2_main( cfg,
                   out_path ) -> None :
     """
         Run xai Explainer
+
+        - For each XAI technique, it calculates an explanation 
+          with respect to the predicted class, pred.
+          This means that the result maps answer the question:
+          Which parts of the image contributed 
+          to the prediction made by the model?
+          Not necessarily to the image's actual class.
+        
+        - For Integrated Gradients, it also saves the completeness error:
+
+
     """
     if len(cfg_list_class) == 0 :
         raise ValueError("list_class non può essere vuota")
