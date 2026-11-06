@@ -22,9 +22,9 @@ def build_techniques(model, cfg, background=None, names=TECHNIQUE_NAMES) -> dict
     """
     unknown = [n for n in names if n not in TECHNIQUE_NAMES]
     if unknown:
-        raise ValueError(f"Tecnica sconosciuta {unknown}; Tecniche disponibili: {TECHNIQUE_NAMES}")
+        raise ValueError(f"Technique unknown; techniques available: {TECHNIQUE_NAMES}")
     if "shap" in names and background is None:
-        raise ValueError("SHAP necessita di un tensore di background (xai.shap_explainer.make_background)")
+        raise ValueError("SHAP needs background tensor (xai.shap_explainer.make_background)")
     
     builders = { "gradcam": lambda: GradCam(model, cfg),
                  "integrated_gradients": lambda: IntegratedGradients(model, cfg),

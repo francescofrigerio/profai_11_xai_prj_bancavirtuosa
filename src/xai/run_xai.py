@@ -1,0 +1,361 @@
+"""
+"""
+
+# import os
+import json
+import time
+from pathlib import Path
+
+
+
+import torch
+import torch.nn.functional as F
+import copy
+import numpy as np
+from matplotlib.figure import Figure
+
+from config import CONFIG , CONFIG_CHECK_CLASSES , TITLES
+from logger import LOGGER
+
+from xai import GradCam
+from xai import TECHNIQUE_NAMES, build_techniques
+from utility import to_densenet_input
+
+def digit_mask(input_img28, threshold, dilation):
+    """
+        This function creates a binary mask of the image.
+
+        It compares each pixel with a threshold:
+        - pixel above the threshold: True;
+        - pixel at or below the threshold: False.
+        In this way, it approximately identifies 
+        the pixels belonging to the digit,
+        and so identify the area occupied by the digit
+
+        In the short:
+        This function is used to distinguish the digit area 
+        from the background, potentially including 
+        a small margin around the strokes(tratti).
+
+        Limits:THRESHOLD must be consistent 
+        with the pixel values in X_train. 
+        If the images are normalized or standardized, 
+        the threshold must be chosen accordingly.
+    """
+    from scipy.ndimage import binary_dilation
+    mask = np.asarray(input_img28) > threshold
+
+    # expands the mask, slightly enlarging the identified area.
+    # The dilation parameter determines how many times 
+    # this expansion is performed. If it is set to zero, 
+    # the mask remains unchanged.
+    return binary_dilation(mask, 
+                           structure=np.ones((3, 3), bool), 
+                           iterations=dilation
+                           ) if dilation else mask
+
+
+def to_grid28(map2d, size, side=28):
+    """
+        This Function convert XAI 2dmap 
+        to mnist risolution 28x28 to compare
+        xai map with the digit mask
+
+        This is the step:
+    """
+
+    # - Convert map2d to tensor and Adds two dimensions—batch 
+    # and channel—resulting 
+    # in the shape (1, 1, H, W).
+    t = torch.as_tensor(np.asarray(map2d), 
+                        dtype=torch.float32)[None, None]
+    if t.shape[-1] < size:
+        # If the map is smaller than the specified size, 
+        # it scales it up to size × size.
+        t = F.interpolate(t, 
+                          size=(size, size), 
+                          mode="bilinear", 
+                          align_corners=False)
+
+    # Resizes it to 28 × 28 using area interpolation.
+    # and removes the batch and channel dimensions 
+    # and returns a NumPy array.  
+    return F.interpolate(t, 
+                         size=(side, side), 
+                         mode="area")[0, 0].numpy()
+
+def make_gradcam_debug_callback(cfg,logger,dataset, device, out_path , list_images):
+    """
+        Grad-CAM debug images of the first and last training epoch.
+        The callback explains the PREDICTED class of the 10 fixed validation images (one per class), so a
+        broken training (maps that do not move, or that look at the background) 
+        is visible at a glance.
+    """
+    def callback(model, epoch):
+           model.eval()
+           explainer = GradCam(model, cfg)
+
+           n_images = len(list_images)
+           fig = Figure(figsize=(2 * n_images, 4.4))
+           axes = fig.subplots(2, n_images)
+           for i, id_class in enumerate(sorted(list_images.keys())):
+               
+               item = list_images[id_class]
+               idx_dataset = item["id_dataset"]
+               
+               # The function to_densenet_input() has to receive a batch with 4 dim. 
+               # So we add the size batch here 
+               # Original Image MNIST: (1, 28, 28)
+               input_image, input_label = dataset[idx_dataset]
+               
+               # Add size of the batch: (1, 1, 28, 28) to the input
+               x28 = input_image.unsqueeze(0)
+
+               # Convert to Input DenseNet: (1, 3, 128, 128)
+               input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
+
+               with torch.no_grad():
+                   # pred = int(model(input_img).argmax(1))
+                   pred = int(model(input_img).argmax(dim=1).item())
+               
+               result = explainer.explain(input_img, pred)
+               
+               # Original Image
+               axes[0, i].imshow(input_image.squeeze(0),cmap="gray")
+               axes[0, i].set_title(f"true {input_label} / pred {pred}",fontsize=8)
+               
+               # Grad-CAM
+               axes[1, i].imshow(result.map, cmap="viridis", interpolation="bilinear")
+               
+               for row in (0, 1):
+                   axes[row, i].axis("off")
+           
+           fig.suptitle(f"Grad-CAM debug, epoch {epoch}")
+           out_path.mkdir(parents=True, exist_ok=True)
+           path = out_path / f"gradcam_debug_epoch{epoch}.png"
+           fig.savefig(path, dpi=100, bbox_inches="tight")
+           logger(f"debug Grad-CAM saved: {path}")
+
+    return callback
+
+
+def run_xai_techniques( cfg,
+                        logger,
+                        dataset,
+                        t_start,
+                        techniques,
+                        model,
+                        lr,
+                        X_t,
+                        y_t,
+                        device,
+                        info,
+                        out_path,
+                        list_img ) -> None :
+    """
+    This function implements Hook that are a tool 
+    for observing the internal 
+    workings of a network during processing.
+    
+    A hook is a function that allows you to attach 
+    to a specific point during the execution 
+    of a PyTorch model, enabling you to intercept 
+    and observe information—such as during the 
+    forward or backward pass—without 
+    having to directly modify the model's code.
+
+    In the context of XAI (Explainable AI), 
+    hooks are primarily used to retrieve layer 
+    activations and their corresponding gradients, 
+    which are necessary for calculating explanations.
+    """
+    
+    rows, ig_errors = [], []
+    n_images = len(list_img)
+
+    # for i in picks:
+    for i, id_class in enumerate(sorted(list_img.keys())):
+
+        item = list_img[id_class]
+        idx_dataset = item["id_dataset"]
+
+        logger.info(f"Start Loop {i} {idx_dataset}")
+
+        # The function to_densenet_input() has to receive a batch with 4 dim. 
+        # So we add the size batch here 
+        # Original Image MNIST: (1, 28, 28)
+        input_image, input_label = dataset[idx_dataset]
+                       
+        # Add size of the batch: (1, 1, 28, 28) to the input
+        x28 = input_image.unsqueeze(0)
+        
+        # Convert to Input DenseNet: (1, 3, 128, 128)
+        # x1 = to_densenet_input(data.X_trainval[i:i + 1], cfg.DENSENET_SIZE).to(device)
+        input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
+        
+        with torch.no_grad():
+            # pred = int(model(input_img).argmax(1))
+            pred = int(model(input_img).argmax(dim=1).item())
+
+        maps = {}
+        for name, technique in techniques.items():
+            logger.info(f"Start Xai {name} {technique}")
+            result = technique.explain(input_img, pred)
+            maps[name] = result
+            
+            if name == "integrated_gradients":
+                ig_errors.append(result.meta["completeness_error"])
+            logger.info(f"End Xai {name} {technique}")
+
+        # sostituzione i con idx_dataset
+        rows.append({"index": int(idx_dataset), 
+                     "true": int(y_t[idx_dataset]), 
+                     "pred": pred, 
+                     "maps": maps,
+                     "lr_map": lr.local_map(X_t[idx_dataset], pred)})
+        
+        logger.info(f"End Loop {i} image {idx_dataset} (true {y_t[idx_dataset]}, predicted {pred}): ")
+
+    # This selects the first index to
+    # compare explanation getting from 
+    # this first with that already in rows[0] 
+    first_idx = rows[0]["index"]
+    # These select and transform the first image
+    first_image, _ = dataset[first_idx]
+    first = to_densenet_input(first_image.unsqueeze(0),
+                              cfg.DENSENET_SIZE
+                              ).to(device)
+
+    # LIME and SHAP can have stochastic components: 
+    # a new execution might produce a slightly different map.                         
+    for name in ("lime", "shap"):
+        logger.info(f"Start Again Calculate Xai {name} {techniques[name]}")
+        # This gets the new calculated map;
+        again = techniques[name].explain(first, rows[0]["pred"]).map
+        # This gest the previously saved calculated map, 
+        ref = rows[0]["maps"][name].map
+
+        diff = float(np.abs(again - ref).max())
+        
+        logger.info(f"{name} Check Difference {diff <= cfg.RELU_MAX_REF_DIFF}", 
+                            f"max difference {diff:.2e}")
+        
+        logger.info(f"End Again Calculate Xai {name} {technique}")
+       
+    # This model's independent copy is used to perform checks 
+    # without affecting the original trained model
+    patched = copy.deepcopy(model).eval()
+
+    # Saliency Map Normalization (Min-Max [0, 1]):
+    # in order to make the maps generated 
+    # by different techniques
+    # homogeneous and directly comparable 
+    # (e.g., Grad-CAM and Integrated Gradients
+    #     can produce raw attribution values 
+    #     on very different scales).
+
+    # Just verify that the recalculation using the copy 
+    # of the model produces results sufficiently close 
+    # to the original ones.
+    # it is a consistency check
+    # We can cancel this test to have a more simple code
+    for name in ("gradcam", "integrated_gradients", "saliency"):
+        # getting the map calculate in the main loop
+        a = rows[0]["maps"][name].map
+        # getting the map recalculated on the same image, 
+        # using the copied model.
+        b = build_techniques(patched, cfg, names=(name,))[name].explain(first, rows[0]["pred"]).map
+        
+        # it measures the maximum absolute difference 
+        # between the two maps, normalized by the 
+        # maximum absolute value of the second map.
+        diff = float(np.abs(a - b).max() / max(np.abs(b).max(), 1e-12))
+        
+        logger.info(f"{name} Check on trained model: "
+                    f"{diff <= cfg.RELU_MAX_REL_DIFF}, "
+                    f"relative difference {diff:.1e}"
+                    )
+         
+    shares = []
+
+    # this section calculating two values ​​for each image:
+    # 1) It represents the proportion 
+    # of the total saliency that falls within the digit mask.
+    # If first value = 0.85, 
+    # it would mean that 85% of the total saliency 
+    # under consideration falls within the area 
+    # identified as the digit.
+
+    # 2) It represents the fraction of the 
+    # image occupied by the mask space digit.
+    # shares contains a pair of indicators for each image, 
+    # rather than the maps themselves.
+    for row in rows:
+        mask = digit_mask(X_t[row["index"], 0].numpy(), 
+                          cfg.MASK_THRESHOLD, 
+                          cfg.MASK_DILATION)
+        
+        g = to_grid28(np.abs(row["maps"]["saliency"].map), 
+                      cfg.DENSENET_SIZE)
+
+        # shares.append((float(g[mask].sum() / g.sum()), 
+        #                       float(mask.mean() )))
+        share = float(g[mask].sum() / max(g.sum(), 1e-12))
+        shares.append(share,float(mask.mean()))
+        
+    
+    # figure plot for all techniques
+    names = list(techniques)
+    fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(rows)))
+    axes = fig.subplots(len(rows), len(names) + 2)
+    for r, row in enumerate(rows):
+        # original image
+        axes[r, 0].imshow(X_t[row["index"], 0], cmap="gray")
+        axes[r, 0].set_ylabel(f"true {row['true']}\npred {row['pred']}", fontsize=8)
+        # Prepare the cell's maps for visualization:
+        # col1 original map
+        # col2 for each XAI technique;
+        # col3 for the local map of the Logistic Regression
+        cells = [(row["maps"][n].map, 
+                  row["maps"][n].signed) for n in names] + [(row["lr_map"], True)]
+
+        for c, (m, signed) in enumerate(cells, start=1):
+            # Graphical normalization is performed using 
+            # the maximum absolute value of each individual map. 
+            # This makes the maps easier to read, 
+            # but be careful: it does not mean that 
+            # the colors can be directly compared 
+            # in quantitative terms across different techniques.
+            a = float(np.abs(m).max()) or 1.0
+            
+            # seismic for maps with both positive and negative value
+            # viridis for those that are non-negative.
+            axes[r, c].imshow(m, cmap="seismic" if signed else "viridis", 
+                              vmin=-a if signed else 0, 
+                              vmax=a,
+                              interpolation="nearest" if m.shape[0] <= 8 else "bilinear")
+        for c in range(len(names) + 2):
+            axes[r, c].set_xticks([])
+            axes[r, c].set_yticks([])
+    for c, title in enumerate(["image"] + [TITLES[n] for n in names] + ["LR local\n(w * x)"]):
+        axes[0, c].set_title(title, fontsize=9)
+    fig.savefig(out_path / "maps_grid.png", 
+                dpi=90, bbox_inches="tight")
+    try:
+        from IPython.display import Image, display
+        display(Image(str(out_path / "maps_grid.png")))
+    except Exception:
+        pass
+
+    # save result to json file
+    results = {
+        "model": {k: info[k] for k in ("action", "reason", "sha256", "device")},
+        "ig_completeness_errors": ig_errors,
+        "images": [{"index": r["index"], "true": r["true"], "pred": r["pred"],
+                    "native_shapes": {n: list(r["maps"][n].map.shape) for n in names}} for r in rows],
+        "total_seconds": time.time() - t_start,
+    }
+    (out_path / "stage2_results.json").write_text(json.dumps(results, indent=2))
+    
+    logger.info(f"all tecniques total time {time.time() - t_start:.0f}s")
+    return results

@@ -256,3 +256,19 @@ def run_check_class_ok_ko( logger,
         
         logger.debug(f"Classe {id_class}: {len(idx_ko_check)} errate {dom_name_}")
         logger.debug(f"Classe {id_class}: {len(idx_ok_check)} corrette {dom_name_}")
+
+    return idx_ok_check , idx_ko_check
+
+def verify_output_files_exist(out_path: Path, cfg) -> bool:
+    """
+        This Function verifies that all need output files real exist
+    """
+    files_to_check = [
+        out_path / cfg.FILE_IMG_LR_OK,
+        out_path / cfg.FILE_IMG_LR_KO,
+        out_path / cfg.FILE_IMG_CNN_OK,
+        out_path / cfg.FILE_IMG_CNN_KO
+    ]
+    
+    # Restituisce True solo se .exists() è True per TUTTI i file nella lista
+    return all(f.exists() for f in files_to_check)

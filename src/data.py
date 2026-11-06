@@ -27,17 +27,27 @@ class TransformedDataset(Dataset):
         Here we Transform Data for DataLoader
         and wrap Dataset to save index of the images
     """
-    def __init__(self, dataset, transform=None):
+    def init_err_idx_lr(self, dataset, transform=None):
+        """
+            This version not store he correct idx
+            parameter for lr model
+        """
         self.dataset = dataset
         self.transform = transform
+    def __init__(self, dataset, transform, original_indices=None):
+        self.dataset = dataset
+        self.transform = transform
+        self.original_indices = original_indices
 
     def __len__(self):
         """
         """
         return len(self.dataset)
 
-    def __getitem__(self, idx):
+    def getitem_err_idx_lr(self, idx):
         """
+            This version not return the correct idx
+            parameter for lr model
         """
         image, label = self.dataset[idx]
 
@@ -45,6 +55,20 @@ class TransformedDataset(Dataset):
             image = self.transform(image)
 
         return image, label , idx
+    
+    def __getitem__(self, idx):
+        image, label = self.dataset[idx]
+
+        if self.transform:
+            image = self.transform(image)
+
+        if self.original_indices is not None:
+            # get original idx from idx of subset
+            original_idx = int(self.original_indices[idx])
+        else:
+            original_idx = idx
+
+        return image, label, original_idx
 
 def debug_iter_dataloader(dataloader_):
     """
@@ -127,14 +151,37 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
                                          )
     
     # Regressione Logistic View
-    train_lr = TransformedDataset(Subset(trainval_base, train_idx), transform_lr)
-    val_lr = TransformedDataset(Subset(trainval_base, val_idx), transform_lr)
-    test_lr = TransformedDataset(test_base, transform_lr)
+    # When we use Subset(trainval_base, train_idx), 
+    # the idx parameter on the SubSet builder
+    # refers to the position 
+    # within the Subset, not the original index 
+    # from trainval_base.
+    train_lr = TransformedDataset(Subset(trainval_base, 
+                                         train_idx), 
+                                         transform_lr,
+                                         train_idx)
+    
+    val_lr = TransformedDataset(Subset(trainval_base, 
+                                       val_idx), 
+                                       transform_lr,
+                                       val_idx)
+    
+    test_lr = TransformedDataset(test_base, 
+                                 transform_lr)
 
     # DenseNet View
-    train_cnn = TransformedDataset(Subset(trainval_base, train_idx), transform_cnn)
-    val_cnn = TransformedDataset(Subset(trainval_base, val_idx), transform_cnn)
-    test_cnn = TransformedDataset(test_base, transform_cnn)
+    train_cnn = TransformedDataset(Subset(trainval_base, 
+                                          train_idx), 
+                                          transform_cnn,
+                                          train_idx)
+    
+    val_cnn = TransformedDataset(Subset(trainval_base, 
+                                        val_idx), 
+                                        transform_cnn,
+                                        val_idx )
+    
+    test_cnn = TransformedDataset(test_base, 
+                                  transform_cnn)
 
     # DataLoader distinti
     datasets_dict = { "trainval": trainval_base,
@@ -166,7 +213,8 @@ def data_to_input_lr( dataloader_ ,
                       cfg=CONFIG,
                       logger=LOGGER ):
     """
-        load data from dataset to input struct for lr
+        load data from dataset 
+        to input struct for lr
     """
     # Alloc tensors 1, 28, 28
     X_input = torch.empty((len(dataloader_.dataset),  channels , w , h),
@@ -243,7 +291,8 @@ def load_dict_from_json(logger,path: Path):
     logger.info("Primo elemento:", list_load_dict[0])
     return list_load_dict
 
-def load_one_image_by_class(logger,json_path: str | Path) -> dict:
+def load_one_image_by_class(logger,
+                            json_path: str | Path) -> dict:
 
     with open(json_path, "r", encoding="utf-8") as f:
         list_load_dict = json.load(f)
@@ -258,6 +307,33 @@ def load_one_image_by_class(logger,json_path: str | Path) -> dict:
                                             "y_true": item["y_true"],
                                             "y_pred": item["y_pred"]
                                         }
+    return images_by_class
+
+def load_images_by_class( logger , 
+                         path: Path, 
+                         n_images_for_class: int = 1 ) -> dict:
+
+    with open(path, "r", encoding="utf-8") as f:
+        list_load_dict = json.load(f)
+
+    images_by_class = {}
+
+    for item in list_load_dict:
+
+        id_class = item["class"]
+
+        if id_class not in images_by_class:
+            images_by_class[id_class] = []
+
+        # Avoid to select more images for the same classes
+        if len(images_by_class[id_class]) >= n_images_for_class:
+            continue
+
+        images_by_class[id_class].append({ "id_dataset": item["id_dataset"],
+                                            "y_true": item["y_true"],
+                                            "y_pred": item["y_pred"]
+                                        })
+
     return images_by_class
 
 
