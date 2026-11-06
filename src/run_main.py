@@ -453,7 +453,7 @@ def main(cfg=CONFIG,logger=LOGGER):
     if flag_pretrained is False :
         phase_1_train(cfg,logger,out,flag_pretrained)
     
-    phase_1_load(cfg,logger,out,flag_pretrained)
+    # phase_1_load(cfg,logger,out,flag_pretrained)
 
     phase_2_xai(cfg,logger,out)
 
