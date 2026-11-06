@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from data import denormalize_np
+from data import denormalize_imagenet_np
 
 
 class CheckErrors(AssertionError):
@@ -52,7 +52,7 @@ def assert_densenet_input(x_data, cfg, tol: float = 1e-4) -> None:
              f"DenseNet input must be (B, 3, {s}, {s}), got {a.shape}")
     _require(a.dtype == np.float32, f"DenseNet input must be float32, got {a.dtype}")
     _require(bool(np.isfinite(a).all()), "DenseNet input contains NaN or inf")
-    pixels = denormalize_np(a)
+    pixels = denormalize_imagenet_np(a)
     _require(float(pixels.min()) >= -tol and float(pixels.max()) <= 1.0 + tol,
              "DenseNet input is not an ImageNet-normalized image in [0, 1] "
              f"(denormalized range [{pixels.min():.3f}, {pixels.max():.3f}])")
