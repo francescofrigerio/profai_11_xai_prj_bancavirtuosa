@@ -89,6 +89,7 @@ def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
         is visible at a glance.
     """
     def callback(model, epoch):
+        print(f"Start Callback Grad-CAM epoch: {epoch}")
         model.eval()
         explainer = GradCam(model, cfg)
 
@@ -102,7 +103,9 @@ def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
             # The function to_densenet_input() has to receive a batch with 4 dim. 
             # So we add the size batch here 
             # Original Image MNIST: (1, 28, 28)
+            print(f"before read dataset on: {idx_dataset}")
             input_image, input_label = dataset[idx_dataset]
+            print(f"after read dataset on: {idx_dataset}")
                
             # Add size of the batch: (1, 1, 28, 28) to the input
             x28 = input_image.unsqueeze(0)
@@ -131,7 +134,7 @@ def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
         out_path.mkdir(parents=True, exist_ok=True)
         path = out_path / f"gradcam_debug_epoch{epoch}.png"
         fig.savefig(path, dpi=100, bbox_inches="tight")
-        print(f"debug Grad-CAM saved: {path}")
+        print(f"End Callback Grad-CAM saved: {path}")
 
     return callback
 
