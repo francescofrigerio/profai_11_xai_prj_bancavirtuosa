@@ -130,7 +130,7 @@ def phase_2_xai( cfg,
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
 
-    callback = make_gradcam_callback(cfg,logger,test_datasets, device, out_path , list_img)
+    callback = make_gradcam_callback(cfg,test_datasets, device, out_path , list_img)
 
     model, info = get_trained_model(cfg,
                             logger, 
