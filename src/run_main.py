@@ -66,7 +66,7 @@ def phase_2_xai( cfg,
         logger.debug("WARNING:", warning)
 
     datasets_dict , loaders_dict , transform_cnn_dict = load_datasets()
-    trainval_dataset = datasets_dict["trainval"]
+    # trainval_dataset = datasets_dict["trainval"]
     test_datasets = datasets_dict["test"]
     # train_idx = datasets_dict["train_idx"]
 
@@ -366,7 +366,8 @@ def phase_1_train(cfg,
                                         val_loader_cnn,
                                         test_loader_cnn, 
                                         device,
-                                        pretrained=flag_pretrained)
+                                        pretrained=flag_pretrained,
+                                        epoch_callback=None)
     
     plot_predict_info(info_cnn["y_true"], 
                               info_cnn["y_pred"],
