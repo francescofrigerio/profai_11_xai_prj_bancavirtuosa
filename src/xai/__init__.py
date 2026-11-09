@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 # from explainer import AttributionResult, Explainer
-from gradcam import GradCamCaptum
+from xai.gradcam import GradCamCaptum
 from xai.integrated_gradients import IntegratedGradientsCaptum
 from xai.lime_explainer import LimeExplainer
 from xai.occlusion import OcclusionCaptum
