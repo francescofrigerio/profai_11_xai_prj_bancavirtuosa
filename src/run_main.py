@@ -29,8 +29,6 @@ from training import get_evaluate_model
 
 
 from utility import run_create_list_images , run_check_class_ok_ko , verify_output_files_exist
-from xai.shap_explainer import make_background
-from xai import build_techniques
 from xai.run_xai import run_exp , make_gradcam_callback
 
 
@@ -57,8 +55,8 @@ def phase_2_xai( cfg,
     """
     if len(cfg.CHECK_CLASSES) == 0 :
         raise ValueError("list_class mancante {len(cfg.CHECK_CLASSES)} ")
-    else:
-        n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(cfg.CHECK_CLASSES))
+    
+    n_for_class = max(1, cfg.NUM_IMAGES_FOR_CLASS // len(cfg.CHECK_CLASSES))
 
     t_start = time.time()
     
@@ -67,10 +65,10 @@ def phase_2_xai( cfg,
     if warning:
         logger.debug("WARNING:", warning)
 
-    datasets_dict , loaders_dict = load_datasets()
+    datasets_dict , loaders_dict , transform_cnn_dict = load_datasets()
     trainval_dataset = datasets_dict["trainval"]
     test_datasets = datasets_dict["test"]
-    train_idx = datasets_dict["train_idx"]
+    # train_idx = datasets_dict["train_idx"]
 
     train_loader_cnn = loaders_dict["cnn"]["train"]
     val_loader_cnn = loaders_dict["cnn"]["val"]
@@ -101,7 +99,7 @@ def phase_2_xai( cfg,
 
     expected_idx = torch.arange(len(test_idx_lr))
 
-    assert torch.equal(test_idx_lr, expected_idx), ( "Errore: test_idx_lr non contiene gli indici consecutivi "
+    assert torch.equal(test_idx_lr, expected_idx), ( "Errore: non contiene indici consecutivi "
                                                     "da 0 a len(test_idx_lr)-1 nell'ordine previsto."
                                                 )
 
@@ -142,23 +140,37 @@ def phase_2_xai( cfg,
                             pretrained=True,    
                             epoch_callback=callback )
 
-    background = make_background(trainval_dataset,train_idx, cfg, device)
+    # pass all dataset train , already processed and normalized
+    # make_background don't need train_idx parameter
+    # background = make_background(transform_cnn_dict["train"],cfg, device)
 
-    techniques = build_techniques(model, cfg, background)
+    # techniques = build_techniques(model, cfg, background)
 
-    results = run_exp( cfg, logger, 
-                       test_datasets,
-                       t_start, 
-                       techniques, 
-                       model, 
-                       lr, 
-                        X_test_lr,
-                        y_test_lr,
-                        device, 
-                        info, 
-                        out_path , 
-                        list_img ) 
-    return results
+    # results = run_exp( cfg, 
+    #                    logger, 
+    #                    test_datasets,
+    #                    t_start, 
+    #                    techniques, 
+    #                    model, 
+    #                    lr, 
+    #                     X_test_lr,
+    #                     y_test_lr,
+    #                     device, 
+    #                     info, 
+    #                     out_path , 
+    #                     list_img ) 
+
+    xai_param_dict = { "test_datasets" : test_datasets,
+                        "t_start": t_start,
+                        "X_test_lr": X_test_lr,
+                        "y_test_lr": y_test_lr,
+                        "info": info,
+                        "list_img": list_img,  
+                        "out_path": out_path,      
+                        "transform_train_cnn": transform_cnn_dict["train"]
+                     }
+    
+    return run_exp( cfg, logger, model, lr, device , xai_param_dict) 
        
 def phase_1_load( cfg,
                 logger,
@@ -190,7 +202,7 @@ def phase_1_load( cfg,
         logger.debug("WARNING:", warning)
 
     # START LOAD DATA
-    _ , loaders_dict = load_datasets()
+    _ , loaders_dict , _ = load_datasets()
     
     # Load tensor for train and test baseline
     train_loader_lr = loaders_dict["lr"]["train"]
@@ -298,6 +310,7 @@ def phase_1_train(cfg,
         plot bar based and order on F1_Score metrics for different classes ) 
     """
 
+    metrics = {}
     t_start = time.time()
     
     logger.debug(f"Output dir: {cfg.OUTPUT_DIR}")
@@ -306,7 +319,7 @@ def phase_1_train(cfg,
     if warning:
         logger.debug("WARNING:", warning)
     
-    datasets_dict , loaders_dict = load_datasets()
+    datasets_dict , loaders_dict , _ = load_datasets()
     test_datasets = datasets_dict["test"]
     
     # Load tensor for train and test baseline
@@ -319,10 +332,16 @@ def phase_1_train(cfg,
     val_loader_cnn = loaders_dict["cnn"]["val"]
     test_loader_cnn = loaders_dict["cnn"]["test"]
         
-    X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
-    X_val_lr , y_val_lr , _ = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, 
+                                                    CONFIG.IMAGE_SIZE, 
+                                                    CONFIG.IMAGE_SIZE)
+    X_val_lr , y_val_lr , _ = data_to_input_lr(val_loader_lr,1, 
+                                               CONFIG.IMAGE_SIZE, 
+                                               CONFIG.IMAGE_SIZE)
         
-    X_test_lr , y_test_lr , _ = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_test_lr , y_test_lr , _ = data_to_input_lr(test_loader_lr,1, 
+                                                 CONFIG.IMAGE_SIZE, 
+                                                 CONFIG.IMAGE_SIZE)
         
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
@@ -411,7 +430,7 @@ def phase_1_train(cfg,
         print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
         # print(f"checkpoint: {info_cnn['path']}\n | total {time.time() - t_start:.0f}s")
         print(f"checkpoint: {info_cnn['path']}\n | total {time.perf_counter() - t_start:.0f}s")
-        return metrics
+    return metrics
     
 def main(cfg=CONFIG,logger=LOGGER):
     """

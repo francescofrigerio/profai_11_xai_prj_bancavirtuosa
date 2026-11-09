@@ -18,6 +18,7 @@ from IPython.display import Image, display
 from config import TITLES
 from utility import to_densenet_input
 from xai import GradCam , build_techniques
+from xai.shap_explainer import make_background
 
 def digit_mask(input_img28, threshold, dilation):
     """
@@ -84,7 +85,8 @@ def to_grid28(map2d, size, side=28):
 def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
     """
         Grad-CAM debug images of the first and last training epoch.
-        The callback explains the PREDICTED class of the 10 fixed validation images (one per class), so a
+        The callback explains the PREDICTED class of the 10 fixed validation images 
+        (one per class), so a
         broken training (maps that do not move, or that look at the background) 
         is visible at a glance.
     """
@@ -138,8 +140,8 @@ def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
 
     return callback
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
-def run_exp( cfg,logger,dataset,t_start,techniques,model,lr,X_data,y_data,device,info,out_path,list_img ) -> None :
+# disable=too-many-arguments, too-many-positional-arguments
+def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :   
     """
     This function implements Hook that are a tool 
     for observing the internal 
@@ -159,9 +161,23 @@ def run_exp( cfg,logger,dataset,t_start,techniques,model,lr,X_data,y_data,device
     """
     
     rows, ig_errors = [], []
-    # n_images = len(list_img)
 
-    # for i in picks:
+    dataset = xai_param_dict["test_datasets"]
+    t_start = xai_param_dict["t_start"]
+    X_data = xai_param_dict["X_test_lr"]
+    y_data = xai_param_dict["y_test_lr"]
+    info = xai_param_dict["info"]
+    list_img = xai_param_dict["list_img"]
+    out_path = xai_param_dict["out_path"]
+    transform_train_cnn = xai_param_dict["transform_train_cnn"]
+    
+
+    # pass all dataset train , already processed and normalized
+    # make_background don't need train_idx parameter
+    background = make_background(transform_train_cnn,cfg,logger, device)
+    techniques = build_techniques(model, cfg, background)
+
+    # n_images = len(list_img)
     for i, id_class in enumerate(sorted(list_img.keys())):
 
         item = list_img[id_class]
@@ -177,7 +193,7 @@ def run_exp( cfg,logger,dataset,t_start,techniques,model,lr,X_data,y_data,device
         # Add size of the batch: (1, 1, 28, 28) to the input
         x28 = input_image.unsqueeze(0)
         
-        # Convert to Input DenseNet: (1, 3, 128, 128)
+        # Convert to Input DenseNet: (1, 3, 128, 128) and normalize
         input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
         
         with torch.no_grad():
@@ -194,13 +210,13 @@ def run_exp( cfg,logger,dataset,t_start,techniques,model,lr,X_data,y_data,device
                 ig_errors.append(result.meta["completeness_error"])
             logger.info(f"End Xai {name} {technique}")
 
-        # sostituzione i con idx_dataset
+        # substiutr i with idx_dataset
         rows.append({"index": int(idx_dataset), 
                      "true": int(y_data[idx_dataset]), 
                      "pred": pred, 
                      "maps": maps,
                      "lr_map": lr.local_map(X_data[idx_dataset], pred)})
-        
+    
         logger.info(f"End Loop {i} image {idx_dataset} (true {y_data[idx_dataset]}, predicted {pred}): ")
 
     # This selects the first index to
@@ -329,7 +345,6 @@ def run_exp( cfg,logger,dataset,t_start,techniques,model,lr,X_data,y_data,device
     fig.savefig(out_path / "maps_grid.png", 
                 dpi=90, bbox_inches="tight")
     try:
-        # from IPython.display import Image, display
         display(Image(str(out_path / "maps_grid.png")))
     except Exception:
         pass

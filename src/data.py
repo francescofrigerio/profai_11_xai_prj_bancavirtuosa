@@ -1,26 +1,20 @@
 """
      Here we load dataset and dataloader
 """
-# pytorch
-import torch
-
 import json
 from pathlib import Path
 
-# computer vision with pytorch
-from torch.utils.data import DataLoader
+# pytorch
+import torch
 
 # preprocessd dataset with pytorch
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
-from torch.utils.data import Subset , Dataset
+from torchvision import datasets , transforms 
+# computer vision with pytorch
+from torch.utils.data import Subset , Dataset , DataLoader
 
 from sklearn.model_selection import train_test_split
-
-from config import CONFIG
 from logger import LOGGER
-
-from config import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
+from config import CONFIG , IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 
 class TransformedDataset(Dataset):
     """
@@ -189,6 +183,13 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
                       "train_idx": train_idx,
                       "val_idx": val_idx,
                     }
+
+
+    transform_cnn_dict = { "train": train_cnn,
+                           "val": val_cnn,
+                           "test": test_cnn  
+                        }
+    
     loaders_dict = { "lr": {
                 "train": DataLoader(train_lr, batch_size=cfg.BATCH_SIZE, shuffle=True),
                 "val": DataLoader(val_lr, batch_size=cfg.BATCH_SIZE, shuffle=False),
@@ -204,14 +205,12 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
         }
     }
 
-    return datasets_dict , loaders_dict
+    return datasets_dict , loaders_dict , transform_cnn_dict
 
 def data_to_input_lr( dataloader_ , 
                       channels , 
                       w , 
-                      h,
-                      cfg=CONFIG,
-                      logger=LOGGER ):
+                      h ):
     """
         load data from dataset 
         to input struct for lr
@@ -280,10 +279,16 @@ def get_images_labels(dataset_,flag_data_loader=True,idx_dataset=0,
 
 
 def save_dict_to_json(file_images , data_dict):
+    """
+        to save dict on json file
+    """
     with open(file_images, "w", encoding="utf-8") as f:
         json.dump(data_dict, f, indent=4)
 
 def load_dict_from_json(logger,path: Path):
+    """
+       to load dict from json file
+    """
     with open(path, "r", encoding="utf-8") as f:
         list_load_dict = json.load(f)
 
@@ -293,6 +298,9 @@ def load_dict_from_json(logger,path: Path):
 
 def load_one_image_by_class(logger,
                             json_path: str | Path) -> dict:
+    """
+        to load an image for every input class
+    """
 
     with open(json_path, "r", encoding="utf-8") as f:
         list_load_dict = json.load(f)
@@ -312,6 +320,9 @@ def load_one_image_by_class(logger,
 def load_images_by_class( logger , 
                          path: Path, 
                          n_images_for_class: int = 1 ) -> dict:
+    """
+         to load N images for every input class    
+    """
 
     with open(path, "r", encoding="utf-8") as f:
         list_load_dict = json.load(f)
