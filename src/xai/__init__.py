@@ -5,11 +5,11 @@ from __future__ import annotations
 
 # from explainer import AttributionResult, Explainer
 from gradcam import GradCamCaptum
-from integrated_gradients import IntegratedGradientsCaptum
-from lime_explainer import LimeExplainer
-from occlusion import OcclusionCaptum
-from saliency import SaliencyCaptum
-from shap_explainer import ShapExplainer
+from xai.integrated_gradients import IntegratedGradientsCaptum
+from xai.lime_explainer import LimeExplainer
+from xai.occlusion import OcclusionCaptum
+from xai.saliency import SaliencyCaptum
+from xai.shap_explainer import ShapExplainer
 
 TECHNIQUE_NAMES = ("gradcam", "integrated_gradients", "occlusion", "saliency", "lime", "shap")
 
