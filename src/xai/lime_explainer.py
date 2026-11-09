@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from lime import lime_image
 
 from utility import denormalize_imagenet, normalize_imagenet , normalize_imagenet_np
-from xai import Explainer
+from xai.explainer import Explainer
 
 
 def grid_segments(size: int, cells: int) -> np.ndarray:

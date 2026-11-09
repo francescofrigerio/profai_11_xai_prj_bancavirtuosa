@@ -9,7 +9,7 @@ import torch
 from captum.attr import IntegratedGradients as ig
 
 from utility import black_normalized
-from xai import Explainer
+from xai.explainer import Explainer
 
 
 class IntegratedGradientsCaptum(Explainer):

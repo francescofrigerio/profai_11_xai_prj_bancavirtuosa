@@ -20,7 +20,7 @@ from __future__ import annotations
 from captum.attr import Occlusion 
 
 from utility import black_normalized
-from xai import Explainer
+from xai.explainer import Explainer
 
 
 

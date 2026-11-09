@@ -7,7 +7,7 @@ import numpy as np
 import shap
 
 from training import set_seed
-from xai import Explainer
+from xai.explainer import Explainer
 from utility import to_densenet_input
 
 def make_background(transform_train, cfg,logger, device):

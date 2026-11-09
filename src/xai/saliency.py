@@ -7,8 +7,7 @@
 """
 from __future__ import annotations
 from captum.attr import Saliency
-
-from xai import Explainer
+from xai.explainer import Explainer
 
 
 class SaliencyCaptum(Explainer):
