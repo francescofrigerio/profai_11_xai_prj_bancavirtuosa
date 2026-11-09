@@ -369,7 +369,7 @@ def phase_1_train(cfg,
                                   out_path,
                                   cfg.FILE_IMG_LR_OK, 
                                   cfg.FILE_IMG_LR_KO,
-                                  n_images_=cfg.NUM_IMAGES_FOR_CLASS,
+                                  n_images=cfg.NUM_IMAGES_FOR_CLASS,
                                   flag_before_ko=True)
     
     list_img = []
