@@ -177,10 +177,14 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     background = make_background(transform_train_cnn,cfg,logger, device)
     techniques = build_techniques(model, cfg, background)
 
+    logger.info(f"Before Loop {list_img}")
+    logger.info(f"Before Loop {list_img.keys()}")
     # n_images = len(list_img)
     for i, id_class in enumerate(sorted(list_img.keys())):
-
+        logger.info(f"Start Loop {i} {id_class}")
         item = list_img[id_class]
+        logger.info(f"Start Loop {i} {type(item)}")
+        logger.info(f"Start Loop {i} {item}")
         idx_dataset = item["id_dataset"]
 
         logger.info(f"Start Loop {i} {idx_dataset}")
