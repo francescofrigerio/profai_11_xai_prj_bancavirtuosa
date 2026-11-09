@@ -4,10 +4,36 @@
 
 from pathlib import Path
 import numpy as np
+import json
 import torch
 from config import IMAGENET_MEAN , IMAGENET_STD
 
 from config import IMAGENET_MEAN_NP , IMAGENET_STD_NP
+
+def to_numpy(x):
+    return torch.as_tensor(x).detach().cpu().numpy()
+
+def save_dict_to_json(file_images, data_dict):
+    """
+        to save dict on json file
+    """
+    file_images = Path(file_images)
+    file_images.parent.mkdir(parents=True, exist_ok=True)
+    with open(file_images, "w", encoding="utf-8") as f:
+        json.dump(data_dict, f, indent=4)
+
+
+def load_dict_from_json(logger,path: Path):
+    """
+       to load dict from json file
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        list_load_dict = json.load(f)
+
+    logger.info(f"Caricati {len(list_load_dict)} elementi con successo!")
+    logger.info(f"Primo elemento:{list_load_dict[0]}")
+    return list_load_dict
+
 
 def normalize_saliency_map(saliency_map: np.ndarray) -> np.ndarray:
     """
@@ -235,6 +261,39 @@ def run_create_list_images( logger,
     return list_images_ok , list_images_ko
 
 
+def create_and_save_images_lists(logger, 
+                                 y_true, 
+                                 y_pred, 
+                                 idx_dataset,
+                                 list_class, 
+                                 out_path,
+                                 file_ok, 
+                                 file_ko,
+                                 n_images=50, 
+                                 flag_before_ko=True):
+    """
+        Create list_images_ok / list_images_ko and save them on 2 json files
+        (used for both LR and CNN)
+    """
+    y_true = to_numpy(y_true)
+    y_pred = to_numpy(y_pred)
+    idx_dataset = np.asarray(idx_dataset)
+
+    list_ok, list_ko = run_create_list_images(logger,
+                                              # X_test_ old solutions
+                                              None,          
+                                              y_true,
+                                              y_pred,
+                                              idx_dataset,
+                                              list_class,
+                                              n_images_=n_images,
+                                              flag_before_ko=flag_before_ko)
+
+    save_dict_to_json(out_path / file_ok, list_ok)
+    save_dict_to_json(out_path / file_ko, list_ko)
+    logger.info(f"Salvati {len(list_ok)} OK in {file_ok} e {len(list_ko)} KO in {file_ko}")
+    return list_ok, list_ko
+
 def run_check_class_ok_ko( logger, 
                             y_test_,
                             y_pred_ , 
@@ -244,7 +303,7 @@ def run_check_class_ok_ko( logger,
         Run for check list images ko for both lr and cnn
         dom_name ('LR' , 'CNN') 
     """
-    idx_ko_check = 0 , idx_ok_check = 0
+    idx_ko_check , idx_ok_check = 0,0
     for id_class in list_class_:
         idx_ko_check = np.where((y_test_ == id_class) &
                              (y_test_ != y_pred_)

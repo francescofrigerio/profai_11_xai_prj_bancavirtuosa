@@ -138,7 +138,8 @@ def get_evaluate_model( cfg,
             outputs_ = model(images)
             # Ottengo il valore della classe prevista
             # usando le etichette per gli output ottenuti che abbiamo definito come prima.
-            _, predicted = torch.max(outputs_, 1)
+            # _, predicted = torch.max(outputs_, 1)
+            predicted = outputs_.argmax(dim=1)
 
             X_test_.append(images)
             y_true_.append(labels)
@@ -154,50 +155,53 @@ def get_evaluate_model( cfg,
     return X_test_ , y_true_ , y_pred_ , idx_list_
 
 def evaluate_model( model_ ,
-                    dataset_,
                     dataloader_ ,
-                    device_ ):
+                    device_ ,
+                    return_idx=False ):
     """
         phase1: Evaluate model with test dataset
+
+       return_idx=False avoid to crash old code
     """
     from tqdm.auto import tqdm
     model_ = model_.to(device_)
 
     model_.eval()
-    y_pred_=[]
-    y_true_=[]
+    
+    y_pred_, y_true_, idx_ = [], [], []
 
-    y_pred_desc_=[]
-    y_true_desc_=[]
+    # y_pred_desc_=[]
+    # y_true_desc_=[]
     with torch.no_grad():
-        for i, (images, labels , _ ) in enumerate(dataloader_):
+        # for i, (images, labels , _ ) in enumerate(dataloader_):
+        for images, labels, idx in dataloader_:
             images, labels = images.to(device_), labels.to(device_)
 
-            # print images gid with relative prevision and ground truth
-
-            # prendo l'output delle previsioni direttamente
-            # dalle immagini caricate applicando la nostra rete neurale convolutiva
-            # e addestrata .
+            # take predict from output of pretrained cnn
             outputs_ = model_(images)
-            # Ottengo il valore della classe prevista
-            # usando le etichette per gli output ottenuti che abbiamo definito come prima.
-            _, predicted = torch.max(outputs_, 1)
+            # Getting the value of predict class 
+            # che differenza c'è fra queste righe
+            predicted = outputs_.argmax(dim=1)
+            # _, predicted = torch.max(outputs_, 1)
 
             y_true_.append(labels)
             y_pred_.append(predicted)
+            idx_.append(torch.as_tensor(idx))
 
-            y_pred_desc_.append(dataset_.classes[lbl] for lbl in predicted.cpu())
-            y_true_desc_.append(dataset_.classes[lbl] for lbl in labels.cpu())
+            # y_pred_desc_.append(dataset_.classes[lbl] for lbl in predicted.cpu())
+            # y_true_desc_.append(dataset_.classes[lbl] for lbl in labels.cpu())
 
     y_true_ = torch.cat(y_true_).cpu().numpy()
     y_pred_ = torch.cat(y_pred_).cpu().numpy()
 
+    if return_idx:
+        return y_pred_, y_true_, torch.cat(idx_).cpu().numpy()
+    
     return y_pred_,y_true_
 
 def train_model(cfg,
                 logger,
                 model_ ,
-                dataset_,
                 dataloader_train_ ,
                 dataloader_val_ ,
                 device_ ,
@@ -240,7 +244,7 @@ def train_model(cfg,
             train_loss = loss.item()
             running_loss += train_loss
             if i % 1000 == 900:    # stampa ogni 100 mini-batch
-                logger.info(f'[Epoca {epoch + 1}, Ciclo {i + 1:5d}] Loss: {running_loss / 10:.3f}')
+                logger.info(f'[Epoca {epoch + 1}, Ciclo {i + 1:5d}] Loss: {running_loss / 100:.3f}')
                 running_loss = 0.0
                 # break
         sync(device_)
@@ -252,7 +256,6 @@ def train_model(cfg,
 
         # LOOP VALIDATION
         y_pred,y_true = evaluate_model( model_,
-                                        dataset_,
                                         dataloader_val_,
                                         device_ )
         val_accuracy = accuracy(y_true,y_pred)
@@ -323,7 +326,6 @@ def get_trained_model(cfg,
         history , train_sec_cnn , val_sec_cnn = train_model(cfg,
                                                             logger,
                                                             model,
-                                                            test_datasets,
                                                             train_loader_cnn ,
                                                             val_loader_cnn ,
                                                             device ,
@@ -336,7 +338,7 @@ def get_trained_model(cfg,
     # model = model.to(device).eval()
     validate_layers(model, cfg)
 
-    y_pred, y_true = evaluate_model( model ,test_datasets,test_loader_cnn ,device)
+    y_pred, y_true , idx_dataset = evaluate_model( model,test_loader_cnn ,device)
     test_accuracy = accuracy(y_true,y_pred)
     logger.info(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
 

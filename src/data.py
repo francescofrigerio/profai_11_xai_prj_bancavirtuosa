@@ -278,23 +278,6 @@ def get_images_labels(dataset_,flag_data_loader=True,idx_dataset=0,
     return images_, labels_
 
 
-def save_dict_to_json(file_images , data_dict):
-    """
-        to save dict on json file
-    """
-    with open(file_images, "w", encoding="utf-8") as f:
-        json.dump(data_dict, f, indent=4)
-
-def load_dict_from_json(logger,path: Path):
-    """
-       to load dict from json file
-    """
-    with open(path, "r", encoding="utf-8") as f:
-        list_load_dict = json.load(f)
-
-    logger.info(f"Caricati {len(list_load_dict)} elementi con successo!")
-    logger.info(f"Primo elemento:{list_load_dict[0]}")
-    return list_load_dict
 
 def load_one_image_by_class(logger,
                             json_path: str | Path) -> dict:
