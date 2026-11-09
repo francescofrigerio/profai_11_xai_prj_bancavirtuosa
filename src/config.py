@@ -119,9 +119,6 @@ class ConfigConstantsDefault:
     DELETION_STEPS: int = 10
 
     # Execution and outputs ONLY on Notebook
-    RUN_CNN_MAN: bool = True
-    # Execution and outputs ALWAIS on Codespace github
-    # RUN_CNN_MAN: bool = False
     OUTPUT_DIR: str = ROOT_DIR / "outputs"
 
     # found and confirmed by visual control

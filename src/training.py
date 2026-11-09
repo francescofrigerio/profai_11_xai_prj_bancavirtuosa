@@ -156,8 +156,7 @@ def get_evaluate_model( cfg,
 
 def evaluate_model( model_ ,
                     dataloader_ ,
-                    device_ ,
-                    return_idx=False ):
+                    device_ ):
     """
         phase1: Evaluate model with test dataset
 
@@ -194,11 +193,8 @@ def evaluate_model( model_ ,
     y_true_ = torch.cat(y_true_).cpu().numpy()
     y_pred_ = torch.cat(y_pred_).cpu().numpy()
 
-    if return_idx:
-        return y_pred_, y_true_, torch.cat(idx_).cpu().numpy()
+    return y_pred_, y_true_, torch.cat(idx_).cpu().numpy()
     
-    return y_pred_,y_true_
-
 def train_model(cfg,
                 logger,
                 model_ ,
@@ -255,7 +251,7 @@ def train_model(cfg,
         t1 = time.perf_counter()
 
         # LOOP VALIDATION
-        y_pred,y_true = evaluate_model( model_,
+        y_pred,y_true , idx_dataset = evaluate_model( model_,
                                         dataloader_val_,
                                         device_ )
         val_accuracy = accuracy(y_true,y_pred)
@@ -289,7 +285,6 @@ def train_model(cfg,
 
 def get_trained_model(cfg,
                       logger,
-                      test_datasets,
                       train_loader_cnn,
                       val_loader_cnn,
                       test_loader_cnn, 

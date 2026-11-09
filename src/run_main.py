@@ -132,7 +132,6 @@ def phase_2_xai( cfg,
 
     model, info = get_trained_model(cfg,
                             logger, 
-                            test_datasets,
                             train_loader_cnn,
                             val_loader_cnn,
                             test_loader_cnn, 
@@ -360,44 +359,36 @@ def phase_1_train(cfg,
                       CONFIG,
                       "lr")
 
-    # False is mandatory To run on codespace 
-    flag_run_cnn = cfg.RUN_CNN_MAN
-    # on codespace github alwais down
-    if cfg.IN_NOTEBOOK is False :
-        flag_run_cnn = False 
-
-    if flag_run_cnn is True:
-        # Cnn DenseNet
-        _ , info_cnn = get_trained_model(cfg,
+    # Cnn DenseNet
+    _ , info_cnn = get_trained_model(cfg,
                                         logger, 
-                                        test_datasets,
                                         train_loader_cnn,
                                         val_loader_cnn,
                                         test_loader_cnn, 
                                         device,
                                         pretrained=flag_pretrained)
     
-        plot_predict_info(info_cnn["y_true"], 
+    plot_predict_info(info_cnn["y_true"], 
                               info_cnn["y_pred"],
                               "CLASSIFIER CNN ON MNIST DATASET " , 
                               "TEST",
                               CONFIG,
                               "cnn")
         
-        y_pred_cnn = info_cnn["y_pred"]
-        test_accuracy_cnn = info_cnn["test_accuracy"]
-        val_acc_cnn = info_cnn["val_acc_history"]
+    y_pred_cnn = info_cnn["y_pred"]
+    test_accuracy_cnn = info_cnn["test_accuracy"]
+    val_acc_cnn = info_cnn["val_acc_history"]
             
-        train_sec_lr = lr.diagnostics["fit_seconds"]
-        train_sec_cnn = info_cnn["train_seconds"]
-        val_sec_cnn = info_cnn["val_seconds"]
+    train_sec_lr = lr.diagnostics["fit_seconds"]
+    train_sec_cnn = info_cnn["train_seconds"]
+    val_sec_cnn = info_cnn["val_seconds"]
         
-        gap = test_accuracy_cnn - test_accuracy_lr
+    gap = test_accuracy_cnn - test_accuracy_lr
        
-        q = quadrants(y_test_lr, y_pred_cnn, y_pred_test_lr)
+    q = quadrants(y_test_lr, y_pred_cnn, y_pred_test_lr)
         
     
-        metrics = {  "densenet": {
+    metrics = {  "densenet": {
                          "val_acc": val_acc_cnn, 
                          "test_acc": test_accuracy_cnn, 
                          "test_macro_f1": macro_f1(y_test_lr, y_pred_cnn, cfg.NUM_CLASSES),
@@ -411,25 +402,25 @@ def phase_1_train(cfg,
                          "quadrants": q, "gap_test_points": gap * 100,
                          "model": {k: info_cnn[k] for k in ("action", "reason", "path", "device")},
                          "history": info_cnn["history"], "total_seconds": time.time() - t_start 
-            }
+                    }
         
-        # default=str converte gli oggetti Path in str
-        (out_path / "lr_cnn_metrics.json").write_text(json.dumps(metrics, indent=2, default=str))
+    # default=str converte gli oggetti Path in str
+    (out_path / "lr_cnn_metrics.json").write_text(json.dumps(metrics, indent=2, default=str))
             
-        np.savetxt(out_path / "confusion_densenet.csv", confusion(y_test_lr, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
-        np.savetxt(out_path / "confusion_lr.csv", confusion(y_test_lr, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
+    np.savetxt(out_path / "confusion_densenet.csv", confusion(y_test_lr, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
+    np.savetxt(out_path / "confusion_lr.csv", confusion(y_test_lr, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
         
-        print(f"\nDenseNet: val {val_acc_cnn:.4f}   | " \
+    print(f"\nDenseNet: val {val_acc_cnn:.4f}   | " \
                   f"test {test_accuracy_cnn:.4f} | " \
                   f"F1 {metrics['densenet']['test_macro_f1']:.4f} | {train_sec_cnn * 1000:.2f} ms/img")
             
-        print(f"LR:       val {val_accuracy_lr:.4f}   | " \
+    print(f"LR:       val {val_accuracy_lr:.4f}   | " \
                   f"test {test_accuracy_lr:.4f} | " \
                   f"F1 {metrics['lr']['test_macro_f1']:.4f} | {train_sec_lr * 1000:.3f} ms/img")
             
-        print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
-        # print(f"checkpoint: {info_cnn['path']}\n | total {time.time() - t_start:.0f}s")
-        print(f"checkpoint: {info_cnn['path']}\n | total {time.perf_counter() - t_start:.0f}s")
+    print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
+    # print(f"checkpoint: {info_cnn['path']}\n | total {time.time() - t_start:.0f}s")
+    print(f"checkpoint: {info_cnn['path']}\n | total {time.perf_counter() - t_start:.0f}s")
     return metrics
     
 def main(cfg=CONFIG,logger=LOGGER):
