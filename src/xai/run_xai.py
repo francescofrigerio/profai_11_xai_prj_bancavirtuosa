@@ -17,7 +17,7 @@ from IPython.display import Image, display
 
 from config import TITLES
 from utility import to_densenet_input
-from xai import GradCam , build_techniques
+from xai import GradCamCaptum , build_techniques
 from xai.shap_explainer import make_background
 
 def digit_mask(input_img28, threshold, dilation):
