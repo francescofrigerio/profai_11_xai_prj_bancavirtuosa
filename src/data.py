@@ -293,7 +293,7 @@ def load_dict_from_json(logger,path: Path):
         list_load_dict = json.load(f)
 
     logger.info(f"Caricati {len(list_load_dict)} elementi con successo!")
-    logger.info("Primo elemento:", list_load_dict[0])
+    logger.info(f"Primo elemento:{list_load_dict[0]}")
     return list_load_dict
 
 def load_one_image_by_class(logger,
@@ -311,6 +311,9 @@ def load_one_image_by_class(logger,
         id_class = item["class"]
 
         if id_class not in images_by_class:
+            # Warninh this format generate a dict
+            # so in the callback loop we write
+            # item = dict_images[id_class]
             images_by_class[id_class] = { "id_dataset": item["id_dataset"],
                                             "y_true": item["y_true"],
                                             "y_pred": item["y_pred"]
@@ -340,6 +343,9 @@ def load_images_by_class( logger ,
         if len(images_by_class[id_class]) >= n_images_for_class:
             continue
 
+        # Warninh this format generate a list
+        # so in the callback loop we write
+        # item = list_images[id_class][0]
         images_by_class[id_class].append({ "id_dataset": item["id_dataset"],
                                             "y_true": item["y_true"],
                                             "y_pred": item["y_pred"]

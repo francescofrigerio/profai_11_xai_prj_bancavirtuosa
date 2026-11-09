@@ -52,7 +52,6 @@ def resolve_mode(cfg,pretrained: bool , ckpt_exists: bool) -> tuple:
             raise FileNotFoundError(f"RUN_MODE=load but there is no checkpoint at {cfg.CHECKPOINT_PATH}")
         return "load", "RUN_MODE=load"
 
-    
     return "load", "RUN_MODE=load"
 
 def debug_epochs(num_epochs: int, mode: str = "first_last") -> tuple:
@@ -202,7 +201,6 @@ def train_model(cfg,
                 dataloader_train_ ,
                 dataloader_val_ ,
                 device_ ,
-                num_epochs_,
                 epoch_callback_ ):
     """
             Train the model with train val dataset
@@ -223,18 +221,10 @@ def train_model(cfg,
 
     callback_epochs = debug_epochs(cfg.NUM_EPOCHS, cfg.GRADCAM_DEBUG_EPOCHS)
     # Training loop
-    for epoch in range(num_epochs_):
+    for epoch in range(cfg.NUM_EPOCHS):
         enter_train_mode(model_,cfg)
         running_loss = 0.0
         sync(device_)
-
-        # batch = next(iter(dataloader_train_))
-
-        # print("Numero elementi nel batch:", len(batch))
-        # print("Tipo batch:", type(batch))
-
-        # for i, item in enumerate(batch):
-        #     print(f"Elemento {i}: shape={item.shape}, dtype={item.dtype}")
 
         # t0 = time.time()
         t0 = time.perf_counter()
@@ -337,7 +327,6 @@ def get_trained_model(cfg,
                                                             train_loader_cnn ,
                                                             val_loader_cnn ,
                                                             device ,
-                                                            cfg.NUM_EPOCHS,
                                                             epoch_callback)
         
         logger.debug(f"before Save Model")

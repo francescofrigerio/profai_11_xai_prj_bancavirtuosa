@@ -129,8 +129,7 @@ def run_create_list_images( logger,
     # Maschere su tutte le classi
     correct_mask = y_pred_ == y_test_
     wrong_mask = y_pred_ != y_test_
-    logger.debug
-    (f" correct_mask {correct_mask} wrong_mask {wrong_mask}")
+    logger.debug(f" correct_mask {correct_mask} wrong_mask {wrong_mask}")
 
     list_images_ok = []
     list_images_ko = []
@@ -245,6 +244,7 @@ def run_check_class_ok_ko( logger,
         Run for check list images ko for both lr and cnn
         dom_name ('LR' , 'CNN') 
     """
+    idx_ko_check = 0 , idx_ok_check = 0
     for id_class in list_class_:
         idx_ko_check = np.where((y_test_ == id_class) &
                              (y_test_ != y_pred_)

@@ -93,13 +93,15 @@ def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
     def callback(model, epoch):
         print(f"Start Callback Grad-CAM epoch: {epoch}")
         model.eval()
-        explainer = GradCam(model, cfg)
+        explainer = GradCamCaptum(model, cfg)
 
         n_images = len(list_images)
         fig = Figure(figsize=(2 * n_images, 4.4))
         axes = fig.subplots(2, n_images)
-        for i, id_class in enumerate(sorted(list_images.keys())):     
-            item = list_images[id_class]
+        for i, id_class in enumerate(sorted(list_images.keys())):
+            # load_images_by_class return a list not a dict 
+            # so we add [0]    
+            item = list_images[id_class][0]
             idx_dataset = item["id_dataset"]
                
             # The function to_densenet_input() has to receive a batch with 4 dim. 
@@ -182,7 +184,9 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     # n_images = len(list_img)
     for i, id_class in enumerate(sorted(list_img.keys())):
         logger.info(f"Start Loop {i} {id_class}")
-        item = list_img[id_class]
+        # load_images_by_class return a list not a dict 
+        # so we add [0]
+        item = list_img[id_class][0]
         logger.info(f"Start Loop {i} {type(item)}")
         logger.info(f"Start Loop {i} {item}")
         idx_dataset = item["id_dataset"]
