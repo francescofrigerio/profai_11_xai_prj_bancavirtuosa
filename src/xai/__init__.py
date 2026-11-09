@@ -3,13 +3,13 @@
 """
 from __future__ import annotations
 
-from xai.explainer import AttributionResult, Explainer
-from xai.gradcam import GradCam
-from xai.integrated_gradients import IntegratedGradients
-from xai.lime_explainer import Lime
-from xai.occlusion import Occlusion
-from xai.saliency import Saliency
-from xai.shap_explainer import Shap
+# from explainer import AttributionResult, Explainer
+from gradcam import GradCamCaptum
+from integrated_gradients import IntegratedGradientsCaptum
+from lime_explainer import LimeExplainer
+from occlusion import OcclusionCaptum
+from saliency import SaliencyCaptum
+from shap_explainer import ShapExplainer
 
 TECHNIQUE_NAMES = ("gradcam", "integrated_gradients", "occlusion", "saliency", "lime", "shap")
 
@@ -26,12 +26,12 @@ def build_techniques(model, cfg, background=None, names=TECHNIQUE_NAMES) -> dict
     if "shap" in names and background is None:
         raise ValueError("SHAP needs background tensor (xai.shap_explainer.make_background)")
     
-    builders = { "gradcam": lambda: GradCam(model, cfg),
-                 "integrated_gradients": lambda: IntegratedGradients(model, cfg),
-                 "occlusion": lambda: Occlusion(model, cfg),
-                 "saliency": lambda: Saliency(model, cfg),
-                 "lime": lambda: Lime(model, cfg),
-                 "shap": lambda: Shap(model, cfg, background),
+    builders = { "gradcam": lambda: GradCamCaptum(model, cfg),
+                 "integrated_gradients": lambda: IntegratedGradientsCaptum(model, cfg),
+                 "occlusion": lambda: OcclusionCaptum(model, cfg),
+                 "saliency": lambda: SaliencyCaptum(model, cfg),
+                 "lime": lambda: LimeExplainer(model, cfg),
+                 "shap": lambda: ShapExplainer(model, cfg, background),
     }
 
     return {n: builders[n]() for n in TECHNIQUE_NAMES if n in names}

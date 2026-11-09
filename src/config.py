@@ -31,7 +31,8 @@ class ConfigConstantsDefault:
     """
         Global config. Replaces magic numbers with descriptive names.
     """
-    MODEL_MODE: str = "train"             # "train" | "load"
+    RUN_MODE: str = "train"             # "train" | "load"
+    RUN_PHASE: int = 0            # "train" | "load"
     LR_EXPECTED_VAL_ACC = (0.90, 0.94)    # design: about 0.92 (phase 0: 0.9222)
     GAP_EXPECTED = (0.03, 0.07)           # design: 4-6 points (phase 0: 4.78 on validation)
     
@@ -145,8 +146,8 @@ class ConfigConstantsDefault:
     THRESHOLDS = { 
                    "backend_max_seconds_per_image": 15.0,    # LIME / SHAP backend accepted if <= (T4)
                    "quant_stage_max_minutes": 20.0,          # time budget of the quantitative stage
-                   "run_all_load_max_minutes": 30.0,         # "Esegui tutto" with MODEL_MODE=load
-                   "run_all_train_max_minutes": 45.0,        # "Esegui tutto" with MODEL_MODE=train
+                   "run_all_load_max_minutes": 30.0,         # "Esegui tutto" with RUN_MODE=load
+                   "run_all_train_max_minutes": 45.0,        # "Esegui tutto" with RUN_MODE=train
                    "ig_completeness_pass_rel": 0.05,         # |sum(attr) - (f(x)-f(b))| / |f(x)-f(b)|
                    "ig_completeness_warn_rel": 0.20,
                    "logits_patch_atol": 1e-4,                # logits before/after the ReLU patch
@@ -171,7 +172,7 @@ class ConfigConstantsDefault:
 
         # Choices
         one_of("DEVICE", ("auto", "cuda", "cpu"))
-        one_of("MODEL_MODE", ("auto", "train", "load"))
+        one_of("RUN_MODE", ("auto", "train", "load"))
         one_of("SIGN_MODE", ("absolute", "positive"))
         one_of("MASK_MODE", ("digit", "full"))
         one_of("OPTIMIZER", ("adam",))

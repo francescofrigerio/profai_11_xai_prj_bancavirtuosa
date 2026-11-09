@@ -84,7 +84,7 @@ def pick_shap_target(shap_values, input_label: int, num_classes: int) -> np.ndar
     return arr[0].sum(axis=0) 
 
 
-class Shap(Explainer):
+class ShapExplainer(Explainer):
     """
         Shap explainer
     """

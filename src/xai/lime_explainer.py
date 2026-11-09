@@ -35,7 +35,7 @@ def grid_segments(size: int, cells: int) -> np.ndarray:
     return (rows[:, None] * cells + rows[None, :]).astype(np.int64)
 
 
-class Lime(Explainer):
+class LimeExplainer(Explainer):
     """
         Lime Explainer
     """

@@ -8,7 +8,7 @@ from captum.attr import LayerGradCam
 from xai.explainer import Explainer
 
 
-class GradCam(Explainer):
+class GradCamCaptum(Explainer):
     """
         get Captum GradCam map
     """

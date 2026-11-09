@@ -45,15 +45,15 @@ def resolve_mode(cfg,pretrained: bool , ckpt_exists: bool) -> tuple:
         (action, reason). action is "train" or "load".
         If pretrained==True action is alwais "load".
     """
-    if cfg.MODEL_MODE == "train" and pretrained == False:
-        return "train", "MODEL_MODE=train"
-    if cfg.MODEL_MODE == "load":
+    if cfg.RUN_MODE == "train" and pretrained == False:
+        return "train", "RUN_MODE=train"
+    if cfg.RUN_MODE == "load":
         if not ckpt_exists:
-            raise FileNotFoundError(f"MODEL_MODE=load but there is no checkpoint at {cfg.CHECKPOINT_PATH}")
-        return "load", "MODEL_MODE=load"
+            raise FileNotFoundError(f"RUN_MODE=load but there is no checkpoint at {cfg.CHECKPOINT_PATH}")
+        return "load", "RUN_MODE=load"
 
     
-    return "load", "MODEL_MODE=load"
+    return "load", "RUN_MODE=load"
 
 def debug_epochs(num_epochs: int, mode: str = "first_last") -> tuple:
     """
@@ -304,7 +304,7 @@ def get_trained_model(cfg,
                       pretrained=False,
                       epoch_callback=None ) -> tuple:
     """
-        Builds the model according to MODEL_MODE. 
+        Builds the model according to RUN_MODE. 
         pretrained=False` exists for the tests only (no ImageNet download)
         Returns (model in eval mode, info dict).
     """

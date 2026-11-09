@@ -1,7 +1,7 @@
 """
     Run From the final notebook).
 
-    Real run on Colab: MNIST -> DenseNet (train or load, per MODEL_MODE) 
+    Real run on Colab: MNIST -> DenseNet (train or load, per RUN_MODE) 
                          -> LR baseline -> metrics ->
     %run run_main.py
 """ 
@@ -449,10 +449,10 @@ def main(cfg=CONFIG,logger=LOGGER):
                     )
 
     # arg --cnn only True o False
-    parser.add_argument( '--cnn',
+    parser.add_argument( '--phase',
                             type=bool,
-                            choices=[True,False],
-                            default=True,
+                            choices=[0,1,2,3],
+                            default=0,
                             help="Modalità di esecuzione (default: PROD)"
                         )
     
