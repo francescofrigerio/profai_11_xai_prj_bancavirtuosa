@@ -491,7 +491,7 @@ def main(cfg=CONFIG,logger=LOGGER):
     # load module pretrained and write json file
     # phase_1_load(cfg,logger,out,flag_pretrained)
 
-    phase_2_xai(cfg,logger,out)
+    # phase_2_xai(cfg,logger,out)
 
     logger.debug("Programma Terminato")
 
