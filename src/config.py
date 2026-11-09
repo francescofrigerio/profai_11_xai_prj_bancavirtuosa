@@ -132,7 +132,7 @@ class ConfigConstantsDefault:
     LIST_IMAGES_SEL_LR_KO: str = "LR_KO"
     LIST_IMAGES_SEL_CNN_OK: str = "CNN_OK"
     LIST_IMAGES_SEL_CNN_OK: str = "CNN_KO"
-    LIST_IMAGES_SEL: str = "LR_OK"
+    LIST_IMAGES_SEL: str = "LR_KO"
 
     IG_COMPLETENESS_MAX = 0.05
     RELU_MAX_REL_DIFF = 1e-3

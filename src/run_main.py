@@ -28,7 +28,8 @@ from training import get_device, get_trained_model
 from training import get_evaluate_model
 
 
-from utility import run_create_list_images , run_check_class_ok_ko , verify_output_files_exist
+from utility import  run_check_class_ok_ko , verify_output_files_exist
+from utility import create_and_save_images_lists  , run_create_list_images
 from xai.run_xai import run_exp , make_gradcam_callback
 
 
@@ -318,8 +319,9 @@ def phase_1_train(cfg,
     if warning:
         logger.debug("WARNING:", warning)
     
-    datasets_dict , loaders_dict , _ = load_datasets()
+    datasets_dict , loaders_dict , transform_dict = load_datasets()
     test_datasets = datasets_dict["test"]
+    idx_dataset = transform_dict["train"]
     
     # Load tensor for train and test baseline
     train_loader_lr = loaders_dict["lr"]["train"]
@@ -346,12 +348,12 @@ def phase_1_train(cfg,
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
     
     val_accuracy_lr = accuracy(y_val_lr, lr.predict(X_val_lr))
-    test_accuracy_lr = accuracy(y_test_lr, lr.predict(X_test_lr))
+    y_pred_test_lr = lr.predict(X_test_lr)
+    test_accuracy_lr = accuracy(y_test_lr, y_pred_test_lr)
     print(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
     print(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
 
     # plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-    y_pred_test_lr = lr.predict(X_test_lr)
     plot_predict_info(y_test_lr, 
                       y_pred_test_lr,
                       "CLASSIFIER LR ON MNIST DATASET " , 
@@ -359,6 +361,28 @@ def phase_1_train(cfg,
                       CONFIG,
                       "lr")
 
+    create_and_save_images_lists( logger, 
+                                  y_test_lr, 
+                                  y_pred_test_lr, 
+                                  idx_dataset,
+                                  cfg.CHECK_CLASSES, 
+                                  out_path,
+                                  cfg.FILE_IMG_LR_OK, 
+                                  cfg.FILE_IMG_LR_KO,
+                                  n_images_=cfg.NUM_IMAGES_FOR_CLASS,
+                                  flag_before_ko=True)
+    
+    list_img = []
+    if cfg.LIST_IMAGES_SEL == cfg.LIST_IMAGES_SEL_LR_OK:
+        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_OK)
+    elif cfg.LIST_IMAGES_SEL == cfg.LIST_IMAGES_SEL_LR_KO:
+        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
+
+    if len(list_img) == 0 :
+            raise ValueError("list_img non può essere vuota")
+    
+    callback = make_gradcam_callback(cfg,test_datasets, device, out_path , list_img)
+                                        
     # Cnn DenseNet
     _ , info_cnn = get_trained_model(cfg,
                                         logger, 
@@ -367,7 +391,7 @@ def phase_1_train(cfg,
                                         test_loader_cnn, 
                                         device,
                                         pretrained=flag_pretrained,
-                                        epoch_callback=None)
+                                        epoch_callback=callback)
     
     plot_predict_info(info_cnn["y_true"], 
                               info_cnn["y_pred"],
