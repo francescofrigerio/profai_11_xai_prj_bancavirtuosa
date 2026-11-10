@@ -32,7 +32,7 @@ class ConfigConstantsDefault:
         Global config. Replaces magic numbers with descriptive names.
     """
     RUN_MODE: str = "train"             # "train" | "load"
-    RUN_PHASE_DEFAULT: int = 9          # 1 | 2 | 3 ..... | 9 
+    RUN_PHASE: int = 9                  # 1 | 2 | 3 ..... | 9 
     RUN_PHASE_1: int = 1                  
     RUN_PHASE_2: int = 2                  
     RUN_PHASE_3: int = 3                                    
@@ -173,7 +173,7 @@ class ConfigConstantsDefault:
         # Choices
         one_of("DEVICE", ("auto", "cuda", "cpu"))
         one_of("RUN_MODE", ("auto", "train", "load"))
-        one_of("RUN_PHASE", (0,1,2,3))
+        one_of("RUN_PHASE", (1,2,3,9))
         one_of("SIGN_MODE", ("absolute", "positive"))
         one_of("MASK_MODE", ("digit", "full"))
         one_of("OPTIMIZER", ("adam",))

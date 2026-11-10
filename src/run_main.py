@@ -515,13 +515,19 @@ def main(cfg=CONFIG, logger=LOGGER):
 
     # Esecuzione condizionale o sequenziale basata sulla fase
     if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_1:
+        logger.info("------------------------------------------------------------------")
         phase_1_train(cfg, logger, out, flag_pretrained)
+        logger.info("------------------------------------------------------------------")
         
     if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_2:
-        phase_2_xai(cfg, logger, out)
+        logger.info("------------------------------------------------------------------")
+        # phase_2_xai(cfg, logger, out)
+        logger.info("------------------------------------------------------------------")
 
     if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_3:
-            phase_2_xai(cfg, logger, out)
+            logger.info("------------------------------------------------------------------")
+            # phase_2_xai(cfg, logger, out)
+            logger.info("------------------------------------------------------------------")
 
     # load module pretrained and write json file
     # phase_1_load(cfg,logger,out,flag_pretrained)
