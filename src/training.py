@@ -254,6 +254,7 @@ def train_model(cfg,
         y_pred,y_true , idx_dataset = evaluate_model( model_,
                                         dataloader_val_,
                                         device_ )
+
         val_accuracy = accuracy(y_true,y_pred)
         sync(device_)
         
@@ -337,11 +338,18 @@ def get_trained_model(cfg,
     test_accuracy = accuracy(y_true,y_pred)
     logger.info(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
 
+    logger.info(f"y_pred shape: {y_pred.shape}")
+    logger.info(f"y_true shape: {y_true.shape}")
+    logger.info(f"idx_dataset type: {type(idx_dataset)}")
+    logger.info(f"idx_dataset shape: {idx_dataset.shape}")
+    logger.info(f"idx_dataset first 10: {idx_dataset[:10]}")
+
     info = {
         "action": action, 
         "reason": reason,
         "y_true": y_true,
         "y_pred": y_pred,
+        "idx_dataset": idx_dataset,
         "test_accuracy": test_accuracy, 
         "history": history, 
         "path": path,

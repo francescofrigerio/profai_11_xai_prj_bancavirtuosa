@@ -392,6 +392,17 @@ def phase_1_train(cfg,
                                         device,
                                         pretrained=flag_pretrained,
                                         epoch_callback=callback)
+
+    create_and_save_images_lists(  logger, 
+                                   info_cnn["y_true"],
+                                   info_cnn["y_pred"], 
+                                   info_cnn["idx_dataset"],
+                                   cfg.CHECK_CLASSES, 
+                                   out_path,
+                                   cfg.FILE_IMG_CNN_OK, 
+                                   cfg.FILE_IMG_CNN_KO,
+                                   n_images=cfg.NUM_IMAGES_FOR_CLASS,
+                                   flag_before_ko=True)
     
     plot_predict_info(info_cnn["y_true"], 
                               info_cnn["y_pred"],
@@ -447,8 +458,77 @@ def phase_1_train(cfg,
     # print(f"checkpoint: {info_cnn['path']}\n | total {time.time() - t_start:.0f}s")
     print(f"checkpoint: {info_cnn['path']}\n | total {time.perf_counter() - t_start:.0f}s")
     return metrics
+
+import argparse
+from pathlib import Path
+
+def main(cfg=CONFIG, logger=LOGGER):
+    """
+        Main Function Of the project
+    """
+
+    # Initialize the parser
+    parser = argparse.ArgumentParser(description="Xai per Classificazione di Cifre in ambito Finance")
+
+    # Define argument (--mode)
+    parser.add_argument(
+        '--mode',
+        type=str,
+        choices=['train', 'load'],
+        default='train',
+        help="Modalità di esecuzione (train o load)"
+    )
+
+    # Define argument (--phase) 9 = default 
+    parser.add_argument(
+        '--phase',
+        type=int,
+        choices=[1, 2, 3, 9],
+        default=9,
+        help="Fase di esecuzione (9 per tutte le fasi - default, oppure 1, 2, 3)"
+    )
     
-def main(cfg=CONFIG,logger=LOGGER):
+    # parse args
+    args = parser.parse_args()
+
+    flag_pretrained = False
+    
+    if args.mode == 'load':
+        flag_pretrained = True
+        logger.info("Training avviato in modalità: LOAD")
+    else:
+        logger.info("Training avviato in modalità: TRAIN")
+
+    # Gestione della fase da eseguire
+    flag_phase_to_run = args.phase
+    
+    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT:
+        logger.info("Fase da eseguire: TUTTE LE FASI (Default - 9)")
+    elif flag_phase_to_run in (1, 2, 3):
+        logger.info(f"Fase da eseguire: {flag_phase_to_run}")
+    else:
+        raise ValueError(f"Attenzione!! Numero fase da eseguire non valido: {flag_phase_to_run}")
+
+    # dir and file output
+    out = Path(cfg.OUTPUT_DIR) 
+    out.mkdir(parents=True, exist_ok=True)
+
+    # Esecuzione condizionale o sequenziale basata sulla fase
+    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_1:
+        phase_1_train(cfg, logger, out, flag_pretrained)
+        
+    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_2:
+        phase_2_xai(cfg, logger, out)
+
+    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_3:
+            phase_2_xai(cfg, logger, out)
+
+    # load module pretrained and write json file
+    # phase_1_load(cfg,logger,out,flag_pretrained)
+
+    logger.debug("Programma Terminato")
+
+def main_old(cfg=CONFIG,logger=LOGGER):
     """
         Main Function Of the project
     """
@@ -466,8 +546,8 @@ def main(cfg=CONFIG,logger=LOGGER):
 
     # arg --cnn only True o False
     parser.add_argument( '--phase',
-                            type=bool,
-                            choices=[0,1,2,3],
+                            type=int,
+                            choices=[1,2,3],
                             default=0,
                             help="Modalità di esecuzione (default: PROD)"
                         )
@@ -480,18 +560,27 @@ def main(cfg=CONFIG,logger=LOGGER):
     if args.mode == 'load':
         flag_pretrained = True
         logger.info("Training avviato in modalità: LOAD")
-   
+
+    flag_phase_to_run = cfg.RUN_PHASE_DEFAULT
+    logger.info(f"Fase da eseguire: DEFAULT {cfg.RUN_PHASE_DEFAULT}")
+    if args.phase in (1,2,3) :
+        flag_phase_to_run = args.phase
+        logger.info(f"Fase da eseguire: DEFAULT {cfg.RUN_PHASE_DEFAULT}")
+    else:
+         raise ValueError(f"attenzione!! numero fase da eseguire non valido {args.phase}")
+    
+
     # dir and file output
     out = Path(cfg.OUTPUT_DIR) 
     out.mkdir(parents=True, exist_ok=True)
 
-    if flag_pretrained is False :
+    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_1 :
         phase_1_train(cfg,logger,out,flag_pretrained)
+    elif flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_2 :
+        phase_2_xai(cfg,logger,out)
 
     # load module pretrained and write json file
     # phase_1_load(cfg,logger,out,flag_pretrained)
-
-    # phase_2_xai(cfg,logger,out)
 
     logger.debug("Programma Terminato")
 

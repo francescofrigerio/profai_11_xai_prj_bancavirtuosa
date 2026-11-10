@@ -32,7 +32,10 @@ class ConfigConstantsDefault:
         Global config. Replaces magic numbers with descriptive names.
     """
     RUN_MODE: str = "train"             # "train" | "load"
-    RUN_PHASE: int = 0            # "train" | "load"
+    RUN_PHASE_DEFAULT: int = 9          # 1 | 2 | 3 ..... | 9 
+    RUN_PHASE_1: int = 1                  
+    RUN_PHASE_2: int = 2                  
+    RUN_PHASE_3: int = 3                                    
     LR_EXPECTED_VAL_ACC = (0.90, 0.94)    # design: about 0.92 (phase 0: 0.9222)
     GAP_EXPECTED = (0.03, 0.07)           # design: 4-6 points (phase 0: 4.78 on validation)
     
@@ -170,6 +173,7 @@ class ConfigConstantsDefault:
         # Choices
         one_of("DEVICE", ("auto", "cuda", "cpu"))
         one_of("RUN_MODE", ("auto", "train", "load"))
+        one_of("RUN_PHASE", (0,1,2,3))
         one_of("SIGN_MODE", ("absolute", "positive"))
         one_of("MASK_MODE", ("digit", "full"))
         one_of("OPTIMIZER", ("adam",))
