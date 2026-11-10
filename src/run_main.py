@@ -514,17 +514,17 @@ def main(cfg=CONFIG, logger=LOGGER):
     out.mkdir(parents=True, exist_ok=True)
 
     # Esecuzione condizionale o sequenziale basata sulla fase
-    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_1:
+    if flag_phase_to_run == cfg.RUN_PHAS or flag_phase_to_run == cfg.RUN_PHASE_1:
         logger.info("------------------------------------------------------------------")
         phase_1_train(cfg, logger, out, flag_pretrained)
         logger.info("------------------------------------------------------------------")
         
-    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_2:
+    if flag_phase_to_run == cfg.RUN_PHASE or flag_phase_to_run == cfg.RUN_PHASE_2:
         logger.info("------------------------------------------------------------------")
         # phase_2_xai(cfg, logger, out)
         logger.info("------------------------------------------------------------------")
 
-    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_3:
+    if flag_phase_to_run == cfg.RUN_PHASE or flag_phase_to_run == cfg.RUN_PHASE_3:
             logger.info("------------------------------------------------------------------")
             # phase_2_xai(cfg, logger, out)
             logger.info("------------------------------------------------------------------")
@@ -567,11 +567,11 @@ def main_old(cfg=CONFIG,logger=LOGGER):
         flag_pretrained = True
         logger.info("Training avviato in modalità: LOAD")
 
-    flag_phase_to_run = cfg.RUN_PHASE_DEFAULT
-    logger.info(f"Fase da eseguire: DEFAULT {cfg.RUN_PHASE_DEFAULT}")
+    flag_phase_to_run = cfg.RUN_PHASE
+    logger.info(f"Fase da eseguire: DEFAULT {cfg.RUN_PHASE}")
     if args.phase in (1,2,3) :
         flag_phase_to_run = args.phase
-        logger.info(f"Fase da eseguire: DEFAULT {cfg.RUN_PHASE_DEFAULT}")
+        logger.info(f"Fase da eseguire: DEFAULT {flag_phase_to_run}")
     else:
          raise ValueError(f"attenzione!! numero fase da eseguire non valido {args.phase}")
     
