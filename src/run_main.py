@@ -6,6 +6,7 @@
     %run run_main.py
 """ 
 import argparse
+import inspect
 import json
 from pathlib import Path
 import time
@@ -30,7 +31,8 @@ from training import get_evaluate_model
 
 from utility import  run_check_class_ok_ko , verify_output_files_exist
 from utility import create_and_save_images_lists  , run_create_list_images
-from xai.run_xai import run_exp , make_gradcam_callback
+from xai.run_xai import run_exp 
+from xai.run_xai import make_gradcam_callback
 
 
 # Configuration Warnings 
@@ -379,6 +381,14 @@ def phase_1_train(cfg,
 
     logger.info(f"Pass param test_loader_cnn type: {type(test_loader_cnn)}")
 
+    
+
+    logger.info("Funzione: %s", make_gradcam_callback)
+    logger.info("Modulo: %s", make_gradcam_callback.__module__)
+    logger.info("File: %s", inspect.getfile(make_gradcam_callback))
+    logger.info("Firma: %s", inspect.signature(make_gradcam_callback))
+    # logger.info("Sorgente make_gradcam_callback:\n%s",inspect.getsource(make_gradcam_callback))
+    
     callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img , logger)
                                         
     # Cnn DenseNet
