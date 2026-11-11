@@ -340,9 +340,8 @@ def get_trained_model(cfg,
 
     logger.info(f"y_pred shape: {y_pred.shape}")
     logger.info(f"y_true shape: {y_true.shape}")
-    logger.info(f"idx_dataset type: {type(idx_dataset)}")
-    logger.info(f"idx_dataset shape: {idx_dataset.shape}")
-    logger.info(f"idx_dataset first 10: {idx_dataset[:10]}")
+    logger.info(f"idx_dataset type: {type(idx_test)}")
+    logger.info(f"idx_dataset first 10: {idx_test[:10]}")
 
     info = {
         "action": action, 

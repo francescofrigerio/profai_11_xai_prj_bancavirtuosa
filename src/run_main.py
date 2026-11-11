@@ -215,7 +215,7 @@ def phase_1_load( cfg,
     X_train , y_train , _ = data_to_input_lr(train_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
     X_val , y_val , _ = data_to_input_lr(val_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
 
-    X_test , y_test , idx_dataset = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
+    X_test , y_test , idx_test = data_to_input_lr(test_loader_lr,1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE)
     # END LOAD DATA
 
     # START PROCESS LR MODEL
@@ -236,7 +236,7 @@ def phase_1_load( cfg,
                                                                      X_test,
                                                                      y_test,
                                                                      y_pred,
-                                                                     idx_dataset,
+                                                                     idx_test,
                                                                      cfg.CHECK_CLASSES,
                                                                      n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                                      flag_before_ko=True)
@@ -245,7 +245,7 @@ def phase_1_load( cfg,
                                                         X_test,
                                                         y_test,
                                                         y_pred ,
-                                                        idx_dataset,
+                                                        idx_test,
                                                         cfg.CHECK_CLASSES,
                                                         n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                         flag_before_ko=False)
@@ -254,7 +254,7 @@ def phase_1_load( cfg,
     # END PROCESS LR MODEL
     
     # START PROCESS CNN MODEL 
-    X_test , y_test , y_pred , idx_dataset = get_evaluate_model( cfg,
+    X_test , y_test , y_pred , idx_test = get_evaluate_model( cfg,
                                                    logger,
                                                    flag_pretrained,
                                                    test_loader_cnn,
@@ -274,7 +274,7 @@ def phase_1_load( cfg,
                                                                         X_test,
                                                                         y_test,
                                                                         y_pred,
-                                                                        idx_dataset,
+                                                                        idx_test,
                                                                         cfg.CHECK_CLASSES,
                                                                         n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                                         flag_before_ko=True)
@@ -283,7 +283,7 @@ def phase_1_load( cfg,
                                                               X_test,
                                                               y_test,
                                                               y_pred,
-                                                              idx_dataset,
+                                                              idx_test,
                                                               cfg.CHECK_CLASSES,
                                                               n_images_=cfg.NUM_IMAGES_FOR_CLASS,
                                                               flag_before_ko=False)
@@ -366,7 +366,7 @@ def phase_1_train(cfg,
     logger.info(f"y_pred_test_lr shape: {y_pred_test_lr.shape}")
     logger.info(f"y_test_lr shape: {y_test_lr.shape}")
     logger.info(f"idx_dataset type: {type(idx_dataset)}")
-    logger.info(f"idx_dataset shape: {idx_dataset.shape}")
+    
     
 
     
