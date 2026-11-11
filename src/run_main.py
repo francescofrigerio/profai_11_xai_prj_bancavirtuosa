@@ -105,7 +105,7 @@ def phase_2_xai( cfg,
                                                 )
 
     logger.debug("Controllo test_idx superato.")
-    logger.info(f"make_gradcam_callback test_loader_cnn {type(test_loader_cnn)}")
+    logger.info(f" test_loader_cnn {type(test_loader_cnn)}")
     print("has dataset:", hasattr(test_loader_cnn, "dataset"))
 
     # Logistic regression (train indices only)
@@ -134,9 +134,9 @@ def phase_2_xai( cfg,
     # The test DataLoader has shuffle=False, and the indices 
     # # it returns correspond to those in test_base.
     # So we can pass test_loader_cnn
-    logger.info(f"make_gradcam_callback test_loader_cnn {type(test_loader_cnn)}")
+    logger.info(f" test_loader_cnn {type(test_loader_cnn)}")
     print("has dataset:", hasattr(test_loader_cnn, "dataset"))
-    callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img)
+    callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img , logger)
 
     model, info = get_trained_model(cfg,
                             logger, 
@@ -146,12 +146,6 @@ def phase_2_xai( cfg,
                             device,
                             pretrained=True,    
                             epoch_callback=callback )
-
-    # pass all dataset train , already processed and normalized
-    # make_background don't need train_idx parameter
-    # background = make_background(transform_cnn_dict["train"],cfg, device)
-
-    # techniques = build_techniques(model, cfg, background)
 
     xai_param_dict = { "test_datasets" : test_datasets,
                         "t_start": t_start,
@@ -312,9 +306,10 @@ def phase_1_train(cfg,
     if warning:
         logger.debug(f"WARNING: {warning}")
     
-    datasets_dict , loaders_dict , transform_dict = load_datasets()
-    test_datasets = datasets_dict["test"]
-    idx_dataset = transform_dict["train"]
+    # datasets_dict , loaders_dict , transform_dict = load_datasets()
+    # test_datasets = datasets_dict["test"]
+    # idx_dataset = transform_dict["train"]
+    _ , loaders_dict , _ = load_datasets()
     
     # Load tensor for train and test baseline
     train_loader_lr = loaders_dict["lr"]["train"]
@@ -325,7 +320,9 @@ def phase_1_train(cfg,
     train_loader_cnn = loaders_dict["cnn"]["train"]
     val_loader_cnn = loaders_dict["cnn"]["val"]
     test_loader_cnn = loaders_dict["cnn"]["test"]
-        
+
+    logger.info(f"test_loader_cnn type: {type(test_loader_cnn)}")
+
     X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, 
                                                     CONFIG.IMAGE_SIZE, 
                                                     CONFIG.IMAGE_SIZE)
@@ -379,8 +376,10 @@ def phase_1_train(cfg,
 
     if len(list_img) == 0 :
             raise ValueError("list_img non può essere vuota")
-    
-    callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img)
+
+    logger.info(f"Pass param test_loader_cnn type: {type(test_loader_cnn)}")
+
+    callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img , logger)
                                         
     # Cnn DenseNet
     _ , info_cnn = get_trained_model(cfg,

@@ -82,7 +82,7 @@ def to_grid28(map2d, size, side=28):
                          size=(side, side), 
                          mode="area")[0, 0].numpy()
 
-def make_gradcam_callback(cfg,dataloader, device, out_path , list_images):
+def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logger):
     """
         Grad-CAM debug images of the first and last training epoch.
         The callback explains the PREDICTED class of the 10 fixed validation images 
@@ -105,8 +105,8 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images):
             idx_dataset = item["id_dataset"]
                
             
-            print(f"before read dataset on: {idx_dataset}")
-            print(f"before read dataset on: {type(dataloader)}")
+            logger.info(f"before read dataset on: {idx_dataset}")
+            logger.info(f"before read dataset on: {type(dataloader)}")
             
 
             # Dataset: allows access to an element using dataset[idx].
