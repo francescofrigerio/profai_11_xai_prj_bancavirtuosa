@@ -580,9 +580,9 @@ def main_old(cfg=CONFIG,logger=LOGGER):
     out = Path(cfg.OUTPUT_DIR) 
     out.mkdir(parents=True, exist_ok=True)
 
-    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_1 :
+    if flag_phase_to_run == cfg.RUN_PHASE or flag_phase_to_run == cfg.RUN_PHASE_1 :
         phase_1_train(cfg,logger,out,flag_pretrained)
-    elif flag_phase_to_run == cfg.RUN_PHASE_DEFAULT or flag_phase_to_run == cfg.RUN_PHASE_2 :
+    elif flag_phase_to_run == cfg.RUN_PHASE or flag_phase_to_run == cfg.RUN_PHASE_2 :
         phase_2_xai(cfg,logger,out)
 
     # load module pretrained and write json file

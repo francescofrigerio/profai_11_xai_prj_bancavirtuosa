@@ -43,3 +43,18 @@ def quadrants(y_true, pred_densenet, pred_lr) -> dict:
         "only_lr": int((~d_ok & l_ok).sum()),
         "both_wrong": int((~d_ok & ~l_ok).sum()),
     }
+
+def quadrant_indices(y_true, pred_densenet, pred_lr) -> dict:
+    """
+        The same four cases, as arrays of positions (used to pick the gallery images).
+    """
+    y = np.asarray(y_true)
+    d_ok = np.asarray(pred_densenet) == y
+    l_ok = np.asarray(pred_lr) == y
+    return {
+        "both_correct": np.where(d_ok & l_ok)[0],
+        "only_densenet": np.where(d_ok & ~l_ok)[0],
+        "only_lr": np.where(~d_ok & l_ok)[0],
+        "both_wrong": np.where(~d_ok & ~l_ok)[0],
+    }
+    
