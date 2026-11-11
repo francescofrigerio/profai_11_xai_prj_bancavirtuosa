@@ -1,0 +1,197 @@
+name: Machine Innovation Monitoring 
+
+on:
+  push:
+    branches: 
+      - "main"
+    paths:
+      # si attiva solo se sono i modificati i files
+      # quindi se è girato un training e sono stati generatu nuovi dati
+      - 'src/outputs-baseline-prod/*.db'
+      - 'src/outputs-baseline-prod/*.png'
+      - 'src/outputs-baseline-debug/*.db'
+      - 'src/outputs-baseline-debug/*.png'
+      
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Seleziona la modalità di esecuzione (demo o prod)"
+        default: "demo"
+        type: choice
+        options:
+          - "demo"
+          - "prod"
+
+permissions:
+  contents: write
+
+jobs:
+  monitoring-metrics:
+    runs-on: ubuntu-latest 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # solo in caso di esecuzione da Airflow (workflow_dispatch) 
+      # rimuove il file JSON precedente
+      - name: Rimuovi metrics JSON precedente (Solo se dispatch da Airflow)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          echo "Rilevato trigger da Airflow (workflow_dispatch). Svuoto il file semaforo..."
+          mv -f ./monitoring/latest_metrics.json ./monitoring/latest_metrics.bak
+          
+          # Crea un file temporaneo vuoto (o un array vuoto []) per evitare 
+          # che eventuali letture concorrenti falliscano brutalmente con 404
+          echo "[]" > ./monitoring/latest_metrics.json
+          
+          # Facciamo un commit immediato e push per pulire la history remota prima che Grafana parta
+          git config --local user.name "francescofrigerio"
+          git config --local user.email "francesco.frigerio@greencore.it"
+          git add ./monitoring/latest_metrics.json
+          git commit -m "Auto: Reset del file semaforo metriche [skip ci]" || echo "Nessun reset necessario"
+          git pull origin main --rebase
+          git push || echo "Nessuna modifica remota da sincronizzare"
+
+      # 2. Configura i permessi ed esegui lo script del DB
+      - name: Esegui install_db.sh e aggiorna il db
+        run: |
+          # ls -lh /opt/machineinnovation/db/metrics.db || true
+          # echo "Numero di righe iniziali nel DB :"
+          # sqlite3 /opt/machineinnovation/db/metrics.db "SELECT COUNT(*) FROM model_metrics_baseline;"
+
+          chmod +x ./install_db.sh
+          if [ "${{ github.event.inputs.mode }}" = "prod" ]; then
+            echo "install db in modalità PRODUCTION..."
+            sudo ./install_db.sh src/outputs-baseline-prod/metrics.db
+          else
+            echo "install db in modalità DEMO..."
+            sudo ./install_db.sh src/outputs-baseline-prod/metrics.db
+          fi
+
+          sudo chmod -R 777 /opt/machineinnovation/
+
+          ls -lh /opt/machineinnovation/db/metrics.db || true
+          echo "Numero di righe finali nel DB:"
+          sqlite3 /opt/machineinnovation/db/metrics.db "SELECT COUNT(*) FROM model_metrics_baseline;" || true
+
+
+      # 3. Avvia Grafana
+      - name: Avvia Grafana
+        working-directory: ./monitoring
+        run: docker compose up -d grafana
+
+      # 4. Attendi che Grafana sia pronto stabilmente
+      - name: Wait start
+        run: sleep 60
+    
+      - name: Wait Grafana Loop
+        run: |
+          MAX_RETRY=30
+          RETRY=0
+
+          until curl -s http://localhost:3000/api/health | grep -q '"database": "ok"'
+          do
+            RETRY=$((RETRY+1))
+
+            echo "Tentativo ${RETRY}/${MAX_RETRY}: Grafana non pronta"
+
+            if [ $RETRY -ge $MAX_RETRY ]; then
+              echo "ERRORE: timeout attesa Grafana"
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          echo "Grafana pronta"
+
+      # 6. Configura l'ambiente Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12' 
+          cache: 'pip'
+
+      # 7. Installa Playwright e Chromium
+      - name: Installa dipendenze e Playwright
+        run: |
+          pip install playwright 
+          playwright install chromium --with-deps
+
+      # 9. Rimuove le vecchie immagini e cattura i nuovi Screenshot
+      - name: Catch Screenshot Dashboard
+        run: |
+          rm -f ./images/dashboard_table.png
+          rm -f ./images/dashboard_timeseries.png
+          python ./monitoring/rend_dashboard_panel.py
+        
+      # Verifica immagini in output
+      - name: Images check
+        run: |
+          echo "Contenuto della Root"
+          ls -lrt
+          echo "=== Contenuto di ./images/ "
+          ls -lrt ./images/ || true
+          
+      - name: Estrai tutti i dati e salva JSON
+        run: |
+          sqlite3 -json /opt/machineinnovation/db/metrics.db "
+          SELECT *
+          FROM model_metrics_baseline
+          LIMIT 1000;
+          " > ./monitoring/all_metrics.json
+
+      - name: Estrai ultima metrica e salva JSON
+        run: |
+          sqlite3 -json /opt/machineinnovation/db/metrics.db "
+              SELECT accuracy, precision, recall, f1_score, timestamp, dom_name
+              FROM model_metrics_baseline
+              WHERE dom_name IN ('test-sent-analysis-prod', 'test-sent-analysis-demo')
+              ORDER BY timestamp DESC
+              LIMIT 1;
+          " > ./monitoring/latest_metrics.json
+
+      # [DEBUG] Verifica che il file JSON sia stato creato correttamente
+      - name: Mostra JSON generato
+        run: |
+          echo "Contenuto di ./monitoring/ "
+          ls -lrt ./monitoring/ || true
+          
+          echo "Ultime Metriche Generate "
+          cat ./monitoring/latest_metrics.json
+
+      # 11. Spegni i container Docker 
+      - name: Stop Docker
+        working-directory: ./monitoring
+        run: docker compose down
+
+      # 12. Commit e Push sul repository
+      - name: Commit + Push of the update graph 
+        run: |
+          git config --local user.name "francescofrigerio"
+          git config --local user.email "francesco.frigerio@greencore.it"
+          git add ./images/dashboard_table.png
+          git add ./images/dashboard_timeseries.png
+          git add ./monitoring/latest_metrics.json
+          git add ./monitoring/all_metrics.json
+
+          # le immagini png possono essere modificate 
+          # di poco ad ogni esecuzione
+          # per evitare salvataggi inutili e sistematici
+          # esegue il seguente controllo
+          if git diff --cached --quiet; then
+             echo "Nessuna modifica alle immagini"
+             exit 0
+          fi
+
+          git commit -m "Auto: Aggiornato grafico di training [skip ci]" || exit 0
+          
+          # Scarica gli ultimi commit remoti e riapplica il tuo commit in cima
+          git pull origin main --rebase
+          
+          git push
+          # dopo ogni commit automatico fare un git pull
+          # ad ogni partenza del codespace 
+          # per non generare errori al successivo push
+          # In caso di errori eseguire dal codespace
+          # git pull origin main --rebase e poi rifare git push
