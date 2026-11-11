@@ -105,6 +105,8 @@ def phase_2_xai( cfg,
                                                 )
 
     logger.debug("Controllo test_idx superato.")
+    logger.info(f"make_gradcam_callback test_loader_cnn {type(test_loader_cnn)}")
+    print("has dataset:", hasattr(test_loader_cnn, "dataset"))
 
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)

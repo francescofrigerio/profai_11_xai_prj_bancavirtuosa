@@ -197,9 +197,7 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
                  )
             },
         "cnn": {
-            "train": DataLoader(
-                train_cnn, batch_size=cfg.BATCH_SIZE, shuffle=True
-            ),
+            "train": DataLoader(train_cnn, batch_size=cfg.BATCH_SIZE, shuffle=True),
             "val": DataLoader(val_cnn, batch_size=cfg.BATCH_SIZE, shuffle=False),
             "test": DataLoader(test_cnn, batch_size=cfg.BATCH_SIZE, shuffle=False)
         }

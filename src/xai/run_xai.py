@@ -106,6 +106,7 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images):
                
             
             print(f"before read dataset on: {idx_dataset}")
+            print(f"before read dataset on: {type(dataloader)}")
             
 
             # Dataset: allows access to an element using dataset[idx].
