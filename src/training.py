@@ -253,7 +253,7 @@ def train_model(cfg,
         t1 = time.perf_counter()
 
         # LOOP VALIDATION
-        _ , y_pred, y_true , idx_dataset = evaluate_model( model_,
+        _ , y_pred, y_true , _ = evaluate_model( model_,
                                         dataloader_val_,
                                         device_ )
 
@@ -340,10 +340,10 @@ def get_trained_model(cfg,
     test_accuracy = accuracy(y_true,y_pred)
     logger.info(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
 
-    logger.info(f"y_pred shape: {y_pred.shape}")
-    logger.info(f"y_true shape: {y_true.shape}")
-    logger.info(f"idx_dataset type: {type(idx_test)}")
-    logger.info(f"idx_dataset first 10: {idx_test[:10]}")
+    # logger.info(f"y_pred shape: {y_pred.shape}")
+    # logger.info(f"y_true shape: {y_true.shape}")
+    # logger.info(f"idx_dataset type: {type(idx_test)}")
+    # logger.info(f"idx_dataset first 10: {idx_test[:10]}")
 
     info = {
         "action": action, 

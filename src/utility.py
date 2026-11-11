@@ -30,8 +30,8 @@ def load_dict_from_json(logger,path: Path):
     with open(path, "r", encoding="utf-8") as f:
         list_load_dict = json.load(f)
 
-    logger.info(f"Caricati {len(list_load_dict)} elementi con successo!")
-    logger.info(f"Primo elemento:{list_load_dict[0]}")
+    logger.debug(f"Caricati {len(list_load_dict)} elementi con successo!")
+    logger.debug(f"Primo elemento:{list_load_dict[0]}")
     return list_load_dict
 
 
@@ -278,8 +278,10 @@ def create_and_save_images_lists(logger,
     """
     y_true = to_numpy(y_true)
     y_pred = to_numpy(y_pred)
-    logger.info(f"idx_dataset type before conversion: {type(idx_dataset)}")
-    logger.info(f"idx_dataset first element: {idx_dataset[0]}")
+    
+    # logger.info(f"idx_dataset type before conversion: {type(idx_dataset)}")
+    # logger.info(f"idx_dataset first element: {idx_dataset[0]}")
+    
     idx_dataset = np.asarray(idx_dataset)
 
     list_ok, list_ko = run_create_list_images(logger,
@@ -293,7 +295,8 @@ def create_and_save_images_lists(logger,
 
     save_dict_to_json(out_path / file_ok, list_ok)
     save_dict_to_json(out_path / file_ko, list_ko)
-    logger.info(f"Salvati {len(list_ok)} OK in {file_ok} e {len(list_ko)} KO in {file_ko}")
+    
+    logger.debug(f"Salvati {len(list_ok)} OK in {file_ok} e {len(list_ko)} KO in {file_ko}")
     return list_ok, list_ko
 
 def run_check_class_ok_ko( logger, 

@@ -64,7 +64,7 @@ def phase_2_xai( cfg,
     logger.debug(f"Immagini per classe: {n_for_class}")
     device, warning = get_device(cfg)
     if warning:
-        logger.debug("WARNING:", warning)
+        logger.debug(f"WARNING: {warning}")
 
     datasets_dict , loaders_dict , transform_cnn_dict = load_datasets()
     # trainval_dataset = datasets_dict["trainval"]
@@ -104,7 +104,7 @@ def phase_2_xai( cfg,
                                                     "da 0 a len(test_idx_lr)-1 nell'ordine previsto."
                                                 )
 
-    logger.info("Controllo test_idx superato.")
+    logger.debug("Controllo test_idx superato.")
 
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
@@ -199,7 +199,7 @@ def phase_1_load( cfg,
     logger.debug(f"Immagini per classe: {n_for_class}")
     device, warning = get_device(cfg)
     if warning:
-        logger.debug("WARNING:", warning)
+        logger.debug(f"WARNING: {warning}")
 
     # START LOAD DATA
     _ , loaders_dict , _ = load_datasets()
@@ -317,7 +317,7 @@ def phase_1_train(cfg,
     
     device, warning = get_device(cfg)
     if warning:
-        logger.debug("WARNING:", warning)
+        logger.debug(f"WARNING: {warning}")
     
     datasets_dict , loaders_dict , transform_dict = load_datasets()
     test_datasets = datasets_dict["test"]
@@ -363,13 +363,9 @@ def phase_1_train(cfg,
 
     
     
-    logger.info(f"y_pred_test_lr shape: {y_pred_test_lr.shape}")
-    logger.info(f"y_test_lr shape: {y_test_lr.shape}")
-    logger.info(f"idx_dataset type: {type(idx_dataset)}")
-    
-    
-
-    
+    # logger.info(f"y_pred_test_lr shape: {y_pred_test_lr.shape}")
+    # logger.info(f"y_test_lr shape: {y_test_lr.shape}")
+    # logger.info(f"idx_dataset type: {type(idx_dataset)}")
     create_and_save_images_lists( logger, 
                                   X_test_lr,
                                   y_test_lr, 
