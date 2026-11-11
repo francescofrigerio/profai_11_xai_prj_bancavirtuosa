@@ -530,7 +530,7 @@ def main(cfg=CONFIG, logger=LOGGER):
         
     if flag_phase_to_run == cfg.RUN_PHASE or flag_phase_to_run == cfg.RUN_PHASE_2:
         logger.info("------------------------------------------------------------------")
-        # phase_2_xai(cfg, logger, out)
+        phase_2_xai(cfg, logger, out)
         logger.info("------------------------------------------------------------------")
 
     if flag_phase_to_run == cfg.RUN_PHASE or flag_phase_to_run == cfg.RUN_PHASE_3:

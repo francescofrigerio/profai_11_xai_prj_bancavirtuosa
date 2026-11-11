@@ -16,6 +16,9 @@ from scipy.ndimage import binary_dilation
 from IPython.display import Image, display
 
 from config import TITLES
+from config import IMAGENET_MEAN_TRANSFORM
+from config import IMAGENET_STD_TRANSFORM
+
 from utility import to_densenet_input
 from xai import GradCamCaptum , build_techniques
 from xai.shap_explainer import make_background
@@ -135,10 +138,10 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
             # before displaying the image. 
             # We don't should display the normalized tensor directly, 
             # as the pixel scale will not correspond to that of a normal image.
-            mean = torch.tensor(cfg.IMAGENET_MEAN_TRANSFORM,
+            mean = torch.tensor(IMAGENET_MEAN_TRANSFORM,
                                 device=input_image.device).view(3, 1, 1)
 
-            std = torch.tensor(cfg.IMAGENET_STD_TRANSFORM,
+            std = torch.tensor(IMAGENET_STD_TRANSFORM,
                                 device=input_image.device ).view(3, 1, 1)
 
             image_display = (input_image * std + mean).clamp(0, 1)
