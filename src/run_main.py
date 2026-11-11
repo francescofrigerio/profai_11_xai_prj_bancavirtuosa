@@ -366,7 +366,7 @@ def phase_1_train(cfg,
     logger.info(f"y_pred_test_lr shape: {y_pred_test_lr.shape}")
     logger.info(f"y_test_lr shape: {y_test_lr.shape}")
     logger.info(f"idx_dataset type: {type(idx_dataset)}")
-    logger.info(f"idx_dataset shape: {idx_dataset.shape}")
+    # logger.info(f"idx_dataset shape: {idx_dataset.shape}")
     logger.info(f"idx_dataset first 10: {idx_dataset[:10]}")
 
     raise ValueError("mi fermo per debug errore")
