@@ -167,7 +167,7 @@ def evaluate_model( model_ ,
 
     model_.eval()
     
-    y_pred_, y_true_, idx_ = [], [], []
+    X_test_ , y_pred_, y_true_, idx_ = [] , [], [], []
 
     # y_pred_desc_=[]
     # y_true_desc_=[]
@@ -183,6 +183,7 @@ def evaluate_model( model_ ,
             predicted = outputs_.argmax(dim=1)
             # _, predicted = torch.max(outputs_, 1)
 
+            X_test_.append(images)
             y_true_.append(labels)
             y_pred_.append(predicted)
             idx_.append(torch.as_tensor(idx))
@@ -190,10 +191,11 @@ def evaluate_model( model_ ,
             # y_pred_desc_.append(dataset_.classes[lbl] for lbl in predicted.cpu())
             # y_true_desc_.append(dataset_.classes[lbl] for lbl in labels.cpu())
 
+    X_test_ = torch.cat(X_test_).cpu().numpy()
     y_true_ = torch.cat(y_true_).cpu().numpy()
     y_pred_ = torch.cat(y_pred_).cpu().numpy()
 
-    return y_pred_, y_true_, torch.cat(idx_).cpu().numpy()
+    return X_test_ , y_pred_, y_true_, torch.cat(idx_).cpu().numpy()
     
 def train_model(cfg,
                 logger,
@@ -251,7 +253,7 @@ def train_model(cfg,
         t1 = time.perf_counter()
 
         # LOOP VALIDATION
-        y_pred,y_true , idx_dataset = evaluate_model( model_,
+        _ , y_pred, y_true , idx_dataset = evaluate_model( model_,
                                         dataloader_val_,
                                         device_ )
 
@@ -334,7 +336,7 @@ def get_trained_model(cfg,
     # model = model.to(device).eval()
     validate_layers(model, cfg)
 
-    y_pred, y_true , idx_test = evaluate_model( model,test_loader_cnn ,device)
+    X_test , y_pred, y_true , idx_test = evaluate_model( model,test_loader_cnn ,device)
     test_accuracy = accuracy(y_true,y_pred)
     logger.info(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
 
@@ -346,6 +348,7 @@ def get_trained_model(cfg,
     info = {
         "action": action, 
         "reason": reason,
+        "X_test" : X_test,
         "y_true": y_true,
         "y_pred": y_pred,
         "idx_test": idx_test,

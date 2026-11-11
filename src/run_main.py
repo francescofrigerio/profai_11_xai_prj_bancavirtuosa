@@ -371,6 +371,7 @@ def phase_1_train(cfg,
 
     
     create_and_save_images_lists( logger, 
+                                  X_test_lr,
                                   y_test_lr, 
                                   y_pred_test_lr, 
                                   idx_test,
@@ -403,6 +404,7 @@ def phase_1_train(cfg,
                                         epoch_callback=callback)
 
     create_and_save_images_lists(  logger, 
+                                   info_cnn["X_test"],
                                    info_cnn["y_true"],
                                    info_cnn["y_pred"], 
                                    info_cnn["idx_test"],
