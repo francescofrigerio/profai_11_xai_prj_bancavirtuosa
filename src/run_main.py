@@ -132,6 +132,8 @@ def phase_2_xai( cfg,
     # The test DataLoader has shuffle=False, and the indices 
     # # it returns correspond to those in test_base.
     # So we can pass test_loader_cnn
+    logger.info(f"make_gradcam_callback test_loader_cnn {type(test_loader_cnn)}")
+    print("has dataset:", hasattr(test_loader_cnn, "dataset"))
     callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img)
 
     model, info = get_trained_model(cfg,

@@ -110,7 +110,7 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images):
 
             # Dataset: allows access to an element using dataset[idx].
             # DataLoader: returns batches of elements when iterated over.
-            dataset = dataloader.datasets
+            dataset = dataloader.dataset
             input_image, input_label, idx = dataset[idx_dataset]
 
             # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
