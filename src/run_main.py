@@ -502,7 +502,7 @@ def main(cfg=CONFIG, logger=LOGGER):
     # Gestione della fase da eseguire
     flag_phase_to_run = args.phase
     
-    if flag_phase_to_run == cfg.RUN_PHASE_DEFAULT:
+    if flag_phase_to_run == cfg.RUN_PHASE:
         logger.info("Fase da eseguire: TUTTE LE FASI (Default - 9)")
     elif flag_phase_to_run in (1, 2, 3):
         logger.info(f"Fase da eseguire: {flag_phase_to_run}")
@@ -514,7 +514,7 @@ def main(cfg=CONFIG, logger=LOGGER):
     out.mkdir(parents=True, exist_ok=True)
 
     # Esecuzione condizionale o sequenziale basata sulla fase
-    if flag_phase_to_run == cfg.RUN_PHAS or flag_phase_to_run == cfg.RUN_PHASE_1:
+    if flag_phase_to_run == cfg.RUN_PHASE or flag_phase_to_run == cfg.RUN_PHASE_1:
         logger.info("------------------------------------------------------------------")
         phase_1_train(cfg, logger, out, flag_pretrained)
         logger.info("------------------------------------------------------------------")
