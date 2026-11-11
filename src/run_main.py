@@ -323,8 +323,6 @@ def phase_1_train(cfg,
     val_loader_cnn = loaders_dict["cnn"]["val"]
     test_loader_cnn = loaders_dict["cnn"]["test"]
 
-    logger.info(f"test_loader_cnn type: {type(test_loader_cnn)}")
-
     X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, 
                                                     CONFIG.IMAGE_SIZE, 
                                                     CONFIG.IMAGE_SIZE)
@@ -342,8 +340,8 @@ def phase_1_train(cfg,
     val_accuracy_lr = accuracy(y_val_lr, lr.predict(X_val_lr))
     y_pred_test_lr = lr.predict(X_test_lr)
     test_accuracy_lr = accuracy(y_test_lr, y_pred_test_lr)
-    logger.info(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
-    logger.info(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
+    logger.debug(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
+    logger.debug(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
 
     # plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
     plot_predict_info(y_test_lr, 
@@ -353,11 +351,6 @@ def phase_1_train(cfg,
                       CONFIG,
                       "lr")
 
-    
-    
-    # logger.info(f"y_pred_test_lr shape: {y_pred_test_lr.shape}")
-    # logger.info(f"y_test_lr shape: {y_test_lr.shape}")
-    # logger.info(f"idx_dataset type: {type(idx_dataset)}")
     create_and_save_images_lists( logger, 
                                   X_test_lr,
                                   y_test_lr, 
@@ -383,10 +376,10 @@ def phase_1_train(cfg,
 
     
 
-    logger.info("Funzione: %s", make_gradcam_callback)
-    logger.info("Modulo: %s", make_gradcam_callback.__module__)
-    logger.info("File: %s", inspect.getfile(make_gradcam_callback))
-    logger.info("Firma: %s", inspect.signature(make_gradcam_callback))
+    # logger.info("Funzione: %s", make_gradcam_callback)
+    # logger.info("Modulo: %s", make_gradcam_callback.__module__)
+    # logger.info("File: %s", inspect.getfile(make_gradcam_callback))
+    # logger.info("Firma: %s", inspect.signature(make_gradcam_callback))
     # logger.info("Sorgente make_gradcam_callback:\n%s",inspect.getsource(make_gradcam_callback))
     
     callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img , logger)

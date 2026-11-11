@@ -27,7 +27,7 @@ from utility import sync
 class AttributionResult:
     technique: str
     input_labels: int
-    data_map: np.ndarray
+    map: np.ndarray
     signed: bool
     output_space: str
     seconds: float

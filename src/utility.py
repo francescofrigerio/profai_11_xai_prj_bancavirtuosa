@@ -336,3 +336,11 @@ def verify_output_files_exist(out_path: Path, cfg) -> bool:
     
     # Restituisce True solo se .exists() è True per TUTTI i file nella lista
     return all(f.exists() for f in files_to_check)
+
+
+# logger.info("Funzione: %s", make_gradcam_callback)
+# logger.info("Modulo: %s", make_gradcam_callback.__module__)
+# logger.info("File: %s", inspect.getfile(make_gradcam_callback))
+# logger.info("Firma: %s", inspect.signature(make_gradcam_callback))
+# logger.info("Sorgente make_gradcam_callback:\n%s",inspect.getsource(make_gradcam_callback))
+
