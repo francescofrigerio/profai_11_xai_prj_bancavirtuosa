@@ -340,7 +340,7 @@ def phase_1_train(cfg,
                                                CONFIG.IMAGE_SIZE, 
                                                CONFIG.IMAGE_SIZE)
         
-    X_test_lr , y_test_lr , _ = data_to_input_lr(test_loader_lr,1, 
+    X_test_lr , y_test_lr , idx_test = data_to_input_lr(test_loader_lr,1, 
                                                  CONFIG.IMAGE_SIZE, 
                                                  CONFIG.IMAGE_SIZE)
         
@@ -366,14 +366,14 @@ def phase_1_train(cfg,
     logger.info(f"y_pred_test_lr shape: {y_pred_test_lr.shape}")
     logger.info(f"y_test_lr shape: {y_test_lr.shape}")
     logger.info(f"idx_dataset type: {type(idx_dataset)}")
-    # logger.info(f"idx_dataset shape: {idx_dataset.shape}")
-    logger.info(f"idx_dataset first 10: {idx_dataset[:10]}")
+    logger.info(f"idx_dataset shape: {idx_dataset.shape}")
+    
 
-    raise ValueError("mi fermo per debug errore")
+    
     create_and_save_images_lists( logger, 
                                   y_test_lr, 
                                   y_pred_test_lr, 
-                                  idx_dataset,
+                                  idx_test,
                                   cfg.CHECK_CLASSES, 
                                   out_path,
                                   cfg.FILE_IMG_LR_OK, 
@@ -405,7 +405,7 @@ def phase_1_train(cfg,
     create_and_save_images_lists(  logger, 
                                    info_cnn["y_true"],
                                    info_cnn["y_pred"], 
-                                   info_cnn["idx_dataset"],
+                                   info_cnn["idx_test"],
                                    cfg.CHECK_CLASSES, 
                                    out_path,
                                    cfg.FILE_IMG_CNN_OK, 

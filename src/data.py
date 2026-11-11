@@ -251,7 +251,8 @@ def data_to_input_lr( dataloader_ ,
     X_input = X_input.reshape(X_input
                               .shape[0], -1).numpy()
     y_input = y_input.numpy()
-    idx = torch.cat(idx_list, dim=0)
+    # idx = torch.cat(idx_list, dim=0)
+    idx = torch.cat(idx_list, dim=0).cpu().numpy()
     
     return X_input , y_input , idx
 

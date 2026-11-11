@@ -334,7 +334,7 @@ def get_trained_model(cfg,
     # model = model.to(device).eval()
     validate_layers(model, cfg)
 
-    y_pred, y_true , idx_dataset = evaluate_model( model,test_loader_cnn ,device)
+    y_pred, y_true , idx_test = evaluate_model( model,test_loader_cnn ,device)
     test_accuracy = accuracy(y_true,y_pred)
     logger.info(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
 
@@ -349,7 +349,7 @@ def get_trained_model(cfg,
         "reason": reason,
         "y_true": y_true,
         "y_pred": y_pred,
-        "idx_dataset": idx_dataset,
+        "idx_test": idx_test,
         "test_accuracy": test_accuracy, 
         "history": history, 
         "path": path,
