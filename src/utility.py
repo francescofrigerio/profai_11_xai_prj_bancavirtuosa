@@ -282,7 +282,8 @@ def create_and_save_images_lists(logger,
     logger.info(f"idx_dataset shape before conversion: {np.shape(idx_dataset)}")
     logger.info(f"idx_dataset first element: {idx_dataset[0]}")
     raise ValueError("mi fermo per debug errore")
-    idx_dataset = np.asarray(idx_dataset)
+    
+    # idx_dataset = np.asarray(idx_dataset)
 
     list_ok, list_ko = run_create_list_images(logger,
                                               # X_test_ old solutions
