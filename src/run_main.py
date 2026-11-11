@@ -153,20 +153,6 @@ def phase_2_xai( cfg,
 
     # techniques = build_techniques(model, cfg, background)
 
-    # results = run_exp( cfg, 
-    #                    logger, 
-    #                    test_datasets,
-    #                    t_start, 
-    #                    techniques, 
-    #                    model, 
-    #                    lr, 
-    #                     X_test_lr,
-    #                     y_test_lr,
-    #                     device, 
-    #                     info, 
-    #                     out_path , 
-    #                     list_img ) 
-
     xai_param_dict = { "test_datasets" : test_datasets,
                         "t_start": t_start,
                         "X_test_lr": X_test_lr,
@@ -357,8 +343,8 @@ def phase_1_train(cfg,
     val_accuracy_lr = accuracy(y_val_lr, lr.predict(X_val_lr))
     y_pred_test_lr = lr.predict(X_test_lr)
     test_accuracy_lr = accuracy(y_test_lr, y_pred_test_lr)
-    print(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
-    print(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
+    logger.info(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
+    logger.info(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
 
     # plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
     plot_predict_info(y_test_lr, 
@@ -394,7 +380,7 @@ def phase_1_train(cfg,
     if len(list_img) == 0 :
             raise ValueError("list_img non può essere vuota")
     
-    callback = make_gradcam_callback(cfg,test_datasets, device, out_path , list_img)
+    callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img)
                                         
     # Cnn DenseNet
     _ , info_cnn = get_trained_model(cfg,
