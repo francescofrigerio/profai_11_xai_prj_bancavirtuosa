@@ -91,7 +91,7 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
         is visible at a glance.
     """
     def callback(model, epoch):
-        print(f"Start Callback Grad-CAM epoch: {epoch}")
+        logger.info(f"Start Callback Grad-CAM epoch: {epoch}")
         model.eval()
         explainer = GradCamCaptum(model, cfg)
 
@@ -117,10 +117,10 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
             # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
             input_img = input_image.unsqueeze(0).to(device)
 
-            print(f"after read dataset on: {idx_dataset}")
+            logger.info(f"after read dataset on: {idx_dataset}")
             # print(f"input_image: {type(input_img)}")
             # print(f"input_image: {type(input_label)}")
-            print(f"input_image: {input_img.shape}")
+            logger.info(f"input_image: {input_img.shape}")
                
             with torch.no_grad():
                 # pred = int(model(input_img).argmax(1))
@@ -157,7 +157,7 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
         out_path.mkdir(parents=True, exist_ok=True)
         path = out_path / f"gradcam_debug_epoch{epoch}.png"
         fig.savefig(path, dpi=100, bbox_inches="tight")
-        print(f"End Callback Grad-CAM saved: {path}")
+        logger.info(f"End Callback Grad-CAM saved: {path}")
 
     return callback
 

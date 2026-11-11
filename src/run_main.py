@@ -106,7 +106,7 @@ def phase_2_xai( cfg,
 
     logger.debug("Controllo test_idx superato.")
     logger.info(f" test_loader_cnn {type(test_loader_cnn)}")
-    print("has dataset:", hasattr(test_loader_cnn, "dataset"))
+    logger.info(f"has dataset:{hasattr(test_loader_cnn, "dataset")}")
 
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
@@ -135,7 +135,7 @@ def phase_2_xai( cfg,
     # # it returns correspond to those in test_base.
     # So we can pass test_loader_cnn
     logger.info(f" test_loader_cnn {type(test_loader_cnn)}")
-    print("has dataset:", hasattr(test_loader_cnn, "dataset"))
+    logger.info(f"has dataset: {hasattr(test_loader_cnn, "dataset")}")
     callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img , logger)
 
     model, info = get_trained_model(cfg,
@@ -445,17 +445,17 @@ def phase_1_train(cfg,
     np.savetxt(out_path / "confusion_densenet.csv", confusion(y_test_lr, y_pred_cnn, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
     np.savetxt(out_path / "confusion_lr.csv", confusion(y_test_lr, y_pred_test_lr, cfg.NUM_CLASSES), fmt="%d", delimiter=",")
         
-    print(f"\nDenseNet: val {val_acc_cnn:.4f}   | " \
+    logger.info(f"\nDenseNet: val {val_acc_cnn:.4f}   | " \
                   f"test {test_accuracy_cnn:.4f} | " \
                   f"F1 {metrics['densenet']['test_macro_f1']:.4f} | {train_sec_cnn * 1000:.2f} ms/img")
             
-    print(f"LR:       val {val_accuracy_lr:.4f}   | " \
+    logger.info(f"LR:       val {val_accuracy_lr:.4f}   | " \
                   f"test {test_accuracy_lr:.4f} | " \
                   f"F1 {metrics['lr']['test_macro_f1']:.4f} | {train_sec_lr * 1000:.3f} ms/img")
             
-    print(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
+    logger.info(f"gap on test: {gap * 100:.2f} points | quadrants: {q}")
     # print(f"checkpoint: {info_cnn['path']}\n | total {time.time() - t_start:.0f}s")
-    print(f"checkpoint: {info_cnn['path']}\n | total {time.perf_counter() - t_start:.0f}s")
+    logger.info(f"checkpoint: {info_cnn['path']}\n | total {time.perf_counter() - t_start:.0f}s")
     return metrics
 
 import argparse
