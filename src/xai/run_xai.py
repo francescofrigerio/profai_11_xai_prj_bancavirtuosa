@@ -82,6 +82,7 @@ def to_grid28(map2d, size, side=28):
                          size=(side, side), 
                          mode="area")[0, 0].numpy()
 
+# def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
 def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
     """
         Grad-CAM debug images of the first and last training epoch.
@@ -104,27 +105,54 @@ def make_gradcam_callback(cfg,dataset, device, out_path , list_images):
             item = list_images[id_class][0]
             idx_dataset = item["id_dataset"]
                
-            # The function to_densenet_input() has to receive a batch with 4 dim. 
-            # So we add the size batch here 
-            # Original Image MNIST: (1, 28, 28)
+            
             print(f"before read dataset on: {idx_dataset}")
-            input_image, input_label = dataset[idx_dataset]
+            
+
+            # Dataset: allows access to an element using dataset[idx].
+            # DataLoader: returns batches of elements when iterated over.
+            input_image, input_label, idx = dataset[idx_dataset]
+
+            # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
+            input_img = input_image.unsqueeze(0).to(device)
+
             print(f"after read dataset on: {idx_dataset}")
+            print(f"input_image: {type(input_img)}")
+            print(f"input_image: {type(input_label)}")
+            print(f"input_image: {input_img.shape}")
                
             # Add size of the batch: (1, 1, 28, 28) to the input
-            x28 = input_image.unsqueeze(0)
-
+            # x28 = input_image.unsqueeze(0)
             # Convert to Input DenseNet: (1, 3, 128, 128)
-            input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
+            # input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
+            
 
             with torch.no_grad():
                 # pred = int(model(input_img).argmax(1))
                 pred = int(model(input_img).argmax(dim=1).item())
                
             result = explainer.explain(input_img, pred)
-               
+            
             # Original Image
-            axes[0, i].imshow(input_image.squeeze(0),cmap="gray")
+            # axes[0, i].imshow(input_image.squeeze(0),cmap="gray")
+            # Reverse the ImageNet normalization 
+            # before displaying the image. 
+            # We don't should display the normalized tensor directly, 
+            # as the pixel scale will not correspond to that of a normal image.
+            mean = torch.tensor(cfg.IMAGENET_MEAN_TRANSFORM,
+                                device=input_image.device).view(3, 1, 1)
+
+            std = torch.tensor(cfg.IMAGENET_STD_TRANSFORM,
+                                device=input_image.device ).view(3, 1, 1)
+
+            image_display = (input_image * std + mean).clamp(0, 1)
+
+            # Display original grayscale image
+            axes[0, i].imshow(
+                image_display.mean(dim=0).cpu().numpy(),
+                cmap="gray"
+            )
+
             axes[0, i].set_title(f"true {input_label} / pred {pred}",fontsize=8)
                
             # Grad-CAM

@@ -129,7 +129,10 @@ def phase_2_xai( cfg,
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
 
-    callback = make_gradcam_callback(cfg,test_datasets, device, out_path , list_img)
+    # The test DataLoader has shuffle=False, and the indices 
+    # # it returns correspond to those in test_base.
+    # So we can pass test_loader_cnn
+    callback = make_gradcam_callback(cfg,test_loader_cnn.dataset, device, out_path , list_img)
 
     model, info = get_trained_model(cfg,
                             logger, 
