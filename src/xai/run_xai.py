@@ -108,11 +108,9 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
             item = list_images[id_class][0]
             idx_dataset = item["id_dataset"]
                
+            logger.debug(f"before read dataset on: {idx_dataset}")
+            logger.debug(f"before read dataset on: {type(dataloader)}")
             
-            logger.info(f"before read dataset on: {idx_dataset}")
-            logger.info(f"before read dataset on: {type(dataloader)}")
-            
-
             # Dataset: allows access to an element using dataset[idx].
             # DataLoader: returns batches of elements when iterated over.
             dataset = dataloader.dataset
@@ -121,7 +119,7 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
             # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
             input_img = input_image.unsqueeze(0).to(device)
 
-            logger.info(f"after read dataset on: {idx_dataset}")
+            logger.debug(f"after read dataset on: {idx_dataset}")
             # print(f"input_image: {type(input_img)}")
             # print(f"input_image: {type(input_label)}")
             logger.info(f"input_image: {input_img.shape}")
@@ -161,7 +159,7 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
         out_path.mkdir(parents=True, exist_ok=True)
         path = out_path / f"gradcam_debug_epoch{epoch}.png"
         fig.savefig(path, dpi=100, bbox_inches="tight")
-        logger.info(f"End Callback Grad-CAM saved: {path}")
+        logger.debug(f"End Callback Grad-CAM saved: {path}")
 
     return callback
 

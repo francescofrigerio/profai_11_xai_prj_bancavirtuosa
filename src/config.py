@@ -129,7 +129,7 @@ class ConfigConstantsDefault:
     FILE_IMG_LR_OK: str = "images_lr_ok.json" 
     FILE_IMG_LR_KO: str = "images_lr_ko.json" 
     FILE_IMG_CNN_OK: str = "images_cnn_ok.json" 
-    FILE_IMG_CNN_OK: str = "images_cnn_ko.json" 
+    FILE_IMG_CNN_KO: str = "images_cnn_ko.json" 
 
     LIST_IMAGES_SEL_LR_OK: str = "LR_OK" 
     LIST_IMAGES_SEL_LR_KO: str = "LR_KO"

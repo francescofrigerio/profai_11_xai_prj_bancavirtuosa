@@ -372,10 +372,7 @@ def phase_1_train(cfg,
     if len(list_img) == 0 :
             raise ValueError("list_img non può essere vuota")
 
-    logger.info(f"Pass param test_loader_cnn type: {type(test_loader_cnn)}")
-
-    
-
+    # logger.info(f"Pass param test_loader_cnn type: {type(test_loader_cnn)}")
     # logger.info("Funzione: %s", make_gradcam_callback)
     # logger.info("Modulo: %s", make_gradcam_callback.__module__)
     # logger.info("File: %s", inspect.getfile(make_gradcam_callback))
