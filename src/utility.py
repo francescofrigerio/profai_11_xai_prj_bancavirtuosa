@@ -279,8 +279,8 @@ def create_and_save_images_lists(logger,
     y_true = to_numpy(y_true)
     y_pred = to_numpy(y_pred)
     
-    # logger.info(f"idx_dataset type before conversion: {type(idx_dataset)}")
-    # logger.info(f"idx_dataset first element: {idx_dataset[0]}")
+    logger.info(f"idx_dataset type before conversion: {type(idx_dataset)}")
+    logger.info(f"idx_dataset first element: {idx_dataset[0]}")
     
     idx_dataset = np.asarray(idx_dataset)
 
