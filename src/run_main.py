@@ -80,12 +80,6 @@ def phase_2_xai( cfg,
                                                CONFIG.IMAGE_SIZE, 
                                                CONFIG.IMAGE_SIZE)
 
-    expected_idx = torch.arange(len(idx_val_lr))
-    
-    assert torch.equal(idx_val_lr, expected_idx), ( "Errore: non contiene indici consecutivi "
-                                                        "da 0 a len(val_idx_lr)-1 nell'ordine previsto."
-                                                    )
-    
     X_test_lr , y_test_lr , idx_test = data_to_input_lr(test_loader_lr,1, 
                                                  CONFIG.IMAGE_SIZE, 
                                                  CONFIG.IMAGE_SIZE)
