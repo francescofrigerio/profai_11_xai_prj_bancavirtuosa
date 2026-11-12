@@ -31,8 +31,7 @@ def load_dict_from_json(logger,path: Path):
     with open(path, "r", encoding="utf-8") as f:
         list_load_dict = json.load(f)
 
-    logger.debug(f"Caricati {len(list_load_dict)} elementi con successo!")
-    logger.debug(f"Primo elemento:{list_load_dict[0]}")
+    logger.debug("Caricati %d elementi con successo!",len(list_load_dict))
     return list_load_dict
 
 

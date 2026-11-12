@@ -60,6 +60,13 @@ def digit_mask(input_img28, threshold, dilation):
                            ) if dilation else mask
 
 
+
+def img28(pos,X_data,size ):
+    """
+        flat vector (784,) -> image (28, 28) for mask and imshow
+    """
+    return X_data[pos].reshape(size, size)
+
 def to_grid28(map2d, size, side=28):
     """
         This Function convert XAI 2dmap 
@@ -242,8 +249,6 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
 
             # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
             input_img = input_image.unsqueeze(0).to(device)
-
-            logger.debug("after read dataset on: %d",original_idx)
             logger.debug("input_image:%s",input_img.shape)
                
             with torch.no_grad():
@@ -286,12 +291,24 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
            
         fig.suptitle(f"Grad-CAM debug, epoch {epoch}")
         out_path.mkdir(parents=True, exist_ok=True)
-        path = out_path / f"gradcam_debug_epoch{epoch}.png"
-        fig.savefig(path, dpi=100, bbox_inches="tight")
-        # plt.show()
-        # plt.close(fig)
-        display(fig)
-        logger.debug("End Callback Grad-CAM saved: %s",path)
+        
+       
+        path_png = out_path / f"gradcam_debug_epoch{epoch}.png"
+        try:
+            fig.savefig(path_png, dpi=100, bbox_inches="tight")
+        
+            try:
+                # display(fig)
+                display(Image(str(path_png)))
+            except Exception:
+                logger.exception("Impossibile mostrare %s", path_png)
+        
+        finally:
+            # Figure delete refernce without pyplot
+            fig.clear()
+            del fig, axes
+
+        logger.debug("End Callback Grad-CAM saved: %s",path_png)
 
     return callback
 
@@ -325,6 +342,10 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     out_path = xai_param_dict["out_path"]
     transform_cnn = xai_param_dict["transform_cnn"] 
     dataloader_cnn = xai_param_dict["dataloader_cnn"]
+
+    dataset = dataloader_cnn.dataset
+    # original idx (saved in the json) -> position in the dataset
+    idx_to_pos = dataset.idx_dataset_position()
    
     # pass all dataset train , already processed and normalized
     # make_background don't need train_idx parameter
@@ -339,24 +360,34 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
         # load_images_by_class return a list not a dict 
         # so we add [0]    
         item = list_images[id_class][0]
-        idx_dataset = item["id_dataset"]
+        original_idx = item["id_dataset"]
                        
-        logger.debug("before read dataset on: %s", idx_dataset)
+        logger.debug("before read dataset on: %s", original_idx)
         logger.debug("before read dataset on: %s", type(dataloader_cnn))
                     
         # Dataset: allows access to an element using dataset[idx].
         # DataLoader: returns batches of elements when iterated over.
-        dataset = dataloader_cnn.dataset
-        input_image, input_label, idx = dataset[idx_dataset]
+        # dataset = dataloader.dataset
+        # input_image, input_label, idx = dataset[idx_dataset]
+        if original_idx not in idx_to_pos:
+            raise KeyError(f"id_dataset {original_idx} not found in this dataset: "
+                            "json list and dataloader must use the same split (val/test)")
+        position = idx_to_pos[original_idx]
         
+        input_image, input_label, idx = dataset[position]
+        # This alerts if the JSON list and the dataloader 
+        # do not belong to the same split.
+        assert idx == original_idx   # sanity check
+        logger.info("assert original_idx :%d",original_idx)
+
+        assert int(input_label) == int(y_data[position])
+        logger.info("assert position :%d",position)
+
+        # assert idx_to_pos[position] == original_idx  
         # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
         input_img = input_image.unsqueeze(0).to(device)
-        
-        logger.debu("after read dataset on: %s",idx_dataset)
         logger.debug("input_image:%s",input_img.shape)
                        
-        
-        
         with torch.no_grad():
             # pred = int(model(input_img).argmax(1))
             pred = int(model(input_img).argmax(dim=1).item())
@@ -372,23 +403,28 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
             logger.info(f"End Xai {name} {technique}")
 
         # substiutr i with idx_dataset
-        rows.append({"index": int(idx_dataset), 
-                     "true": int(y_data[idx_dataset]), 
+        # original_idx idc original (log/json)
+        # dataset position X_data[idx]
+        rows.append({"index": original_idx, 
+                     "pos": position,
+                     "true": int(y_data[position]), 
                      "pred": pred, 
                      "maps": maps,
-                     "lr_map": lr.local_map(X_data[idx_dataset], pred)})
+                     # local_map runs reshape(28,28)
+                     "lr_map": lr.local_map(X_data[position], pred)})
     
-        logger.info(f"End Loop {i} image {idx_dataset} (true {y_data[idx_dataset]}, predicted {pred}): ")
+        logger.info(f"End Loop {i} image {original_idx} {position} (true {y_data[position]}, predicted {pred}): ")
 
     # This selects the first index to
     # compare explanation getting from 
     # this first with that already in rows[0] 
-    first_idx = rows[0]["index"]
+    first_idx = rows[0]["pos"]
     # These select and transform the first image
-    first_image, _ = dataset[first_idx]
-    first = to_densenet_input(first_image.unsqueeze(0),
-                              cfg.DENSENET_SIZE
-                              ).to(device)
+    # already 3x128x128 and normlaized because we begin from transform
+    first, _ , _ = dataset[first_idx]
+    # first = to_densenet_input(first_image.unsqueeze(0),
+    #                          cfg.DENSENET_SIZE
+    #                          ).to(device)
 
     # LIME and SHAP can have stochastic components: 
     # a new execution might produce a slightly different map.                         
@@ -400,10 +436,8 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
         ref = rows[0]["maps"][name].map
 
         diff = float(np.abs(again - ref).max())
-        
-        logger.info(f"{name} Check Difference {diff <= cfg.RELU_MAX_REF_DIFF}", 
-                    f"max difference {diff:.2e}")
-        
+        logger.info("%s check difference: %s, max difference %.2e",name, diff <= cfg.RELU_MAX_REF_DIFF, diff)
+            
         logger.info(f"End Again Calculate Xai {name} {techniques[name]}")
        
     # This model's independent copy is used to perform checks 
@@ -434,12 +468,8 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
         # between the two maps, normalized by the 
         # maximum absolute value of the second map.
         diff = float(np.abs(a - b).max() / max(np.abs(b).max(), 1e-12))
-        
-        logger.info(f"{name} Check on trained model: "
-                    f"{diff <= cfg.RELU_MAX_REL_DIFF}, "
-                    f"relative difference {diff:.1e}"
-                    )
-         
+        logger.info("%s check on train: %s, relative difference %.2e",name, diff <= cfg.RELU_MAX_REF_DIFF, diff)
+
     shares = []
 
     # Here we calculate two values
@@ -455,7 +485,8 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     # shares contains a pair of indicators for each image, 
     # rather than the maps themselves.
     for row in rows:
-        mask = digit_mask(X_data[row["index"], 0].numpy(), 
+        # mask = digit_mask(X_data[row["pos"], 0].numpy(), cfg.MASK_THRESHOLD, cfg.MASK_DILATION)
+        mask = digit_mask(img28(row["pos"],X_data,size=cfg.IMAGE_SIZE), 
                           cfg.MASK_THRESHOLD, 
                           cfg.MASK_DILATION)
         
@@ -465,7 +496,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
         # shares.append((float(g[mask].sum() / g.sum()), 
         #                       float(mask.mean() )))
         share = float(g[mask].sum() / max(g.sum(), 1e-12))
-        shares.append(share,float(mask.mean()))
+        shares.append((share,float(mask.mean())))
         
     
     # figure plot for all techniques
@@ -474,7 +505,9 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     axes = fig.subplots(len(rows), len(names) + 2)
     for r, row in enumerate(rows):
         # original image
-        axes[r, 0].imshow(X_data[row["index"], 0], cmap="gray")
+        # axes[r, 0].imshow(X_data[row["pos"], 0], cmap="gray")
+        axes[r, 0].imshow(img28(row["pos"],X_data,size=cfg.IMAGE_SIZE), cmap="gray")
+
         axes[r, 0].set_ylabel(f"true {row['true']}\npred {row['pred']}", fontsize=8)
         # Prepare the cell's maps for visualization:
         # col1 original map
@@ -503,16 +536,24 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
             axes[r, c].set_yticks([])
     for c, title in enumerate(["image"] + [TITLES[n] for n in names] + ["LR local\n(w * x)"]):
         axes[0, c].set_title(title, fontsize=9)
-    fig.savefig(out_path / "maps_grid.png", 
-                dpi=90, bbox_inches="tight")
+
+    path_png = out_path / "maps_grid.png"
     try:
-        display(Image(str(out_path / "maps_grid.png")))
-    except Exception:
-        pass
+        fig.savefig(path_png, dpi=90, bbox_inches="tight")
+
+        try:
+            display(Image(str(path_png)))
+        except Exception:
+            logger.exception("Impossibile mostrare %s", path_png)
+
+    finally:
+        # Figure delete refernce without pyplot
+        fig.clear()
+        del fig, axes
 
     # save result to json file
     results = {
-        "model": {k: info[k] for k in ("action", "reason", "sha256", "device")},
+        "model": {k: info[k] for k in ("action", "reason", "device")},
         "ig_completeness_errors": ig_errors,
         "images": [{"index": r["index"], "true": r["true"], "pred": r["pred"],
                     "native_shapes": {n: list(r["maps"][n].map.shape) 

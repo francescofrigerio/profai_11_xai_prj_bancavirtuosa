@@ -146,7 +146,7 @@ def phase_2_xai( cfg,
                              "dataloader_cnn": test_loader_cnn
                         }
 
-        return run_exp( cfg, logger, model, lr, device , xai_param_dict) 
+    return run_exp( cfg, logger, model, lr, device , xai_param_dict) 
  
 def phase_1_train(cfg,
                 logger,
