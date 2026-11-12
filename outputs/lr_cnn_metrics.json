@@ -1,67 +1,82 @@
 {
   "densenet": {
-    "val_acc": 0.9693333333333334,
-    "test_acc": 0.9703,
-    "test_macro_f1": 0.9697966008894676,
-    "train_sec_cnn": 460.83986167599994,
-    "val_sec_cnn": 51.50990105099993
+    "val_acc": 0.969,
+    "test_acc": 0.968,
+    "test_macro_f1": 0.9675269686221893,
+    "train_sec_cnn": 250.21077835799997,
+    "val_sec_cnn": 29.23936740099998
   },
   "lr": {
     "val_acc": 0.922,
-    "test_acc": 0.9241,
-    "test_macro_f1": 0.92296361592536,
-    "fit_seconds": 83.75894267099997,
-    "n_iter": 255
+    "test_acc": 0.9244,
+    "test_macro_f1": 0.9232530926865292,
+    "fit_seconds": 51.188011365999955,
+    "n_iter": 258
   },
   "quadrants": {
-    "both_correct": 9061,
-    "only_densenet": 642,
-    "only_lr": 180,
-    "both_wrong": 117
+    "both_correct": 9054,
+    "only_densenet": 626,
+    "only_lr": 190,
+    "both_wrong": 130
   },
-  "gap_test_points": 4.620000000000002,
+  "gap_test_points": 4.359999999999998,
   "model": {
     "action": "train",
-    "reason": "MODEL_MODE=train",
+    "reason": "RUN_MODE=train",
     "path": "/content/profai_11_xai_prj_bancavirtuosa/checkpoints/densenet121_mnist.pt",
     "device": "cuda"
   },
   "history": [
     {
       "epoch": 0,
-      "train_loss": 0.27124202251434326,
-      "val_acc": 0.948,
-      "train_seconds": 92.45645034,
-      "val_seconds": 10.202000888999976
+      "y_pred_val": "[1 9 3 ... 2 0 4]",
+      "y_true_val": "[1 9 3 ... 5 0 4]",
+      "idx_val": "[58886 22875 48551 ... 13829 40340 38131]",
+      "train_loss": 0.15554256737232208,
+      "val_acc": 0.9478333333333333,
+      "train_seconds": 52.54450842999995,
+      "val_seconds": 5.9317980849999685
     },
     {
       "epoch": 1,
-      "train_loss": 0.07110244780778885,
-      "val_acc": 0.9603333333333334,
-      "train_seconds": 94.23226168299999,
-      "val_seconds": 10.580224332
+      "y_pred_val": "[1 9 3 ... 2 0 4]",
+      "y_true_val": "[1 9 3 ... 5 0 4]",
+      "idx_val": "[58886 22875 48551 ... 13829 40340 38131]",
+      "train_loss": 0.18000338971614838,
+      "val_acc": 0.9588333333333333,
+      "train_seconds": 49.51446304199999,
+      "val_seconds": 5.741100115999984
     },
     {
       "epoch": 2,
-      "train_loss": 0.23051492869853973,
+      "y_pred_val": "[1 9 3 ... 2 0 4]",
+      "y_true_val": "[1 9 3 ... 5 0 4]",
+      "idx_val": "[58886 22875 48551 ... 13829 40340 38131]",
+      "train_loss": 0.11971116065979004,
       "val_acc": 0.964,
-      "train_seconds": 90.80421374599996,
-      "val_seconds": 10.246340872000019
+      "train_seconds": 49.307942583,
+      "val_seconds": 5.7762226830000145
     },
     {
       "epoch": 3,
-      "train_loss": 0.033643122762441635,
-      "val_acc": 0.9658333333333333,
-      "train_seconds": 93.51134663200003,
-      "val_seconds": 10.506524163999984
+      "y_pred_val": "[1 9 3 ... 2 0 4]",
+      "y_true_val": "[1 9 3 ... 5 0 4]",
+      "idx_val": "[58886 22875 48551 ... 13829 40340 38131]",
+      "train_loss": 0.1728944629430771,
+      "val_acc": 0.9653333333333334,
+      "train_seconds": 49.42987918799997,
+      "val_seconds": 5.853835025999956
     },
     {
       "epoch": 4,
-      "train_loss": 0.0857788547873497,
-      "val_acc": 0.9693333333333334,
-      "train_seconds": 89.83558927499996,
-      "val_seconds": 9.97481079399995
+      "y_pred_val": "[1 9 3 ... 2 0 4]",
+      "y_true_val": "[1 9 3 ... 5 0 4]",
+      "idx_val": "[58886 22875 48551 ... 13829 40340 38131]",
+      "train_loss": 0.20757712423801422,
+      "val_acc": 0.969,
+      "train_seconds": 49.41398511500006,
+      "val_seconds": 5.936411491000058
     }
   ],
-  "total_seconds": 630.047358751297
+  "total_seconds": 361.2512164115906
 }
