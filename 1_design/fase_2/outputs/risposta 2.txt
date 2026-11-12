@@ -1,0 +1,24 @@
+Tappa 2 chiusa
+
+80 test passati su 80 (53,7 secondi), compresi quelli che richiedono torch. È il numero atteso: i 79 del giro precedente, con quello corretto, più il nuovo test sullo sfondo di SHAP.
+
+Il run reale era già tutto PASS. I file che hai appena inviato (griglia di mappe, risultati, verifiche) sono identici a quelli dell’invio precedente, stesso SHA incluso, quindi non aggiungono informazioni nuove. Ho registrato la chiusura nell’errata.
+
+Cosa c’è di consolidato
+Sei tecniche dietro un unico contratto, con controlli negativi (input non normalizzato, batch, classe inesistente, modello in train).
+Test con segnale piantato: ogni tecnica trova la regione piantata e segue la classe richiesta.
+Tempi: 7,4 s per immagine con tutte e sei (Grad-CAM 0,02, Saliency 0,04, Occlusion 0,26, IG 0,51, LIME 3,2, SHAP 3,4). Stima di “Esegui tutto”: circa 20 minuti in load e 26 in train.
+Equivalenze verificate sul modello addestrato: ReLU in-place identiche a quelle patchate, IG con errore di completezza = 2,7%, LIME e SHAP riproducibili.
+Una cosa resta aperta, non bloccante
+
+Le due immagini di debug del Grad-CAM (outputs/stage2/debug/gradcam_debug_epoch1.png e …epoch5.png): la funzione D09 è implementata e il file è stato scritto, ma nessuno l’ha ancora guardata. Se vuoi, mandamele quando ricapita di avere una sessione: serve solo per vedere che la prima epoca sia “disordinata” e l’ultima segua le cifre.
+
+Tappa 3
+
+Sono pronto a partire con campionamento e confronto. Il materiale è quasi tutto già deciso nell’errata (E07–E11, E03, E17, E26), quindi applicherei questi default:
+
+Campione quantitativo: stratificato per classe predetta, 10 per classe (N=100), seed fisso.
+Galleria da 24: 10 corrette (una per classe, a caso con seed), 6 errori più confidenti, 8 dai quadranti (2 per quadrante, senza duplicati).
+Confronto (il cuore del progetto): Spearman e IoU sul top-20% dentro la maschera digit (soglia 0,1, dilatazione 1), con la regola di ricampionamento a 28×28. Le matrici sono 7×7 con la LR locale, con media e deviazione standard sul campione. Aggiungo il riferimento casuale (atteso: Spearman ˜ 0 e IoU ˜ 0,111, che sarà un test), la tabella dell’attribuzione fuori dalla cifra con la cautela su IG e LIME, e la deletion dietro il flag.
+
+Tra le cose da fissare insieme a te ce n’è una nuova, emersa dalla griglia: Occlusion sul 5 è negativa, cioè coprire il tratto alza il logit. In tappa 3 la ispezioneremo con i numeri (i logit con e senza copertura) invece di fidarci della figura. Dimmi di procedere e preparo il codice, i test e il driver, con lo stesso schema: ti consegno tutto nello zip e il run su Colab chiude la tappa.
