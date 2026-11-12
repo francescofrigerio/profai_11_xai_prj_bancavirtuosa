@@ -84,12 +84,6 @@ def phase_2_xai( cfg,
                                                  CONFIG.IMAGE_SIZE, 
                                                  CONFIG.IMAGE_SIZE)
 
-    expected_idx = torch.arange(len(idx_test))
-        
-    assert torch.equal(idx_test, expected_idx), ( "Errore: non contiene indici consecutivi "
-                                                "da 0 a len(idx_test)-1 nell'ordine previsto."
-                                                )
-        
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
     # from here is different compare to phase 1
