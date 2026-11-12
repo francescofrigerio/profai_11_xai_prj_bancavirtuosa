@@ -269,10 +269,9 @@ def phase_1_train(cfg,
 
     if cfg.FLAG_LIST_VAL :
         create_and_save_images_lists(  logger, 
-                                           # [item["X_val"] for item in history],
-                                           [item["y_true_val"] for item in history],
-                                           [item["y_pred_val"] for item in history],
-                                           [item["idx_val"] for item in history],
+                                           last["y_true_val"],
+                                           last["y_pred_val"],
+                                           last["idx_val"],
                                            cfg.CHECK_CLASSES, 
                                            out_path,
                                            cfg.FILE_IMG_CNN_OK, 

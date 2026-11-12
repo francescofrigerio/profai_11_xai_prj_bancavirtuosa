@@ -155,19 +155,15 @@ def run_create_list_images( logger,
     # Maschere su tutte le classi
     correct_mask = y_pred_ == y_test_
     wrong_mask = y_pred_ != y_test_
-    logger.debug(f" correct_mask {correct_mask} wrong_mask {wrong_mask}")
-
+   
     list_images_ok = []
     list_images_ko = []
-
-    logger.debug(f" y_test_ {y_test_}")
-    logger.debug(f" y_test_ {type(y_test_)}")
 
     for id_class in list_class_:
         logger.debug(f" start classe {id_class}")
 
         class_mask = y_test_ == id_class
-        logger.debug(f" total_class_mask {class_mask}")
+        # logger.debug(f" total_class_mask {class_mask}")
 
         class_ok_mask = class_mask & correct_mask
         class_ko_mask = class_mask & wrong_mask
@@ -183,9 +179,6 @@ def run_create_list_images( logger,
         idx_ok = np.where((np.asarray(y_test_) == id_class) &
                           (np.asarray(y_test_) == np.asarray(y_pred_)))[0]
 
-        logger.debug(f"Indici KO di controllo: {idx_ko[:10]}")
-        logger.debug(f"Indici OK di controllo: {idx_ok[:10]}")
-
         # stabilisco quanti errori e quante
         # immagini corrette possiamo selezionare
         if flag_before_ko is True:
@@ -196,8 +189,6 @@ def run_create_list_images( logger,
             # n_ok utilizza soltanto i posti rimasti dopo aver selezionato gli errori.
             n_ok = min(len(idx_ok), n_per_class - n_ko)
 
-            logger.debug(f"BEFORE KO n_ko {n_ko}")
-            logger.debug(f"BEFORE KO  n_ok {n_ok}")
         else:
             # n_ok non può superare né il numero di errori 
             # disponibili né il limite per classe.
@@ -206,9 +197,6 @@ def run_create_list_images( logger,
             # n_ko utilizza soltanto i posti rimasti dopo aver selezionato gli ok.
             n_ko = min(len(idx_ko), n_per_class - n_ok)
 
-            logger.debug(f"BEFORE OK n_ok {n_ok}")
-            logger.debug(f"BEFORE OK n_ko {n_ko}")
-            
         idx_ko_selected = idx_ko[:n_ko]
         idx_ok_selected = idx_ok[:n_ok]
 
@@ -281,6 +269,11 @@ def create_and_save_images_lists(logger,
     
     logger.info(f"idx_dataset type before conversion: {type(idx_dataset)}")
     logger.info(f"idx_dataset first element: {idx_dataset[0]}")
+
+    if y_true.ndim != 1 or y_pred.shape != y_true.shape or idx_dataset.shape != y_true.shape:
+        raise ValueError(f"Attesi array 1D della stessa lunghezza, ottenuti "
+                         f"{y_true.shape}, {y_pred.shape}, {idx_dataset.shape}")
+
     
     idx_dataset = np.asarray(idx_dataset)
 

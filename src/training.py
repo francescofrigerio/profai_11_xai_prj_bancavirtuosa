@@ -279,7 +279,7 @@ def train_model(cfg,
                     "train_seconds": train_seconds,
                     "val_seconds": val_seconds})
         
-        if epoch_callback_ is not None and epoch in callback_epochs:
+        if epoch_callback_ is not None and (epoch + 1) in callback_epochs:
                 epoch_callback_(model_, epoch)
 
     cnn_train_seconds = sum(item["train_seconds"] for item in history)
