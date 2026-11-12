@@ -242,9 +242,9 @@ def train_model(cfg,
             train_loss = loss.item()
             running_loss += train_loss
             if i % 1000 == 900:    # stampa ogni 100 mini-batch
-                logger.info(f'[Epoca {epoch + 1}, Ciclo {i + 1:5d}] Loss: {running_loss / 100:.3f}')
+                logger.debug(f'[Epoca {epoch + 1}, Ciclo {i + 1:5d}] Loss: {running_loss / 100:.3f}')
                 running_loss = 0.0
-                # break
+            
         sync(device_)
         
         # train_seconds = time.time() - t0
@@ -260,13 +260,13 @@ def train_model(cfg,
         
         # val_seconds = time.time() - t1
         val_seconds = time.perf_counter() - t1
-        logger.info(f'[Epoca {epoch + 1}, loop {i + 1:5d}] train time: {train_seconds:.3f}  val time: {val_seconds:.3f} ')
+        logger.debug(f'[Epoca {epoch + 1}, loop {i + 1:5d}] train time: {train_seconds:.3f}  val time: {val_seconds:.3f} ')
 
         if epoch + 1 == cfg.NUM_EPOCHS:
             if ( val_accuracy < cfg.MIN_VAL_ACCURACY ):
                 logger.info(f"WARNING!! Validation Accuracy(DenseNet Cnn) is lower the treshold({cfg.MIN_VAL_ACCURACY}): {val_accuracy}")
             else:
-                logger.info(f"Validation Accuracy (DenseNet Cnn): {val_accuracy}")
+                logger.debug(f"Validation Accuracy (DenseNet Cnn): {val_accuracy}")
 
         history.append({
                     "epoch": epoch, 

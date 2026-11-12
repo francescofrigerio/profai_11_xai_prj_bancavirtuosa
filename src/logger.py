@@ -13,5 +13,5 @@ logging.basicConfig(
 
 # Here Create Object logger with trace level INFO
 LOGGER = logging.getLogger("AiAppLogger")
-# LOGGER.setLevel(logging.INFO)
-LOGGER.setLevel(logging.DEBUG)
+LOGGER.setLevel(logging.INFO)
+# LOGGER.setLevel(logging.DEBUG)
