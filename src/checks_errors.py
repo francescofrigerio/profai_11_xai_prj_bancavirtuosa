@@ -44,8 +44,10 @@ def assert_lr_input(x_data, cfg) -> None:
 
 
 def assert_densenet_input(x_data, cfg, tol: float = 1e-4) -> None:
-    """(B, 3, S, S) float32; once denormalized: values in [0, 1] and identical channels.
-    It catches a missing/duplicated normalization and the wrong order of the operations."""
+    """
+        (B, 3, S, S) float32; once denormalized: values in [0, 1] and identical channels.
+        It catches a missing/duplicated normalization and the wrong order of the operations.
+    """
     a = detach_cpu_numpy(x_data)
     s = cfg.DENSENET_SIZE
     _require(a.ndim == 4 and a.shape[1:] == (3, s, s),
@@ -80,9 +82,11 @@ def assert_proba(p, cfg, atol: float = 1e-4) -> None:
              f"probabilities do not sum to 1 (max deviation {np.abs(a.sum(axis=1) - 1).max():.2e})")
 
 
-# The 'Verification' table
+# The 'Verification' table Obsolete
 class Verifications:
-    """Rows (name, status, detail) of the table shown in the report appendix."""
+    """
+        Rows (name, status, detail) of the table shown in the report appendix.
+    """
 
     ORDER = {"PASS": 0, "INFO": 0, "WARN": 1, "FAIL": 2}
 
