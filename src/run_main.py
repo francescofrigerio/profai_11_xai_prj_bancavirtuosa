@@ -89,9 +89,9 @@ def phase_2_xai( cfg,
     # from here is different compare to phase 1
    
     list_img = []
-    if cfg.LIST_IMAGES_SEL == cfg.LIST_IMAGES_SEL_CNN_OK:
+    if cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_OK:
         list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_OK)
-    elif cfg.LIST_IMAGES_SEL == cfg.LIST_IMAGES_SEL_CNN_KO:
+    elif cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_KO:
         list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
 
     if len(list_img) == 0 :
@@ -227,9 +227,9 @@ def phase_1_train(cfg,
                                   flag_before_ko=True)
     
     list_img = []
-    if cfg.LIST_IMAGES_SEL == cfg.LIST_IMAGES_SEL_LR_OK:
+    if cfg.LIST_IMAGES_SEL_PHASE_1 == cfg.LIST_IMAGES_SEL_LR_OK:
         list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_OK)
-    elif cfg.LIST_IMAGES_SEL == cfg.LIST_IMAGES_SEL_LR_KO:
+    elif cfg.LIST_IMAGES_SEL_PHASE_1 == cfg.LIST_IMAGES_SEL_LR_KO:
         list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
 
     if len(list_img) == 0 :
