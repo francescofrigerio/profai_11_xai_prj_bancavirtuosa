@@ -10,6 +10,7 @@ SRC_DIR = ROOT_DIR / "src"
 sys.path.insert(0, str(SRC_DIR))
 
 from training import get_evaluate_model , read_checkpoint , build_densenet
+from utility import  run_check_class_ok_ko , verify_output_files_exist
 from config import CONFIG
 from logger import LOGGER
 from utility import ls_dir
@@ -137,7 +138,7 @@ def test_load_checkpoint_weights_only(cfg=CONFIG, logger=LOGGER):
 
 
 
-def test_model_evaluation(cfg, logger, test_loader, device_):
+def test_model_evaluation(cfg=CONFIG, logger=LOGGER, test_loader, device_):
     """
         Verifica l'esecuzione della pipeline di valutazione e la coerenza degli output.
     """
@@ -160,3 +161,11 @@ def test_model_evaluation(cfg, logger, test_loader, device_):
     
     # Assicuriamoci che l'accuracy sia un valore percentuale valido (tra 0 e 1)
     assert 0.0 <= acc <= 1.0, f"Valore di accuracy non valido: {acc}"
+
+def test_verify_file(cfg=CONFIG, logger=LOGGER):
+    
+    out_path = Path(cfg.OUTPUT_DIR) 
+    out_path.mkdir(parents=True, exist_ok=True)
+    
+    verify_output_files_exist(out_path,cfg)
+

@@ -253,9 +253,7 @@ def train_model(cfg,
         t1 = time.perf_counter()
 
         # LOOP VALIDATION
-        _ , y_pred, y_true , _ = evaluate_model( model_,
-                                        dataloader_val_,
-                                        device_ )
+        X_val , y_pred, y_true , idx_val = evaluate_model( model_,dataloader_val_ ,device_)
 
         val_accuracy = accuracy(y_true,y_pred)
         sync(device_)
@@ -272,6 +270,10 @@ def train_model(cfg,
 
         history.append({
                     "epoch": epoch, 
+                    "X_val": X_val, 
+                    "y_pred_val": y_pred, 
+                    "y_true_val": y_true, 
+                    "idx_val": idx_val, 
                     "train_loss": train_loss, 
                     "val_acc": val_accuracy,
                     "train_seconds": train_seconds,
@@ -360,7 +362,7 @@ def get_trained_model(cfg,
         "val_seconds": val_sec_cnn,
         "device": str(device),
     }
-    return model, info
+    return model, info , history
 
 
 

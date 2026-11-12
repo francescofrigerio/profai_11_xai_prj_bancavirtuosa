@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import json
 import torch
+import inspect
 from config import IMAGENET_MEAN , IMAGENET_STD
 
 from config import IMAGENET_MEAN_NP , IMAGENET_STD_NP
@@ -337,10 +338,18 @@ def verify_output_files_exist(out_path: Path, cfg) -> bool:
     # Restituisce True solo se .exists() è True per TUTTI i file nella lista
     return all(f.exists() for f in files_to_check)
 
-
-# logger.info("Funzione: %s", make_gradcam_callback)
-# logger.info("Modulo: %s", make_gradcam_callback.__module__)
-# logger.info("File: %s", inspect.getfile(make_gradcam_callback))
-# logger.info("Firma: %s", inspect.signature(make_gradcam_callback))
-# logger.info("Sorgente make_gradcam_callback:\n%s",inspect.getsource(make_gradcam_callback))
+def print_inspect_function(logger,f_imported_defined):
+    """
+        logger.info("Funzione: %s", make_gradcam_callback)
+        logger.info("Modulo: %s", make_gradcam_callback.__module__)logger.info("File: %s", inspect.getfile(make_gradcam_callback))
+        logger.info("Firma: %s", inspect.signature(make_gradcam_callback))
+        logger.info("Sorgente make_gradcam_callback:\n%s",inspect.getsource(make_gradcam_callback))    
+    """
+    logger.info("Funzione: %s", f_imported_defined)
+    logger.info("Modulo: %s", f_imported_defined.__module__)
+    logger.info("File: %s", inspect.getfile(f_imported_defined))
+    logger.info("Firma: %s", inspect.signature(f_imported_defined))
+    logger.info("Sorgente f_imported_defined:\n%s",inspect.getsource(f_imported_defined))
+    
+    
 

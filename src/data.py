@@ -64,6 +64,12 @@ class TransformedDataset(Dataset):
 
         return image, label, original_idx
 
+    def idx_dataset_position(self):
+        idx_position = {  int(original_idx): position
+                            for position, original_idx in enumerate(self.original_indices)
+                        }
+        return idx_position
+        
 def debug_iter_dataloader(dataloader_):
     """
         Number elements batch: 3

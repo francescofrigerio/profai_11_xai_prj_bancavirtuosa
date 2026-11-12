@@ -126,6 +126,7 @@ class ConfigConstantsDefault:
 
     # found and confirmed by visual control
     CHECK_CLASSES: tuple[int, ...] = (2, 3, 5, 8)
+    FLAG_LIST_VAL: bool = True 
     FILE_IMG_LR_OK: str = "images_lr_ok.json" 
     FILE_IMG_LR_KO: str = "images_lr_ko.json" 
     FILE_IMG_CNN_OK: str = "images_cnn_ok.json" 

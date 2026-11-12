@@ -12,6 +12,9 @@ import torch.nn.functional as F
 
 import numpy as np
 from matplotlib.figure import Figure
+# from matplotlib.pyplot import plt
+from IPython.display import display
+
 from scipy.ndimage import binary_dilation
 from IPython.display import Image, display
 
@@ -95,7 +98,7 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
         is visible at a glance.
     """
     def callback(model, epoch):
-        logger.info(f"Start Callback Grad-CAM epoch: {epoch}")
+        logger.debug("Start Callback Grad-CAM epoch:%d",epoch)
         model.eval()
         explainer = GradCamCaptum(model, cfg)
 
@@ -108,8 +111,8 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
             item = list_images[id_class][0]
             idx_dataset = item["id_dataset"]
                
-            logger.debug(f"before read dataset on: {idx_dataset}")
-            logger.debug(f"before read dataset on: {type(dataloader)}")
+            logger.debug("before read dataset on: %s", idx_dataset)
+            logger.debug("before read dataset on: %s", type(dataloader))
             
             # Dataset: allows access to an element using dataset[idx].
             # DataLoader: returns batches of elements when iterated over.
@@ -119,15 +122,20 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
             # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
             input_img = input_image.unsqueeze(0).to(device)
 
-            logger.debug(f"after read dataset on: {idx_dataset}")
-            # print(f"input_image: {type(input_img)}")
-            # print(f"input_image: {type(input_label)}")
-            logger.info(f"input_image: {input_img.shape}")
+            logger.debug("after read dataset on: %s",idx_dataset)
+            logger.debug("input_image:%s",input_img.shape)
                
             with torch.no_grad():
                 # pred = int(model(input_img).argmax(1))
                 pred = int(model(input_img).argmax(dim=1).item())
-               
+
+            # Thus, in the case of a 3 classified as an 8, the map highlights 
+            # the regions that support the prediction of an 8. 
+            # It does not necessarily show the regions that would 
+            # have allowed for the correct identification of the 3.
+            # Furthermore,  the brighter areas indicate greater activation relevant 
+            # to the chosen class—not a precise segmentation of the digit, 
+            # nor causal evidence of the decision-making process.
             result = explainer.explain(input_img, pred)
             
             # Original Image
@@ -159,7 +167,10 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
         out_path.mkdir(parents=True, exist_ok=True)
         path = out_path / f"gradcam_debug_epoch{epoch}.png"
         fig.savefig(path, dpi=100, bbox_inches="tight")
-        logger.debug(f"End Callback Grad-CAM saved: {path}")
+        # plt.show()
+        # plt.close(fig)
+        display(fig)
+        logger.debug("End Callback Grad-CAM saved: %s",path)
 
     return callback
 
@@ -185,45 +196,45 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     
     rows, ig_errors = [], []
 
-    dataset = xai_param_dict["test_datasets"]
     t_start = xai_param_dict["t_start"]
-    X_data = xai_param_dict["X_test_lr"]
-    y_data = xai_param_dict["y_test_lr"]
+    X_data = xai_param_dict["X_data"]
+    y_data = xai_param_dict["y_data"]
     info = xai_param_dict["info"]
-    list_img = xai_param_dict["list_img"]
+    list_images = xai_param_dict["list_img"]
     out_path = xai_param_dict["out_path"]
-    transform_train_cnn = xai_param_dict["transform_train_cnn"]
-    
-
+    transform_cnn = xai_param_dict["transform_cnn"] 
+    dataloader_cnn = xai_param_dict["dataloader_cnn"]
+   
     # pass all dataset train , already processed and normalized
     # make_background don't need train_idx parameter
-    background = make_background(transform_train_cnn,cfg,logger, device)
+    background = make_background(transform_cnn,cfg,logger, device)
     techniques = build_techniques(model, cfg, background)
 
-    logger.info(f"Before Loop {list_img}")
-    logger.info(f"Before Loop {list_img.keys()}")
+    logger.info("Before Loop %s", list_images)
+    logger.info("Before Loop %s ", list_images.keys())
     # n_images = len(list_img)
-    for i, id_class in enumerate(sorted(list_img.keys())):
-        logger.info(f"Start Loop {i} {id_class}")
+    for i, id_class in enumerate(sorted(list_images.keys())):
+        logger.debug("Start Loop %d %d " , i ,id_class)
         # load_images_by_class return a list not a dict 
-        # so we add [0]
-        item = list_img[id_class][0]
-        logger.info(f"Start Loop {i} {type(item)}")
-        logger.info(f"Start Loop {i} {item}")
+        # so we add [0]    
+        item = list_images[id_class][0]
         idx_dataset = item["id_dataset"]
-
-        logger.info(f"Start Loop {i} {idx_dataset}")
-
-        # The function to_densenet_input() has to receive a batch with 4 dim. 
-        # So we add the size batch here 
-        # Original Image MNIST: (1, 28, 28)
-        input_image, _ = dataset[idx_dataset]
                        
-        # Add size of the batch: (1, 1, 28, 28) to the input
-        x28 = input_image.unsqueeze(0)
+        logger.debug("before read dataset on: %s", idx_dataset)
+        logger.debug("before read dataset on: %s", type(dataloader))
+                    
+        # Dataset: allows access to an element using dataset[idx].
+        # DataLoader: returns batches of elements when iterated over.
+        dataset = dataloader_cnn.dataset
+        input_image, input_label, idx = dataset[idx_dataset]
         
-        # Convert to Input DenseNet: (1, 3, 128, 128) and normalize
-        input_img = to_densenet_input(x28,cfg.DENSENET_SIZE).to(device)
+        # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
+        input_img = input_image.unsqueeze(0).to(device)
+        
+        logger.debu("after read dataset on: %s",idx_dataset)
+        logger.debug("input_image:%s",input_img.shape)
+                       
+        
         
         with torch.no_grad():
             # pred = int(model(input_img).argmax(1))
