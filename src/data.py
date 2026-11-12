@@ -64,11 +64,24 @@ class TransformedDataset(Dataset):
 
         return image, label, original_idx
 
-    def idx_dataset_position(self):
+    def idx_dataset_position_old(self):
         idx_position = {  int(original_idx): position
                             for position, original_idx in enumerate(self.original_indices)
                         }
         return idx_position
+    def idx_dataset_position(self):
+        """
+            original idx -> position inside this dataset
+        """
+        dict_result = {}
+        if self.original_indices is None:
+            dict_result = {i: i for i in range(len(self))}
+        else:
+            dict_result = {
+                           int(original_idx):
+                           position for position, original_idx in enumerate(self.original_indices)
+                          }
+        return dict_result
         
 def debug_iter_dataloader(dataloader_):
     """

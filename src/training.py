@@ -270,7 +270,7 @@ def train_model(cfg,
 
         history.append({
                     "epoch": epoch, 
-                    "X_val": X_val, 
+                    # "X_val": X_val, 
                     "y_pred_val": y_pred, 
                     "y_true_val": y_true, 
                     "idx_val": idx_val, 

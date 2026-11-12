@@ -2,11 +2,11 @@
     Commont utility for Normalization , Model Cnn and Logistic Regression
 """
 
+import json
+import inspect
 from pathlib import Path
 import numpy as np
-import json
 import torch
-import inspect
 from config import IMAGENET_MEAN , IMAGENET_STD
 
 from config import IMAGENET_MEAN_NP , IMAGENET_STD_NP
@@ -137,7 +137,7 @@ def sync(device) -> None:
 
 
 def run_create_list_images( logger, 
-                            X_test_ , 
+                            # X_test_ , 
                             y_test_,
                             y_pred_ , 
                             idx_dataset_,
@@ -219,9 +219,9 @@ def run_create_list_images( logger,
             # con 3 dimensioni ma la prima è uguale a 1 relativa a 1x28x28
             # toglie la prima dimensione ininfluente
             # LR: il codice rimane quasi identico al precedente
-            img_to_save = X_test_[i]
-            if img_to_save.ndim == 3 and img_to_save.shape[0] == 1:
-                img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
+            # img_to_save = X_test_[i]
+            # if img_to_save.ndim == 3 and img_to_save.shape[0] == 1:
+            #     img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
 
             # cast to int else json.write not work
             # i=Posizione nella sequenza delle predizioni
@@ -242,9 +242,9 @@ def run_create_list_images( logger,
             # con 3 dimensioni ma la prima è uguale a 1 relativa a 1x28x28
             # toglie la prima dimensione ininfluente
             # LR: il codice rimane quasi identico al precedente
-            img_to_save = X_test_[i]
-            if img_to_save.ndim == 3 and img_to_save.shape[0] == 1:
-                img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
+            # img_to_save = X_test_[i]
+            # if img_to_save.ndim == 3 and img_to_save.shape[0] == 1:
+            #     img_to_save = img_to_save.squeeze(0) # Rimuove la dimensione del canale se è 1
 
             # cast to int else json.write not work
             dict_curr_ko = {  "class": int(id_class),
@@ -263,7 +263,7 @@ def run_create_list_images( logger,
 
 
 def create_and_save_images_lists(logger, 
-                                 X_test,
+                                 # X_test,
                                  y_true, 
                                  y_pred, 
                                  idx_dataset,
@@ -286,7 +286,7 @@ def create_and_save_images_lists(logger,
     idx_dataset = np.asarray(idx_dataset)
 
     list_ok, list_ko = run_create_list_images(logger,
-                                              X_test,          
+                                              # X_test,          
                                               y_true,
                                               y_pred,
                                               idx_dataset,

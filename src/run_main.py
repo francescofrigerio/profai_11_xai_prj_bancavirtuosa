@@ -215,7 +215,7 @@ def phase_1_train(cfg,
     
     if cfg.FLAG_LIST_VAL :
         create_and_save_images_lists( logger, 
-                                          X_val_lr,
+                                          # X_val_lr,
                                           y_val_lr, 
                                           y_pred_val_lr, 
                                           idx_val_lr,
@@ -227,7 +227,7 @@ def phase_1_train(cfg,
                                           flag_before_ko=True)
     else:
         create_and_save_images_lists( logger, 
-                                  X_test_lr,
+                                  # X_test_lr,
                                   y_test_lr, 
                                   y_pred_test_lr, 
                                   idx_test,
@@ -262,9 +262,14 @@ def phase_1_train(cfg,
                                                 device,
                                                 pretrained=flag_pretrained,
                                                 epoch_callback=callback)
+
+    last = history[-1] if history else None
+    if last is None or "y_pred_val" not in last:
+        raise ValueError("history senza predizioni di validation: rifare il training")
+
     if cfg.FLAG_LIST_VAL :
         create_and_save_images_lists(  logger, 
-                                           [item["X_val"] for item in history],
+                                           # [item["X_val"] for item in history],
                                            [item["y_true_val"] for item in history],
                                            [item["y_pred_val"] for item in history],
                                            [item["idx_val"] for item in history],
@@ -276,7 +281,7 @@ def phase_1_train(cfg,
                                            flag_before_ko=True)
     else:
         create_and_save_images_lists(  logger, 
-                                       info_cnn["X_test"],
+                                       # info_cnn["X_test"],
                                        info_cnn["y_true"],
                                        info_cnn["y_pred"], 
                                        info_cnn["idx_test"],
