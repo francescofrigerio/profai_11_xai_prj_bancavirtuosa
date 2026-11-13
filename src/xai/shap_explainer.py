@@ -8,7 +8,6 @@ import shap
 
 from training import set_seed
 from xai.explainer import Explainer
-from utility import to_densenet_input
 
 def make_background(transform_train, cfg,logger, device):
     """
@@ -52,7 +51,6 @@ def make_background(transform_train, cfg,logger, device):
     input_images = torch.stack([transform_train[int(i)][0] for i in pick])
     logger.info(f" input_images shape {input_images.shape}")
     # not run other select with pick and other normalization 
-    # return to_densenet_input(input_images[torch.as_tensor(pick)], cfg.DENSENET_SIZE).to(device)
     return input_images.to(device)
 
 def pick_shap_target(shap_values, input_label: int, num_classes: int) -> np.ndarray:

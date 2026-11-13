@@ -7,9 +7,12 @@ import inspect
 from pathlib import Path
 import numpy as np
 import torch
+import torch.nn.functional as F
+from scipy.ndimage import binary_dilation
 
 from config import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 from config import IMAGENET_MEAN_NP , IMAGENET_STD_NP
+
 
 def require(condition: bool, message: str) -> None:
     """
@@ -110,6 +113,14 @@ def black_normalized(size: int, device):
     """
     return normalize_imagenet(torch.zeros(1, 3, size, size, device=device))
 
+def black_baseline(device):
+    """
+        black pixel after ImageNet normalization: (0 - mean) / std, shape (1,3,1)
+    """
+    mean = torch.tensor(IMAGENET_MEAN_TRANSFORM, device=device)
+    std = torch.tensor(IMAGENET_STD_TRANSFORM, device=device)
+    return ((0 - mean) / std).view(1, 3, 1)
+
 def denormalize_imagenet_np(x_data: np.ndarray) -> np.ndarray:
     """
         numpy version of denormalize image net, for the contract checks (no torch needed).
@@ -118,27 +129,71 @@ def denormalize_imagenet_np(x_data: np.ndarray) -> np.ndarray:
     std = np.asarray(IMAGENET_STD_TRANSFORM, dtype=np.float64).reshape(1, 3, 1, 1)
     return np.asarray(x_data, dtype=np.float64) * std + mean
 
-def to_densenet_input(input_img, size: int):
+def digit_mask(input_img28, threshold, dilation):
     """
-        input_img (N, 1, 28, 28) in [0, 1] 
-        
-        Interpolate resize Images from 28 x 28 to size x size.
-        "Bilinear" refers to the interpolation method used to calculate the new pixels.
+        This function creates a binary mask of the image.
 
-        repeat replicates the tensor along the specified dimensions
-        from (N, 1, 224, 224) to → (N, 3, 224, 224)
+        It compares each pixel with a threshold:
+        - pixel above the threshold: True;
+        - pixel at or below the threshold: False.
+        In this way, it approximately identifies 
+        the pixels belonging to the digit,
+        and so identify the area occupied by the digit
 
-        Final normalize for ImageNet.
-        The shape of output obect is (N, 3, size, size) normalized.
+        In the short:
+        This function is used to distinguish the digit area 
+        from the background, potentially including 
+        a small margin around the strokes(tratti).
 
-        The same grayscale image is copied into the three RGB channels
-        because DenseNet, when pre-trained on ImageNet, expects three channels.
+        Limits:THRESHOLD must be consistent 
+        with the pixel values in X_train. 
+        If the images are normalized or standardized, 
+        the threshold must be chosen accordingly.
     """
-    import torch.nn.functional as F
-    x = F.interpolate(input_img, size=(size, size), mode="bilinear", align_corners=False)
-    x = x.repeat(1, 3, 1, 1)
-    return normalize_imagenet(x)
+    mask = np.asarray(input_img28) > threshold
 
+    # expands the mask, slightly enlarging the identified area.
+    # The dilation parameter determines how many times 
+    # this expansion is performed. If it is set to zero, 
+    # the mask remains unchanged.
+    return binary_dilation(mask, 
+                           structure=np.ones((3, 3), bool), 
+                           iterations=dilation
+                           ) if dilation else mask
+
+
+
+def img28(pos,X_data,size ):
+    """
+        flat vector (784,) -> image (28, 28) for mask and imshow
+    """
+    return X_data[pos].reshape(size, size)
+
+def to_grid28(map2d, size, side=28):
+    """
+        This Function convert XAI 2dmap  (4x4, 8x8, 128x128) -> size x size, 
+        to compare with the digit mask
+    """
+
+    # - Convert map2d to tensor and Adds two dimensions—batch 
+    # and channel—resulting 
+    # in the shape (1, 1, H, W).
+    t = torch.as_tensor(np.asarray(map2d), 
+                        dtype=torch.float32)[None, None]
+    if t.shape[-1] < size:
+        # If the map is smaller than the specified size, 
+        # it scales it up to size × size.
+        t = F.interpolate(t, 
+                          size=(size, size), 
+                          mode="bilinear", 
+                          align_corners=False)
+
+    # Resizes it to 28 × 28 using area interpolation.
+    # and removes the batch and channel dimensions 
+    # and returns a NumPy array.  
+    return F.interpolate(t, 
+                         size=(side, side), 
+                         mode="area")[0, 0].numpy()
 def ls_dir(str_dir):
 
     print(f"Comando ls {str_dir} ")

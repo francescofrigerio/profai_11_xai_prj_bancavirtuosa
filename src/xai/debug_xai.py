@@ -12,89 +12,13 @@ import torch.nn.functional as F
 
 import numpy as np
 from matplotlib.figure import Figure
-# from matplotlib.pyplot import plt
-from IPython.display import display
-
-from scipy.ndimage import binary_dilation
 from IPython.display import Image, display
+from utility import digit_mask , img28 , to_grid28
 
-from config import TITLES
-from config import IMAGENET_MEAN_TRANSFORM
-from config import IMAGENET_STD_TRANSFORM
+from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM , TITLES
 
-from utility import to_densenet_input
 from xai import GradCamCaptum , build_techniques
 from xai.shap_explainer import make_background
-
-
-def digit_mask(input_img28, threshold, dilation):
-    """
-        This function creates a binary mask of the image.
-
-        It compares each pixel with a threshold:
-        - pixel above the threshold: True;
-        - pixel at or below the threshold: False.
-        In this way, it approximately identifies 
-        the pixels belonging to the digit,
-        and so identify the area occupied by the digit
-
-        In the short:
-        This function is used to distinguish the digit area 
-        from the background, potentially including 
-        a small margin around the strokes(tratti).
-
-        Limits:THRESHOLD must be consistent 
-        with the pixel values in X_train. 
-        If the images are normalized or standardized, 
-        the threshold must be chosen accordingly.
-    """
-    mask = np.asarray(input_img28) > threshold
-
-    # expands the mask, slightly enlarging the identified area.
-    # The dilation parameter determines how many times 
-    # this expansion is performed. If it is set to zero, 
-    # the mask remains unchanged.
-    return binary_dilation(mask, 
-                           structure=np.ones((3, 3), bool), 
-                           iterations=dilation
-                           ) if dilation else mask
-
-
-
-def img28(pos,X_data,size ):
-    """
-        flat vector (784,) -> image (28, 28) for mask and imshow
-    """
-    return X_data[pos].reshape(size, size)
-
-def to_grid28(map2d, size, side=28):
-    """
-        This Function convert XAI 2dmap 
-        to mnist risolution 28x28 to compare
-        xai map with the digit mask
-
-        This is the step:
-    """
-
-    # - Convert map2d to tensor and Adds two dimensions—batch 
-    # and channel—resulting 
-    # in the shape (1, 1, H, W).
-    t = torch.as_tensor(np.asarray(map2d), 
-                        dtype=torch.float32)[None, None]
-    if t.shape[-1] < size:
-        # If the map is smaller than the specified size, 
-        # it scales it up to size × size.
-        t = F.interpolate(t, 
-                          size=(size, size), 
-                          mode="bilinear", 
-                          align_corners=False)
-
-    # Resizes it to 28 × 28 using area interpolation.
-    # and removes the batch and channel dimensions 
-    # and returns a NumPy array.  
-    return F.interpolate(t, 
-                         size=(side, side), 
-                         mode="area")[0, 0].numpy()
 
 def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logger):
     """
