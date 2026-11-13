@@ -2,6 +2,7 @@ import time
 import warnings
 from dataclasses import dataclass
 from sklearn.linear_model import LogisticRegression
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import accuracy_score
 import numpy as np
 
@@ -12,8 +13,11 @@ def lr_kwargs(cfg) -> dict:
         version, so it is never passed 
         (sklearn >= 1.8 deprecates the `penalty` argument).
     """
-    import sklearn
-    kw = dict(C=cfg.LR_C, solver=cfg.LR_SOLVER, max_iter=cfg.LR_MAX_ITER, random_state=cfg.SEED)
+    kw = dict(C=cfg.LR_C, 
+              solver=cfg.LR_SOLVER, 
+              max_iter=cfg.LR_MAX_ITER, 
+              tol=cfg.LR_TOL, 
+              random_state=cfg.SEED)
     
     return kw
 
@@ -25,6 +29,29 @@ class LRBaseline:
     logger: any
     diagnostics: dict
     accuracy: float = 0 
+
+    
+    def check_reproducibility(self,X_t, y_t, cfg):
+        """  
+              Run this code to test this model
+              run with reproduce alwai the same result(reprocibility)
+              on the same environment.
+        """
+
+        model_1 = LogisticRegression(**lr_kwargs(cfg)).fit(X_t, y_t)
+        model_2 = LogisticRegression(**lr_kwargs(cfg)).fit(X_t, y_t)
+
+        coef_equal = np.array_equal(model_1.coef_,model_2.coef_)
+        intercept_equal = np.array_equal(model_1.intercept_,model_2.intercept_)
+        predictions_equal = np.array_equal(model_1.predict(X_t),model_2.predict(X_t))
+        max_coef_diff = float(np.max(np.abs(model_1.coef_ - model_2.coef_)))
+
+        return { "coef_exact_equal": bool(coef_equal),
+                 "intercept_exact_equal": bool(intercept_equal),
+                 "predictions_equal": bool(predictions_equal),
+                 # "max_coef_diff": max_coef_diff,
+                 "coef_reproducible": max_coef_diff <= cfg.LR_MAX_C
+               }
 
     def get_model(self) -> any :
             """
@@ -122,7 +149,7 @@ class LRBaseline:
         for warning in self.diagnostics["other_warnings"]:
             logger.info(f"[INFO] {tag_diag}: warning raised -> {warning}")
 
-def fit_baseline(X_t, y_t, X_v , y_v, cfg , logger ) -> LRBaseline:
+def fit_baseline_old(X_t, y_t, X_v , y_v, cfg , logger ) -> LRBaseline:
     """
          Fit on train A ConvergenceWarning is re-emitted, never swallowed.
     """
@@ -149,6 +176,90 @@ def fit_baseline(X_t, y_t, X_v , y_v, cfg , logger ) -> LRBaseline:
 
     }
     return LRBaseline(model,cfg,logger,diagnostics)
+
+
+
+
+
+def fit_baseline(X_t, y_t, X_v, y_v, cfg, logger) -> "LRBaseline":
+    """
+        Add initial test data
+        Fit on train A ConvergenceWarning is re-emitted, never swallowed.
+    """
+        
+    # check type data
+    X_t = np.asarray(X_t)
+    X_v = np.asarray(X_v)
+    y_t = np.asarray(y_t)
+    y_v = np.asarray(y_v)
+
+    # Verify size data
+    assert X_t.ndim == 2
+    assert X_v.ndim == 2
+    assert X_t.shape[1] == X_v.shape[1]
+    assert len(X_t) == len(y_t)
+    assert len(X_v) == len(y_v)
+
+    # Verify iffinite data
+    assert np.isfinite(X_t).all()
+    assert np.isfinite(X_v).all()
+
+    t0 = time.perf_counter()
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+
+        model = LogisticRegression(**lr_kwargs(cfg))
+        model.fit(X_t, y_t)
+
+    fit_seconds = time.perf_counter() - t0
+
+    # Warning diagnostics
+    categories = sorted({
+        w.category.__name__ for w in caught
+    })
+
+    convergence_warning = any(
+        issubclass(w.category, ConvergenceWarning)
+        for w in caught
+    )
+
+    other_warnings = sorted({
+        f"{w.category.__name__}: {str(w.message)[:140]}"
+        for w in caught
+        if not issubclass(w.category, ConvergenceWarning)
+    })
+
+    diagnostics = { "fit_seconds": float(fit_seconds),
+                    "n_iter": int(np.max(model.n_iter_)),
+                    "convergence_warning": convergence_warning,
+                     "solver": model.solver,
+                    "C": model.C,
+                    "tol": model.tol,
+                    "max_iter": model.max_iter,
+                    "warning_categories": categories,
+                    "other_warnings": other_warnings,
+                    "n_train": int(len(X_t)),
+                    "val_accuracy": float(model.score(X_v, y_v)),
+                    "classes_ok": bool(
+                        np.array_equal(
+                            model.classes_,
+                            np.arange(cfg.NUM_CLASSES)
+                        )
+                    ),
+                 }
+
+    logger.info( f"LogisticRegression fitted | "
+                f"n_iter={diagnostics['n_iter']} | "
+                f"val_acc={diagnostics['val_accuracy']:.6f}"
+                )
+
+    return LRBaseline( model=model,
+                        cfg=cfg,
+                        logger=logger,
+                        diagnostics=diagnostics
+                    )
+
 
 
 

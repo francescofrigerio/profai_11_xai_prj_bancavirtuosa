@@ -84,7 +84,13 @@ class ConfigConstantsDefault:
     LR_PENALTY: str = "l2"
     LR_SOLVER: str = "lbfgs"
     LR_C: float = 1.0
-    LR_MAX_ITER: int = 1000              # check ConvergenceWarning in phase zero
+    LR_MAX_ITER: int = 1000    
+    LR_FIT_INTERCEPT: bool = True    
+    LR_N_JOBS: int = 1  
+    LR_TOL: float = 1e-4  
+    LR_MAX_C: float = 1e-10  
+    # check ConvergenceWarning 
+    # check reproducibility
 
     # XAI techniques
     # LIME and SHAP always use the reference packages `lime` and `shap` (E24): no backend switch.

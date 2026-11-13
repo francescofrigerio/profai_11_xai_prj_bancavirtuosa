@@ -273,7 +273,6 @@ def train_model(cfg,
 
         history.append({
                     "epoch": epoch, 
-                    # "X_val": X_val, 
                     "y_pred_val": y_pred, 
                     "y_true_val": y_true, 
                     "idx_val": idx_val, 
@@ -347,12 +346,7 @@ def get_trained_model(cfg,
 
     if action == "load" and epoch_callback is not None :
         epoch_callback(model,cfg.NUM_EPOCHS+1)
-           
-    # logger.info(f"y_pred shape: {y_pred.shape}")
-    # logger.info(f"y_true shape: {y_true.shape}")
-    # logger.info(f"idx_dataset type: {type(idx_test)}")
-    # logger.info(f"idx_dataset first 10: {idx_test[:10]}")
-
+        
     info = {
         "action": action, 
         "reason": reason,

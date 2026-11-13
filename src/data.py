@@ -21,13 +21,6 @@ class TransformedDataset(Dataset):
         Here we Transform Data for DataLoader
         and wrap Dataset to save index of the images
     """
-    def init_err_idx_lr(self, dataset, transform=None):
-        """
-            This version not store he correct idx
-            parameter for lr model
-        """
-        self.dataset = dataset
-        self.transform = transform
     def __init__(self, dataset, transform, original_indices=None):
         self.dataset = dataset
         self.transform = transform
@@ -38,18 +31,6 @@ class TransformedDataset(Dataset):
         """
         return len(self.dataset)
 
-    def getitem_err_idx_lr(self, idx):
-        """
-            This version not return the correct idx
-            parameter for lr model
-        """
-        image, label = self.dataset[idx]
-
-        if self.transform is not None:
-            image = self.transform(image)
-
-        return image, label , idx
-    
     def __getitem__(self, idx):
         image, label = self.dataset[idx]
 

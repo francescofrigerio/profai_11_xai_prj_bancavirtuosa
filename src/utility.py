@@ -7,10 +7,16 @@ import inspect
 from pathlib import Path
 import numpy as np
 import torch
-# from config import IMAGENET_MEAN , IMAGENET_STD
+
 from config import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 from config import IMAGENET_MEAN_NP , IMAGENET_STD_NP
 
+def require(condition: bool, message: str) -> None:
+    """
+    """
+    if not condition:
+        raise ValueError(message)
+            
 def to_numpy(x):
     return torch.as_tensor(x).detach().cpu().numpy()
 

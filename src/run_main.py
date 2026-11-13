@@ -21,13 +21,13 @@ from data import data_to_input_lr, load_datasets
 from data import  load_images_by_class
 
 from logger import LOGGER
-from metrics import accuracy, confusion, macro_f1, quadrants
+from metrics import accuracy, confusion, macro_f1, quadrants , create_quadrant_lists
 from output import plot_predict_info 
 from training import get_device, get_trained_model 
 
-from utility import create_and_save_images_lists  
-from xai.run_xai import run_exp 
-from xai.run_xai import make_gradcam_callback
+from utility import create_and_save_images_lists , require  
+from xai.debug_xai import run_exp , make_gradcam_callback
+# from xai.debug_xai import make_gradcam_callback
 
 
 # Configuration Warnings 
@@ -86,6 +86,7 @@ def phase_2_xai( cfg,
 
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
+    y_pred_val_lr = lr.predict(X_val_lr)
     # from here is different compare to phase 1
    
     list_img = []
@@ -109,8 +110,20 @@ def phase_2_xai( cfg,
                                             pretrained=flag_pretrained,
                                             epoch_callback=callback)
     
-
-     
+    # here we verifiy the alignment
+    # It works because because valloader_lr e valloader_cnn has shuffle=False
+    require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! indici non allineati tra cnn ed lr")
+    
+    create_quadrant_lists( cfg,
+                           logger, 
+                           history['y_true_val'], 
+                           y_pred_val_lr, 
+                           history['y_pred_val'], 
+                           idx_val_lr,
+                           cfg.CHECK_CLASSES, 
+                           out_path, 
+                           n_per_class=1 )
+    
     list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
     list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
 
