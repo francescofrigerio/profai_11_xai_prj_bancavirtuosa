@@ -256,7 +256,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     out_path = xai_param_dict["out_path"]
     transform_cnn = xai_param_dict["transform_cnn"] 
     dataloader_cnn = xai_param_dict["dataloader_cnn"]
-    flag_error_pred = xai_param_dict["flag_error_pred"]
+    flag_error_pred_cnn = xai_param_dict["flag_error_pred_cnn"]
 
     dataset = dataloader_cnn.dataset
     # original idx (saved in the json) -> position in the dataset
@@ -419,7 +419,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(rows)))
 
     fig.suptitle("XAI - IMMAGINI PREDETTE CON ERRORE DA DENSENET" 
-                 if flag_error_pred else "XAI - IMMAGINI PREDETTE CON ERRORE DA LR",
+                 if flag_error_pred_cnn else "XAI - IMMAGINI PREDETTE CON ERRORE DA LR",
                 fontsize=14,
                 fontweight="bold",
                 y=1.02
@@ -461,7 +461,11 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     for c, title in enumerate(["image"] + [TITLES[n] for n in names] + ["LR local\n(w * x)"]):
         axes[0, c].set_title(title, fontsize=9)
 
-    path_png = out_path / "maps_grid.png"
+    if flag_error_pred_cnn:
+        path_png = out_path / "maps_grid_ko_cnn.png"
+    else:
+        path_png = out_path / "maps_grid_ko_lr.png"
+
     try:
         fig.savefig(path_png, dpi=90, bbox_inches="tight")
 

@@ -125,7 +125,7 @@ def phase_2_xai( cfg,
                         "out_path": out_path,   
                         "transform_cnn": transform_val_cnn,   
                         "dataloader_cnn": val_loader_cnn,
-                        "flag_error_pred": False
+                        "flag_error_pred_cnn": False
                     }
    
 
@@ -139,7 +139,7 @@ def phase_2_xai( cfg,
                             "out_path": out_path,   
                             "transform_cnn": transform_val_cnn,   
                             "dataloader_cnn": val_loader_cnn,
-                            "flag_error_pred": True
+                            "flag_error_pred_cnn": True
                         }
 
        
