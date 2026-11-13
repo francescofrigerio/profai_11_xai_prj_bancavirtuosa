@@ -89,7 +89,7 @@ class Explainer:
                                  self.signed, 
                                  self.output_space, 
                                  seconds,
-                                 self._meta(input_img, int(input_label)))
+                                 self.meta(input_img, int(input_label)))
       
 
 
