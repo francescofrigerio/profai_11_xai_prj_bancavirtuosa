@@ -488,7 +488,11 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
                                       for n in names}} for r in rows],
         "total_seconds": time.time() - t_start,
     }
-    (out_path / "stage2_results.json").write_text(json.dumps(results, indent=2))
+
+    if flag_error_pred_cnn:
+        (out_path / "stage2_results_ko_cnn.json").write_text(json.dumps(results, indent=2))
+    else:
+        (out_path / "stage2_results_ko_lr.json").write_text(json.dumps(results, indent=2))
     
     logger.info(f"All tecniques run correctly. Total time {time.time() - t_start:.0f}s")
     return results

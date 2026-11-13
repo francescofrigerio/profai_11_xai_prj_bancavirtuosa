@@ -352,17 +352,17 @@ def main(cfg=CONFIG, logger=LOGGER):
     if args.mode == 'load':
         # we can pass load also with phase 1
         flag_pretrained = True
-        logger.info("Training avviato in modalità: LOAD")
+        logger.debug("Training avviato in modalità: LOAD")
     else:
-        logger.info("Training avviato in modalità: TRAIN")
+        logger.debug("Training avviato in modalità: TRAIN")
 
     # Gestione della fase da eseguire
     flag_phase_to_run = args.phase
     
     if flag_phase_to_run == cfg.RUN_PHASE:
-        logger.info("Fase da eseguire: TUTTE LE FASI (Default - 9)")
+        logger.debug("Fase da eseguire: TUTTE LE FASI (Default - 9)")
     elif flag_phase_to_run in (1, 2, 3):
-        logger.info("Fase da eseguire: %d",flag_phase_to_run)
+        logger.debug("Fase da eseguire: %d",flag_phase_to_run)
     else:
         raise ValueError(f"Attenzione!! Numero fase da eseguire non valido: {flag_phase_to_run}")
 
