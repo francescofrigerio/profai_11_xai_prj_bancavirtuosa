@@ -494,5 +494,5 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     else:
         (out_path / "stage2_results_ko_lr.json").write_text(json.dumps(results, indent=2))
     
-    logger.info(f"All tecniques run correctly. Total time {time.time() - t_start:.0f}s")
+    logger.debug(f"All tecniques run correctly. Total time {time.time() - t_start:.0f}s")
     return results
