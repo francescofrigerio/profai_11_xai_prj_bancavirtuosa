@@ -405,21 +405,20 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     # image occupied by the mask space digit.
     # shares contains a pair of indicators for each image, 
     # rather than the maps themselves.
-    for row in rows:
-        # mask = digit_mask(X_data[row["pos"], 0].numpy(), cfg.MASK_THRESHOLD, cfg.MASK_DILATION)
-        mask = digit_mask(img28(row["pos"],X_data,size=cfg.IMAGE_SIZE), 
+    shares = []
+    if "saliency" in techniques:
+        for row in rows:
+            # mask = digit_mask(X_data[row["pos"], 0].numpy(), cfg.MASK_THRESHOLD, cfg.MASK_DILATION)
+            mask = digit_mask(img28(row["pos"],X_data,size=cfg.IMAGE_SIZE), 
                           cfg.MASK_THRESHOLD, 
                           cfg.MASK_DILATION)
-        
-        g = to_grid28(np.abs(row["maps"]["saliency"].map), 
-                      cfg.DENSENET_SIZE)
-
-        # shares.append((float(g[mask].sum() / g.sum()), 
-        #                       float(mask.mean() )))
-        share = float(g[mask].sum() / max(g.sum(), 1e-12))
-        shares.append((share,float(mask.mean())))
-        
     
+            g = to_grid28(np.abs(row["maps"]["saliency"].map), 
+                           cfg.DENSENET_SIZE)
+
+            share = float(g[mask].sum() / max(g.sum(), 1e-12))
+            shares.append((share,float(mask.mean())))
+        
     # figure plot for all techniques
     names = list(techniques)
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(rows)))
