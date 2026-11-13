@@ -111,7 +111,7 @@ def phase_2_xai( cfg,
     
 
      
-    list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
+    list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
     list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
 
     if len(list_img_ok) == 0 or len(list_img_ko) == 0:
