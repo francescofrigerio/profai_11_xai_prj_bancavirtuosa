@@ -84,8 +84,21 @@ def phase_2_xai( cfg,
                                                  CONFIG.IMAGE_SIZE, 
                                                  CONFIG.IMAGE_SIZE)
 
+    # run reproducibility check
+    repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
+
+    if not all(repro_results.values()):
+         failed_checks = [key for key, value in repro_results.items() if not value]
+    
+         raise RuntimeError(f"Attenzione: Il test di riproducibilità è fallito! "
+                            f"Controlli non superati: {failed_checks}"
+                            )
+
+    logger.info("Test di riproducibilità superato con successo!")
+
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
+    
     # from here is different compare to phase 1
    
     list_img = []
@@ -191,6 +204,19 @@ def phase_1_train(cfg,
                                                  CONFIG.IMAGE_SIZE, 
                                                  CONFIG.IMAGE_SIZE)
         
+    
+    # run reproducibility check
+    repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
+    
+    if not all(repro_results.values()):
+        failed_checks = [key for key, value in repro_results.items() if not value]
+        
+        raise RuntimeError(f"Attenzione: Il test di riproducibilità è fallito! "
+                           f"Controlli non superati: {failed_checks}"
+                           )
+    
+    logger.info("Test di riproducibilità superato con successo!")
+    
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
 
