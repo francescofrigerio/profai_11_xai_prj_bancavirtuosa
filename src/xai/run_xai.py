@@ -256,6 +256,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     out_path = xai_param_dict["out_path"]
     transform_cnn = xai_param_dict["transform_cnn"] 
     dataloader_cnn = xai_param_dict["dataloader_cnn"]
+    flag_error_pred = xai_param_dict["flag_error_pred"]
 
     dataset = dataloader_cnn.dataset
     # original idx (saved in the json) -> position in the dataset
@@ -305,7 +306,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
 
         maps = {}
         for name, technique in techniques.items():
-            logger.info(f"Start Xai {name} {technique}")
+            logger.debug(f"Start Xai {name} {technique}")
             result = technique.explain(input_img, pred)
             maps[name] = result
             
@@ -340,7 +341,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     # LIME and SHAP can have stochastic components: 
     # a new execution might produce a slightly different map.                         
     for name in ("lime", "shap"):
-        logger.info(f"Start Again Calculate Xai {name} {techniques[name]}")
+        logger.debug(f"Start Again Calculate Xai {name} {techniques[name]}")
         # This gets the new calculated map;
         again = techniques[name].explain(first, rows[0]["pred"]).map
         # This gest the previously saved calculated map, 
@@ -416,6 +417,14 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     # figure plot for all techniques
     names = list(techniques)
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(rows)))
+
+    fig.suptitle("XAI - IMMAGINI PREDETTE CON ERRORE DA DENSENET" 
+                 if flag_error_pred else "XAI - IMMAGINI PREDETTE CON ERRORE DA LR",
+                fontsize=14,
+                fontweight="bold",
+                y=1.02
+                )
+    
     axes = fig.subplots(len(rows), len(names) + 2)
     for r, row in enumerate(rows):
         # original image
