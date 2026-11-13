@@ -48,12 +48,13 @@ class IntegratedGradientsCaptum(Explainer):
             and the sum of the attributions.
             These are two complementary checks for the same theoretical property.
         """
-        ig_attr, self.conv_delta = ig(self.model).attribute(input_img, baselines=black_normalized(self.cfg.DENSENET_SIZE, 
-                                                                                    input_img.device), 
-                                        target=input_label,
-                                        n_steps=self.cfg.IG_STEPS, 
-                                        internal_batch_size=self.cfg.IG_BATCH_SIZE,
-                                        return_convergence_delta=True )
+        ig_attr, self.conv_delta = ig(self.model).attribute(input_img, 
+                                                            baselines=black_normalized(self.cfg.DENSENET_SIZE, 
+                                                                                        input_img.device), 
+                                                            target=input_label,
+                                                            n_steps=self.cfg.IG_STEPS, 
+                                                            internal_batch_size=self.cfg.IG_BATCH_SIZE,
+                                                            return_convergence_delta=True )
         
         self.last_sum = ig_attr.sum().item()
         # 1. Take abs to consider the magnitude of the element

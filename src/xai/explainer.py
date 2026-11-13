@@ -88,6 +88,8 @@ class Explainer:
                                  map, 
                                  self.signed, 
                                  self.output_space, 
-                                 seconds)
+                                 seconds,
+                                 self._meta(input_img, int(input_label)))
+      
 
 
