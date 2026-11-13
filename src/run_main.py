@@ -58,8 +58,8 @@ def phase_2_xai( cfg,
         logger.debug(f"WARNING: {warning}")
     
     datasets_dict , loaders_dict , transform_cnn_dict = load_datasets()
-    trainval_dataset = datasets_dict["trainval"]
-    test_dataset = datasets_dict["test"]
+    # trainval_dataset = datasets_dict["trainval"]
+    # test_dataset = datasets_dict["test"]
     transform_val_cnn = transform_cnn_dict["val"]
     transform_test_cnn = transform_cnn_dict["test"]
     
@@ -90,19 +90,15 @@ def phase_2_xai( cfg,
    
     list_img = []
     if cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_OK:
-        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_OK)
+        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
     elif cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_KO:
-        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
+        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
 
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
 
-    info_cnn = {}
-    if cfg.FLAG_LIST_VAL :
-        callback = make_gradcam_callback(cfg,val_loader_cnn, device, out_path , list_img , logger)
-    else:
-        callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img , logger)
-                                        
+    callback = make_gradcam_callback(cfg,val_loader_cnn, device, out_path , list_img , logger)
+                                      
     # Cnn DenseNet
     model , info_cnn , history = get_trained_model(cfg,
                                             logger, 
@@ -113,28 +109,43 @@ def phase_2_xai( cfg,
                                             pretrained=flag_pretrained,
                                             epoch_callback=callback)
     
-    if cfg.FLAG_LIST_VAL :
-        xai_param_dict = {  "t_start": t_start,
+
+     
+    list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
+    list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+
+    if len(list_img_ok) == 0 or len(list_img_ko) == 0:
+            raise ValueError("list_img non possono essere vuote")
+    
+    xai_param_dict_ok = {  "t_start": t_start,
+                        "X_data": X_val_lr,
+                        "y_data": y_val_lr,
+                        "info": info_cnn,
+                        "list_img": list_img_ok,  
+                        "out_path": out_path,   
+                        "transform_cnn": transform_val_cnn,   
+                        "dataloader_cnn": val_loader_cnn,
+                        "flag_list_img": "OK"
+                    }
+   
+
+    result_ok = run_exp( cfg, logger, model, lr, device , xai_param_dict_ok) 
+
+    xai_param_dict_ko = {  "t_start": t_start,
                             "X_data": X_val_lr,
                             "y_data": y_val_lr,
                             "info": info_cnn,
-                            "list_img": list_img,  
+                            "list_img": list_img_ko,  
                             "out_path": out_path,   
                             "transform_cnn": transform_val_cnn,   
-                            "dataloader_cnn": val_loader_cnn
-                        }
-    else:
-        xai_param_dict = { "t_start": t_start,
-                            "X_data": X_test_lr,
-                            "y_data": y_test_lr,
-                            "info": info_cnn,
-                            "list_img": list_img,  
-                            "out_path": out_path,      
-                             "transform_cnn": transform_test_cnn,   
-                             "dataloader_cnn": test_loader_cnn
+                            "dataloader_cnn": val_loader_cnn,
+                            "flag_list_img": "KO"
                         }
 
-    return run_exp( cfg, logger, model, lr, device , xai_param_dict) 
+       
+    result_ko = run_exp( cfg, logger, model, lr, device , xai_param_dict_ko) 
+
+    return result_ok , result_ko
  
 def phase_1_train(cfg,
                 logger,
@@ -200,31 +211,17 @@ def phase_1_train(cfg,
                       CONFIG,
                       "lr")
 
+    create_and_save_images_lists( logger, 
+                                y_val_lr, 
+                                y_pred_val_lr, 
+                                idx_val_lr,
+                                cfg.CHECK_CLASSES, 
+                                out_path,
+                                cfg.FILE_IMG_LR_OK, 
+                                cfg.FILE_IMG_LR_KO,
+                                n_images=cfg.NUM_IMAGES_FOR_CLASS,
+                                flag_before_ko=True)
     
-    if cfg.FLAG_LIST_VAL :
-        create_and_save_images_lists( logger, 
-                                          # X_val_lr,
-                                          y_val_lr, 
-                                          y_pred_val_lr, 
-                                          idx_val_lr,
-                                          cfg.CHECK_CLASSES, 
-                                          out_path,
-                                          cfg.FILE_IMG_LR_OK, 
-                                          cfg.FILE_IMG_LR_KO,
-                                          n_images=cfg.NUM_IMAGES_FOR_CLASS,
-                                          flag_before_ko=True)
-    else:
-        create_and_save_images_lists( logger, 
-                                  # X_test_lr,
-                                  y_test_lr, 
-                                  y_pred_test_lr, 
-                                  idx_test,
-                                  cfg.CHECK_CLASSES, 
-                                  out_path,
-                                  cfg.FILE_IMG_LR_OK, 
-                                  cfg.FILE_IMG_LR_KO,
-                                  n_images=cfg.NUM_IMAGES_FOR_CLASS,
-                                  flag_before_ko=True)
     
     list_img = []
     if cfg.LIST_IMAGES_SEL_PHASE_1 == cfg.LIST_IMAGES_SEL_LR_OK:
@@ -235,12 +232,8 @@ def phase_1_train(cfg,
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
 
-    info_cnn = {}
-    if cfg.FLAG_LIST_VAL :
-        callback = make_gradcam_callback(cfg,val_loader_cnn, device, out_path , list_img , logger)
-    else:
-        callback = make_gradcam_callback(cfg,test_loader_cnn, device, out_path , list_img , logger)
-                                        
+    callback = make_gradcam_callback(cfg,val_loader_cnn, device, out_path , list_img , logger)
+                                    
     # Cnn DenseNet
     _ , info_cnn , history = get_trained_model(cfg,
                                                 logger, 
@@ -255,29 +248,19 @@ def phase_1_train(cfg,
     if last is None or "y_pred_val" not in last:
         raise ValueError("history senza predizioni di validation: rifare il training")
 
-    if cfg.FLAG_LIST_VAL :
-        create_and_save_images_lists(  logger, 
-                                           last["y_true_val"],
-                                           last["y_pred_val"],
-                                           last["idx_val"],
-                                           cfg.CHECK_CLASSES, 
-                                           out_path,
-                                           cfg.FILE_IMG_CNN_OK, 
-                                           cfg.FILE_IMG_CNN_KO,
-                                           n_images=cfg.NUM_IMAGES_FOR_CLASS,
-                                           flag_before_ko=True)
-    else:
-        create_and_save_images_lists(  logger, 
-                                       # info_cnn["X_test"],
-                                       info_cnn["y_true"],
-                                       info_cnn["y_pred"], 
-                                       info_cnn["idx_test"],
-                                       cfg.CHECK_CLASSES, 
-                                       out_path,
-                                       cfg.FILE_IMG_CNN_OK, 
-                                       cfg.FILE_IMG_CNN_KO,
-                                       n_images=cfg.NUM_IMAGES_FOR_CLASS,
-                                       flag_before_ko=True)
+    
+    create_and_save_images_lists(  logger, 
+                                    last["y_true_val"],
+                                    last["y_pred_val"],
+                                    last["idx_val"],
+                                    cfg.CHECK_CLASSES, 
+                                    out_path,
+                                    cfg.FILE_IMG_CNN_OK, 
+                                    cfg.FILE_IMG_CNN_KO,
+                                    n_images=cfg.NUM_IMAGES_FOR_CLASS,
+                                    flag_before_ko=True)
+    
+       
 
     # alwais with test data
     plot_predict_info(info_cnn["y_true"], 

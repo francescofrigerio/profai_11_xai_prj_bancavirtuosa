@@ -266,9 +266,6 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     background = make_background(transform_cnn,cfg,logger, device)
     techniques = build_techniques(model, cfg, background)
 
-    logger.info("Before Loop %s", list_images)
-    logger.info("Before Loop %s ", list_images.keys())
-    # n_images = len(list_img)
     for i, id_class in enumerate(sorted(list_images.keys())):
         logger.debug("Start Loop %d %d " , i ,id_class)
         # load_images_by_class return a list not a dict 
@@ -292,10 +289,10 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
         # This alerts if the JSON list and the dataloader 
         # do not belong to the same split.
         assert idx == original_idx   # sanity check
-        logger.info("assert original_idx :%d",original_idx)
+        logger.debug("assert original_idx :%d",original_idx)
 
         assert int(input_label) == int(y_data[position])
-        logger.info("assert position :%d",position)
+        logger.debug("assert position :%d",position)
 
         # assert idx_to_pos[position] == original_idx  
         # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
@@ -314,7 +311,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
             
             if name == "integrated_gradients":
                 ig_errors.append(result.meta["completeness_error"])
-            logger.info(f"End Xai {name} {technique}")
+            logger.debug(f"End Xai {name} {technique}")
 
         # substiutr i with idx_dataset
         # original_idx idc original (log/json)
@@ -327,21 +324,19 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
                      # local_map runs reshape(28,28)
                      "lr_map": lr.local_map(X_data[position], pred)})
     
-        logger.info(f"End Loop {i} image {original_idx} {position} (true {y_data[position]}, predicted {pred}): ")
+        logger.debug(f"End Loop {i} image {original_idx} {position} (true {y_data[position]}, predicted {pred}): ")
 
     # This selects the first index to
     # compare explanation getting from 
     # this first with that already in rows[0] 
     first_idx = rows[0]["pos"]
+    
     # These select and transform the first image
     # already 3x128x128 and normlaized because we begin from transform
     first, _ , _ = dataset[first_idx]
     # convert shape from [3,28,28] to [28,28]
     first = first.unsqueeze(0).to(device)
-    # first = to_densenet_input(first_image.unsqueeze(0),
-    #                          cfg.DENSENET_SIZE
-    #                          ).to(device)
-
+    
     # LIME and SHAP can have stochastic components: 
     # a new execution might produce a slightly different map.                         
     for name in ("lime", "shap"):
@@ -352,9 +347,8 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
         ref = rows[0]["maps"][name].map
 
         diff = float(np.abs(again - ref).max())
-        logger.info("%s check difference: %s, max difference %.2e",name, diff <= cfg.RELU_MAX_REF_DIFF, diff)
-            
-        logger.info(f"End Again Calculate Xai {name} {techniques[name]}")
+        logger.debug("%s check difference: %s, max difference %.2e",name, diff <= cfg.RELU_MAX_REF_DIFF, diff)     
+        logger.debug(f"End Again Calculate Xai {name} {techniques[name]}")
        
     # This model's independent copy is used to perform checks 
     # without affecting the original trained model
@@ -364,7 +358,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     # in order to make the maps generated 
     # by different techniques
     # homogeneous and directly comparable 
-    # (e.g., Grad-CAM and Integrated Gradients
+    # (Grad-CAM and Integrated Gradients
     #     can produce raw attribution values 
     #     on very different scales).
 
@@ -389,7 +383,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
         # between the two maps, normalized by the 
         # maximum absolute value of the second map.
         diff = float(np.abs(a - b).max() / max(np.abs(b).max(), 1e-12))
-        logger.info("%s check on train: %s, relative difference %.2e",name, diff <= cfg.RELU_MAX_REF_DIFF, diff)
+        logger.debug("%s check on train: %s, relative difference %.2e",name, diff <= cfg.RELU_MAX_REF_DIFF, diff)
 
     shares = []
 
@@ -451,6 +445,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
                               vmin=-a if signed else 0, 
                               vmax=a,
                               interpolation="nearest" if m.shape[0] <= 8 else "bilinear")
+            
         for c in range(len(names) + 2):
             axes[r, c].set_xticks([])
             axes[r, c].set_yticks([])
@@ -482,5 +477,5 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     }
     (out_path / "stage2_results.json").write_text(json.dumps(results, indent=2))
     
-    logger.info(f"all tecniques total time {time.time() - t_start:.0f}s")
+    logger.info(f"All tecniques run correctly. Total time {time.time() - t_start:.0f}s")
     return results
