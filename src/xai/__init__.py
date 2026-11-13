@@ -25,13 +25,25 @@ def build_techniques(model, cfg, background=None, names=TECHNIQUE_NAMES) -> dict
         raise ValueError(f"Technique unknown; techniques available: {TECHNIQUE_NAMES}")
     if "shap" in names and background is None:
         raise ValueError("SHAP needs background tensor (xai.shap_explainer.make_background)")
-    
-    builders = { "gradcam": lambda: GradCamCaptum(model, cfg),
-                 "integrated_gradients": lambda: IntegratedGradientsCaptum(model, cfg),
-                 "occlusion": lambda: OcclusionCaptum(model, cfg),
-                 "saliency": lambda: SaliencyCaptum(model, cfg),
-                 "lime": lambda: LimeExplainer(model, cfg),
-                 "shap": lambda: ShapExplainer(model, cfg, background),
-    }
 
-    return {n: builders[n]() for n in TECHNIQUE_NAMES if n in names}
+    effective_names = list(names)
+
+    if cfg.SALIENCY_DISABLE:
+        effective_names = [ n for n in effective_names if n != "saliency" ]
+        
+        builders = { "gradcam": lambda: GradCamCaptum(model, cfg),
+                    "integrated_gradients": lambda: IntegratedGradientsCaptum(model, cfg),
+                    "occlusion": lambda: OcclusionCaptum(model, cfg),
+                    "lime": lambda: LimeExplainer(model, cfg),
+                    "shap": lambda: ShapExplainer(model, cfg, background),
+                    }
+    else:
+        builders = { "gradcam": lambda: GradCamCaptum(model, cfg),
+                    "integrated_gradients": lambda: IntegratedGradientsCaptum(model, cfg),
+                    "occlusion": lambda: OcclusionCaptum(model, cfg),
+                    "saliency": lambda: SaliencyCaptum(model, cfg),
+                    "lime": lambda: LimeExplainer(model, cfg),
+                    "shap": lambda: ShapExplainer(model, cfg, background),
+                    }
+
+    return {n: builders[n]() for n in TECHNIQUE_NAMES if n in effective_names}

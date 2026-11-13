@@ -84,8 +84,10 @@ def save_checkpoint(path, model, cfg, history) -> str:
     return path
 
 
-def read_checkpoint(path) -> dict:
-    return torch.load(path, map_location="cpu", weights_only=True)
+def read_checkpoint(path,device="cpu") -> dict:
+    print("start read_checkpoint with weights_only=True ")
+    # return torch.load(path, map_location="cpu", weights_only=True)
+    return torch.load(path, map_location=device, weights_only=True)
 
 
 
@@ -103,7 +105,7 @@ def get_evaluate_model( cfg,
     logger.debug(f"Checkpoint path: {path}")
     logger.debug(f"Checkpoint exists: {path.exists()}")
     if path.exists():
-        saved = read_checkpoint(path) 
+        saved = read_checkpoint(path,device_) 
     else:
         raise ValueError(f"Checkpoint Not exists {path}")
         
@@ -301,7 +303,7 @@ def get_trained_model(cfg,
         pretrained=False` exists for the tests only (no ImageNet download)
         Returns (model in eval mode, info dict).
     """
-
+    logger.debug(f"CHECKPOINT_PATH :({cfg.CHECKPOINT_PATH})")
     path = Path(cfg.CHECKPOINT_PATH)
     saved = read_checkpoint(path) if path.exists() else None
     action, reason = resolve_mode(cfg,pretrained, saved is not None)
@@ -329,7 +331,7 @@ def get_trained_model(cfg,
                                                             train_loader_cnn ,
                                                             val_loader_cnn ,
                                                             device ,
-                                                            epoch_callback)
+                                                            epoch_callback )
         
         logger.debug(f"before Save Model")
         save_checkpoint(path, model, cfg, history)
@@ -342,6 +344,9 @@ def get_trained_model(cfg,
     test_accuracy = accuracy(y_true,y_pred)
     logger.info(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
 
+    if action == "load" and epoch_callback is not None :
+        epoch_callback(model,cfg.NUM_EPOCHS+1)
+           
     # logger.info(f"y_pred shape: {y_pred.shape}")
     # logger.info(f"y_true shape: {y_true.shape}")
     # logger.info(f"idx_dataset type: {type(idx_test)}")

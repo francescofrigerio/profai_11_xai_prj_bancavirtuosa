@@ -96,92 +96,6 @@ def to_grid28(map2d, size, side=28):
                          size=(side, side), 
                          mode="area")[0, 0].numpy()
 
-def make_gradcam_callback_old(cfg,dataloader, device, out_path , list_images , logger):
-    """
-        Grad-CAM debug images of the first and last training epoch.
-        The callback explains the PREDICTED class of the 10 fixed validation images 
-        (one per class), so a
-        broken training (maps that do not move, or that look at the background) 
-        is visible at a glance.
-    """
-    def callback(model, epoch):
-        logger.debug("Start Callback Grad-CAM epoch:%d",epoch)
-        model.eval()
-        explainer = GradCamCaptum(model, cfg)
-
-        n_images = len(list_images)
-        fig = Figure(figsize=(2 * n_images, 4.4))
-        axes = fig.subplots(2, n_images)
-        for i, id_class in enumerate(sorted(list_images.keys())):
-            # load_images_by_class return a list not a dict 
-            # so we add [0]    
-            item = list_images[id_class][0]
-            idx_dataset = item["id_dataset"]
-               
-            logger.debug("before read dataset on: %s", idx_dataset)
-            logger.debug("before read dataset on: %s", type(dataloader))
-            
-            # Dataset: allows access to an element using dataset[idx].
-            # DataLoader: returns batches of elements when iterated over.
-            dataset = dataloader.dataset
-            input_image, input_label, idx = dataset[idx_dataset]
-
-            # Add batch dimension: (3, 128, 128) -> (1, 3, 128, 128)
-            input_img = input_image.unsqueeze(0).to(device)
-
-            logger.debug("after read dataset on: %s",idx_dataset)
-            logger.debug("input_image:%s",input_img.shape)
-               
-            with torch.no_grad():
-                # pred = int(model(input_img).argmax(1))
-                pred = int(model(input_img).argmax(dim=1).item())
-
-            # Thus, in the case of a 3 classified as an 8, the map highlights 
-            # the regions that support the prediction of an 8. 
-            # It does not necessarily show the regions that would 
-            # have allowed for the correct identification of the 3.
-            # Furthermore,  the brighter areas indicate greater activation relevant 
-            # to the chosen class—not a precise segmentation of the digit, 
-            # nor causal evidence of the decision-making process.
-            result = explainer.explain(input_img, pred)
-            
-            # Original Image
-            # axes[0, i].imshow(input_image.squeeze(0),cmap="gray")
-            # Reverse the ImageNet normalization 
-            # before displaying the image. 
-            # We don't should display the normalized tensor directly, 
-            # as the pixel scale will not correspond to that of a normal image.
-            mean = torch.tensor(IMAGENET_MEAN_TRANSFORM,
-                                device=input_image.device).view(3, 1, 1)
-
-            std = torch.tensor(IMAGENET_STD_TRANSFORM,
-                                device=input_image.device ).view(3, 1, 1)
-
-            image_display = (input_image * std + mean).clamp(0, 1)
-
-            # Display original grayscale image
-            axes[0, i].imshow(image_display.mean(dim=0).cpu().numpy(),cmap="gray")
-            axes[0, i].set_title(f"true {input_label} / pred {pred}",fontsize=8)
-               
-            # Grad-CAM
-            # pylint: disable=no-member
-            axes[1, i].imshow(result.map, cmap="viridis", interpolation="bilinear")
-               
-            for row in (0, 1):
-                axes[row, i].axis("off")
-           
-        fig.suptitle(f"Grad-CAM debug, epoch {epoch}")
-        out_path.mkdir(parents=True, exist_ok=True)
-        path = out_path / f"gradcam_debug_epoch{epoch}.png"
-        fig.savefig(path, dpi=100, bbox_inches="tight")
-        # plt.show()
-        # plt.close(fig)
-        display(fig)
-        logger.debug("End Callback Grad-CAM saved: %s",path)
-
-    return callback
-
-
 def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logger):
     """
         Grad-CAM debug images of the first and last training epoch.
@@ -422,6 +336,8 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     # These select and transform the first image
     # already 3x128x128 and normlaized because we begin from transform
     first, _ , _ = dataset[first_idx]
+    # convert shape from [3,28,28] to [28,28]
+    first = first.unsqueeze(0).to(device)
     # first = to_densenet_input(first_image.unsqueeze(0),
     #                          cfg.DENSENET_SIZE
     #                          ).to(device)
@@ -457,7 +373,12 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     # to the original ones.
     # it is a consistency check
     # We can cancel this test to have a more simple code
-    for name in ("gradcam", "integrated_gradients", "saliency"):
+    check_names = ["gradcam", "integrated_gradients"]
+
+    if "saliency" in techniques:
+        check_names.append("saliency")
+
+    for name in check_names:
         # getting the map calculate in the main loop
         a = rows[0]["maps"][name].map
         # getting the map recalculated on the same image, 

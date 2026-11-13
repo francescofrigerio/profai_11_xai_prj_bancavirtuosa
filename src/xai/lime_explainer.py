@@ -106,7 +106,7 @@ class LimeExplainer(Explainer):
 
     def attribute_grid(self, input_img, input_label):
         """
-            get Captum GradCam map
+            get Captum Lime map
         """
         cfg, model, device = self.cfg, self.model, input_img.device
         size = input_img.shape[-1]

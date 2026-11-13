@@ -39,10 +39,8 @@ def make_background(transform_train, cfg,logger, device):
         Thus, the "pick" step serves not only to set the seed—making the selection repeatable—
         but also to choose the background images.
 
-        input_images	Tutte le immagini trainval, shape (N, 1, 28, 28)
-
-
-
+        input_images	All trainval images shape (N, 1, 28, 28)
+        Output Shape : (N, 3, 128, 128)
     """
     logger.info(f" transform_train len {len(transform_train)}")
     rng = np.random.RandomState(cfg.SEED) # pylint: disable=no-member
