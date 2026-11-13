@@ -85,9 +85,10 @@ def save_checkpoint(path, model, cfg, history) -> str:
 
 
 def read_checkpoint(path,device="cpu") -> dict:
-    print("start read_checkpoint with weights_only=True ")
+    print("start read_checkpoint with weights_only=False ")
     # return torch.load(path, map_location="cpu", weights_only=True)
-    return torch.load(path, map_location=device, weights_only=True)
+    # return torch.load(path, map_location=device, weights_only=True)
+    return torch.load(path, map_location=device, weights_only=False)
 
 
 
