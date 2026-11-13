@@ -57,12 +57,30 @@ class LimeExplainer(Explainer):
             )
 
     def attribute_quickshift(self, input_img, input_label):
+        """
+            LIME processing workflow
+            DenseNet input (1, 3, 128, 128) ImageNet-normalized
+
+            Denormalization PyTorch tensor → NumPy image (HWC format, [0, 1] range)
+
+            LIME Generation of perturbed images
+
+            classifier_fn
+            NumPy (NHWC format) → Tensor (NCHW format) → ImageNet normalization
+
+            DenseNet121 Class probabilities with Softmax
+        """
 
         cfg, model, device = self.cfg, self.model, input_img.device
         size = input_img.shape[-1]
         
         # Extract NumPy Image in the format (H, W, 3)
         img = denormalize_imagenet(input_img)[0].permute(1, 2, 0).clamp(0, 1).detach().cpu().numpy().astype(np.float64)
+        
+        print("Input shape: %s", input_img.shape)
+        print("Denorm shape: %s", img.shape)
+        print("Denorm range: %.4f - %.4f",img.min().item(),img.max().item())
+
         segments = grid_segments(size, cfg.LIME_GRID_CELLS)
         
         def classifier_fn(batch):

@@ -7,8 +7,8 @@ import inspect
 from pathlib import Path
 import numpy as np
 import torch
-from config import IMAGENET_MEAN , IMAGENET_STD
-
+# from config import IMAGENET_MEAN , IMAGENET_STD
+from config import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 from config import IMAGENET_MEAN_NP , IMAGENET_STD_NP
 
 def to_numpy(x):
@@ -45,12 +45,37 @@ def normalize_saliency_map(saliency_map: np.ndarray) -> np.ndarray:
         return np.zeros_like(saliency_map)
     return (saliency_map - min_val) / (max_val - min_val)
 
-def denormalize_imagenet(img_hwc_np):
+def denormalize_imagenet(img):
+    """
+    Reverse ImageNet normalization.
+
+    Input:
+        img: PyTorch tensor with shape (N, 3, H, W)
+
+    Output:
+        Denormalized tensor with values clipped to [0, 1].
+    """
+
+    mean = torch.as_tensor( IMAGENET_MEAN_TRANSFORM,
+                            dtype=img.dtype,
+                            device=img.device
+                        ).view(1, 3, 1, 1)
+
+    std = torch.as_tensor(IMAGENET_STD_TRANSFORM,
+                        dtype=img.dtype,
+                        device=img.device
+                    ).view(1, 3, 1, 1)
+
+    img_denorm = img * std + mean
+
+    return img_denorm.clamp(0.0, 1.0)
+
+def denormalize_imagenet_old(img_hwc_np):
     """
         Rollback from image net Normalize value
         This function Converts the image from ImageNet scale to a pixels view range [0, 1].
     """
-    img_denorm = (img_hwc_np * IMAGENET_STD) + IMAGENET_MEAN
+    img_denorm = (img_hwc_np * IMAGENET_STD_TRANSFORM) + IMAGENET_MEAN_TRANSFORM
     # Clip to be sure the range will be strictly [0, 1] for LIME
     return np.clip(img_denorm, 0.0, 1.0)
 
@@ -65,8 +90,8 @@ def normalize_imagenet(input_img):
         and the gradients.
        
     """
-    mean = torch.tensor(IMAGENET_MEAN, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
-    std = torch.tensor(IMAGENET_STD, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
+    mean = torch.tensor(IMAGENET_MEAN_TRANSFORM, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
+    std = torch.tensor(IMAGENET_STD_TRANSFORM, dtype=input_img.dtype, device=input_img.device).view(1, 3, 1, 1)
 
     return (input_img - mean) / std
 
@@ -83,8 +108,8 @@ def denormalize_imagenet_np(x_data: np.ndarray) -> np.ndarray:
     """
         numpy version of denormalize image net, for the contract checks (no torch needed).
     """
-    mean = np.asarray(IMAGENET_MEAN, dtype=np.float64).reshape(1, 3, 1, 1)
-    std = np.asarray(IMAGENET_STD, dtype=np.float64).reshape(1, 3, 1, 1)
+    mean = np.asarray(IMAGENET_MEAN_TRANSFORM, dtype=np.float64).reshape(1, 3, 1, 1)
+    std = np.asarray(IMAGENET_STD_TRANSFORM, dtype=np.float64).reshape(1, 3, 1, 1)
     return np.asarray(x_data, dtype=np.float64) * std + mean
 
 def to_densenet_input(input_img, size: int):
