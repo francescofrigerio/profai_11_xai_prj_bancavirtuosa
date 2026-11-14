@@ -1,11 +1,16 @@
-h[MAIN]
+[MAIN]
+# non funziona per trovare il path
+# init-hook='import sys; sys.path.append("src")'
 
 [MASTER]
-python-path = .
+# funziona ma deprecato per trovare il path
+# python-path = .
 
-[BASIC]
+# Sezione basic spostato sotto per 
+# non duplicarla
+# [BASIC]
 # Permette lo snake_case standard E le variabili che iniziano per X (es. X_train)
-variable-rgx = [a-z_][a-z0-9_]{2,30}$|^X_?[a-zA-Z0-9]*$
+# variable-rgx = [a-z_][a-z0-9_]{2,30}$|^X_?[a-zA-Z0-9]*$
 
 # Analyse import fallback blocks. This can be used to support both Python 2 and
 # 3 compatible code, which means that the block might have code that exists
@@ -127,6 +132,9 @@ unsafe-load-any-extension=no
 
 
 [BASIC]
+
+# Permette lo snake_case standard E le variabili che iniziano per X (es. X_train)
+variable-rgx = [a-z_][a-z0-9_]{2,30}$|^X_?[a-zA-Z0-9]*$
 
 # Naming style matching correct argument names.
 argument-naming-style=snake_case

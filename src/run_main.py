@@ -26,19 +26,19 @@ from output import plot_predict_info
 from training import get_device, get_trained_model 
 
 from utility import create_and_save_images_lists , require  
-from xai.debug_xai import run_exp , make_gradcam_callback
-
+from xai.explore_xai import run_exp , make_gradcam_callback
+from xai.compare_xai import run_group_xai
 
 # Configuration Warnings 
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-def phase_2_xai( cfg,
+def compare_2_xai( cfg,
                  logger,
                  out_path,
                  flag_pretrained = True ) -> None :
     """
-        Run xai Explainer : 
+        Run xai Explainer to compare: 
         - In this phase the model will be alwais pretrained
 
         - For each XAI technique, it calculates an explanation 
@@ -56,11 +56,8 @@ def phase_2_xai( cfg,
     if warning:
         logger.debug(f"WARNING: {warning}")
     
-    datasets_dict , loaders_dict , transform_cnn_dict = load_datasets()
-    # trainval_dataset = datasets_dict["trainval"]
-    # test_dataset = datasets_dict["test"]
+    _ , loaders_dict , transform_cnn_dict = load_datasets()
     transform_val_cnn = transform_cnn_dict["val"]
-    transform_test_cnn = transform_cnn_dict["test"]
     
     # Load tensor for train and test baseline
     train_loader_lr = loaders_dict["lr"]["train"]
@@ -79,31 +76,28 @@ def phase_2_xai( cfg,
                                                CONFIG.IMAGE_SIZE, 
                                                CONFIG.IMAGE_SIZE)
 
-    X_test_lr , y_test_lr , idx_test = data_to_input_lr(test_loader_lr,1, 
-                                                 CONFIG.IMAGE_SIZE, 
-                                                 CONFIG.IMAGE_SIZE)
-
-    # run reproducibility check
-    repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
-    
-    if not all(repro_results.values()):
-        failed_checks = [key for key, value in repro_results.items() if not value]
-        
-        raise RuntimeError(f"Attenzione: Il test di riproducibilità è fallito! "
-                            f"Controlli non superati: {failed_checks}"
-                        )
-    
+    # X_test_lr , y_test_lr , idx_test = data_to_input_lr(test_loader_lr,1, 
+    #                                             CONFIG.IMAGE_SIZE, 
+    #                                             CONFIG.IMAGE_SIZE)
+            
     logger.info("Test di riproducibilità superato con successo!")
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
+
+    # run reproducibility check
+    repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
+    if not all(repro_results.values()):
+        failed_checks = [key for key, value in repro_results.items() if not value]
+        raise RuntimeError(f"Attenzione: test di riproducibilità fallito! {failed_checks}")
+    
     y_pred_val_lr = lr.predict(X_val_lr)
+    
     # from here is different compare to phase 1
-   
     list_img = []
-    if cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_OK:
-        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
-    elif cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_KO:
-        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+    # if cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_OK:
+    #     list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
+    # elif cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_KO:
+    list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
 
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
@@ -126,13 +120,13 @@ def phase_2_xai( cfg,
     
     create_quadrant_lists( cfg,
                            logger, 
-                           history['y_true_val'], 
-                           y_pred_val_lr, 
-                           history['y_pred_val'], 
-                           idx_val_lr,
-                           cfg.CHECK_CLASSES, 
-                           out_path, 
-                           n_per_class=1 )
+                            history['y_true_val'], 
+                            y_pred_val_lr, 
+                            history['y_pred_val'], 
+                            idx_val_lr,
+                            cfg.CHECK_CLASSES, 
+                            out_path, 
+                            n_per_class=1 )
     
     list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
     list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
@@ -169,7 +163,142 @@ def phase_2_xai( cfg,
     result_ko = run_exp( cfg, logger, model, lr, device , xai_param_dict_ko) 
 
     return result_ok , result_ko
- 
+
+
+def explore_2_xai( cfg,
+                   logger,
+                   out_path,
+                   flag_pretrained = True ) -> None :
+    """
+        Run xai Explainer to explore: 
+        - In this phase the model will be alwais pretrained
+
+        - For each XAI technique, it calculates an explanation 
+          with respect to the predicted class, pred.
+          This means that the result maps answer the question:
+          Which parts of the image contributed 
+          to the prediction made by the model?
+          Not necessarily to the image's actual class.
+        
+        - For Integrated Gradients, it also saves the completeness error:
+    """
+    t_start = time.time()
+    
+    device, warning = get_device(cfg)
+    if warning:
+        logger.debug(f"WARNING: {warning}")
+    
+    _ , loaders_dict , transform_cnn_dict = load_datasets()
+    transform_val_cnn = transform_cnn_dict["val"]
+    
+    # Load tensor for train and test baseline
+    train_loader_lr = loaders_dict["lr"]["train"]
+    val_loader_lr = loaders_dict["lr"]["val"]
+    test_loader_lr = loaders_dict["lr"]["test"]
+    
+    # Load tensor for train and test cnn
+    train_loader_cnn = loaders_dict["cnn"]["train"]
+    val_loader_cnn = loaders_dict["cnn"]["val"]
+    test_loader_cnn = loaders_dict["cnn"]["test"]
+
+    X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, 
+                                                    CONFIG.IMAGE_SIZE, 
+                                                    CONFIG.IMAGE_SIZE)
+    X_val_lr , y_val_lr , idx_val_lr = data_to_input_lr(val_loader_lr,1, 
+                                               CONFIG.IMAGE_SIZE, 
+                                               CONFIG.IMAGE_SIZE)
+
+    # X_test_lr , y_test_lr , idx_test = data_to_input_lr(test_loader_lr,1, 
+    #                                             CONFIG.IMAGE_SIZE, 
+    #                                             CONFIG.IMAGE_SIZE)
+          
+    logger.info("Test di riproducibilità superato con successo!")
+    # Logistic regression (train indices only)
+    lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
+
+    # run reproducibility check
+    repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
+    if not all(repro_results.values()):
+        failed_checks = [key for key, value in repro_results.items() if not value]
+        raise RuntimeError(f"Attenzione: test di riproducibilità fallito! {failed_checks}")
+    
+    y_pred_val_lr = lr.predict(X_val_lr)
+    
+    # from here is different compare to phase 1
+    list_img = []
+    # if cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_OK:
+    #     list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
+    # elif cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_KO:
+    list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+
+    if len(list_img) == 0 :
+        raise ValueError("list_img non può essere vuota")
+
+    callback = make_gradcam_callback(cfg,val_loader_cnn, device, out_path , list_img , logger)
+                                      
+    # Cnn DenseNet
+    model , info_cnn , history = get_trained_model(cfg,
+                                            logger, 
+                                            train_loader_cnn,
+                                            val_loader_cnn,
+                                            test_loader_cnn, 
+                                            device,
+                                            pretrained=flag_pretrained,
+                                            epoch_callback=callback)
+    
+    # here we verifiy the alignment
+    # It works because because valloader_lr e valloader_cnn has shuffle=False
+    require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! indici non allineati tra cnn ed lr")
+    
+    list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
+    list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+
+    if len(list_img_ok) == 0 or len(list_img_ko) == 0:
+            raise ValueError("list_img non possono essere vuote")
+    
+    xai_param_dict_ok = {  "t_start": t_start,
+                        "X_data": X_val_lr,
+                        "y_data": y_val_lr,
+                        "info": info_cnn,
+                        "list_img": list_img_ok,  
+                        "out_path": out_path,   
+                        "transform_cnn": transform_val_cnn,   
+                        "dataloader_cnn": val_loader_cnn,
+                        "flag_error_pred_cnn": False
+                    }
+   
+
+    result_ok = run_exp( cfg, logger, model, lr, device , xai_param_dict_ok) 
+
+    xai_param_dict_ko = {  "t_start": t_start,
+                            "X_data": X_val_lr,
+                            "y_data": y_val_lr,
+                            "info": info_cnn,
+                            "list_img": list_img_ko,  
+                            "out_path": out_path,   
+                            "transform_cnn": transform_val_cnn,   
+                            "dataloader_cnn": val_loader_cnn,
+                            "flag_error_pred_cnn": True
+                        }
+
+       
+    result_ko = run_exp( cfg, logger, model, lr, device , xai_param_dict_ko) 
+
+    return result_ok , result_ko
+
+def phase_2_xai( cfg,
+                 logger,
+                 out_path,
+                 flag_pretrained = True ) -> None :
+    """
+         This function runs phase_2 as two steps
+         1 - explore and debug images with Xai ( not valid for decision)
+         2 - compare images with Xai (valid for decision)
+    """
+    explore_2_xai(cfg,logger,out_path,flag_pretrained)
+
+    compare_2_xai(cfg,logger,out_path,flag_pretrained)
+
 def phase_1_train(cfg,
                 logger,
                 out_path,
@@ -213,23 +342,18 @@ def phase_1_train(cfg,
     X_test_lr , y_test_lr , idx_test = data_to_input_lr(test_loader_lr,1, 
                                                  CONFIG.IMAGE_SIZE, 
                                                  CONFIG.IMAGE_SIZE)
-        
-    
-    # run reproducibility check
-    repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
-    
-    if not all(repro_results.values()):
-        failed_checks = [key for key, value in repro_results.items() if not value]
-        
-        raise RuntimeError(f"Attenzione: Il test di riproducibilità è fallito! "
-                            f"Controlli non superati: {failed_checks}"
-                           )
-    
-    logger.info("Test di riproducibilità superato con successo!")
     
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
 
+    # run reproducibility check
+    repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
+    if not all(repro_results.values()):
+        failed_checks = [key for key, value in repro_results.items() if not value]
+        raise RuntimeError(f"Attenzione: test di riproducibilità fallito! {failed_checks}")
+        
+    logger.info("Test di riproducibilità superato con successo!")
+    
     y_pred_val_lr = lr.predict(X_val_lr)
     val_accuracy_lr = accuracy(y_val_lr,y_pred_val_lr)
 
