@@ -2,6 +2,7 @@
     Function to calc metrics for models
 """
 import numpy as np
+import pandas as pd
 
 from sklearn.metrics import f1_score
 from sklearn.metrics import confusion_matrix
@@ -59,45 +60,43 @@ def quadrant_indices(y_true, pred_densenet, pred_lr) -> dict:
         "both_wrong": np.where(~d_ok & ~l_ok)[0],
     }
 
-def create_quadrant_lists( cfg,
-                         logger, 
-                          y_true, 
-                          y_pred_lr, 
-                          y_pred_cnn, 
-                          idx,
-                          classes, 
-                          out_path, 
-                          n_per_class=1 ):
+def print_final_metrics(out_path , file_name="xai_metrics_all.csv") -> dict:
     """
-        Save quadrants on json
-        Quadrants: both_ok, lr_ko_cnn_ok, lr_ok_cnn_ko, both_ko (same split)
+        Print general final metrics:
+        Hot to read the single metrics:
+
+        mask_share and focus_ratio: 
+        1- mask_share represents the attribution share within the digit. 
+        
+        2- focus_ratio divides this by the area of ​​the digit; thus, a value of 1 indicates 
+        uniform distribution, while values ​​significantly greater than 1 signify 
+        that attention is concentrated on the stroke itself. 
+        A CNN that makes an incorrect prediction may still exhibit a high focus value—
+        it is simply focusing on the wrong part of the stroke.
+        
+        3- del_gain: the difference between the drop in probability resulting 
+        from random masking and that resulting from map-guided masking. 
+        A positive value indicates that the map is more faithful than random chance. 
+        A value near 0 suggests that the map does not accurately describe 
+        what the model is actually using, even if the visualization itself appears compelling. 
+        For signed maps, only the positive component—representing evidence in favor of 
+        the class—is considered.
+        
+        4- agreement: the mean rank correlation between different techniques. 
+        A low value for cases where both methods fail (both_ko) combined with a high value 
+        for cases where both succeed (both_ok) would be an interesting finding: 
+            it would suggest that explanations are consistent when the model is confident, 
+            but diverge when the model’s prediction is ambiguous.
+        _true grid: for instances categorized as lr_ok_cnn_ko 
+        (where the linear model is correct but the CNN is incorrect) 
+        and both_ko (where both models are incorrect), this compares the attribution 
+        map for the true class against the map for the predicted class.
     """
-    
-    y_true, y_pred_lr, y_pred_cnn, idx = map(np.asarray, (y_true, y_pred_lr, y_pred_cnn, idx))
-    
-    lr_ok, cnn_ok = y_pred_lr == y_true, y_pred_cnn == y_true
 
-    groups = { "both_ok": lr_ok & cnn_ok,
-               "lr_ko_cnn_ok": ~lr_ok & cnn_ok,
-               "lr_ok_cnn_ko": lr_ok & ~cnn_ok,
-               "both_ko": ~lr_ok & ~cnn_ok }
+    df = pd.read_csv(out_path / file_name)
+    query_out = (df[df.target == "pred"].groupby(["group", 
+                                                  "technique"])
+                                    [["mask_share", "focus_ratio", "del_gain", "agreement"]]
+                                    .mean().round(3))
+    print(query_out)
 
-    # random but reproducible, not the "first" ones
-    rng = np.random.default_rng(cfg.SEED)       
-    for name, mask in groups.items():
-        items = []
-        for c in classes:
-            cand = np.where(mask & (y_true == c))[0]
-            pick = np.sort(rng.choice(cand, 
-                                      size=min(len(cand), n_per_class), 
-                                      replace=False)) if len(cand) else []
-            
-            items += [{"class": int(c), 
-                       "id_dataset": int(idx[p]), 
-                       "y_true": int(y_true[p]),
-                       "y_pred": int(y_pred_cnn[p]),          # compat. con load_images_by_class
-                       "y_pred_lr": int(y_pred_lr[p])
-                       } for p in pick]
-        save_dict_to_json(out_path / f"images_{name}.json", items)
-        logger.debug("%s: %d candidati, %d salvati", name, int(mask.sum()), len(items))
-    

@@ -14,13 +14,17 @@ import numpy as np
 from matplotlib.figure import Figure
 from IPython.display import Image, display
 
+from config import CONFIG
 from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 from constants import TITLES, GROUPS_RESULT_OK_KO
 
-from utility import digit_mask , img28 , to_grid28
+from utility import digit_mask , img28
+from utility import black_normalized
+
 from xai import GradCamCaptum , build_techniques
 from xai.shap_explainer import make_background
-from utility import black_normalized
+
+from faithfulness import explain_target
 
 def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, max_rows=10):
     sel = [r for r in rows if target_key in r["maps"]][:max_rows]
@@ -57,9 +61,16 @@ def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, ma
         fig.clear()
 
 
-def run_group_xai(cfg, logger, model, device, techniques, lr, ctx, group, list_images):
+def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group, list_images):
     """
         XAI on one group (quadrant): maps for PRED class (and TRUE class if CNN is wrong).
+        This is a function designed for individual groups, and replaces phase_2_xai 
+        with a loop that iterates through the four quadrants. 
+        For each image, it provides an explanation 
+        for the predicted class—including the true class 
+        if the CNN’s prediction is incorrect—and then calculates quantitative metrics, 
+        saving them in both JSON and CSV formats.
+
     """
     t0 = time.time()
     out_path = ctx["out_path"]
@@ -68,8 +79,8 @@ def run_group_xai(cfg, logger, model, device, techniques, lr, ctx, group, list_i
     X_data, y_data, y_pred_lr = ctx["X_data"], ctx["y_data"], ctx["y_pred_lr"]
 
     names = list(techniques)
-    fractions = getattr(cfg, "DELETION_FRACTIONS", (0.0, 0.05, 0.1, 0.2, 0.3, 0.5))
-    ig_max = getattr(cfg, "IG_MAX_COMPLETENESS_ERROR", 0.05)
+    fractions = cfg.DELETION_FRACTIONS
+    
     # baseline = black_baseline(device)
     baseline = black_normalized(device)
     
@@ -86,28 +97,51 @@ def run_group_xai(cfg, logger, model, device, techniques, lr, ctx, group, list_i
 
             input_image, input_label, idx = dataset[position]
             assert idx == original_idx
+
+            # check the target class on record selected
             assert int(input_label) == int(y_data[position])
 
             input_img = input_image.unsqueeze(0).to(device)
+            
+            # get the probs with softwmax (multiclass classification)
             with torch.no_grad():
                 probs = F.softmax(model(input_img), dim=1)[0]
+
+            # get predicted and true class based on the max prob
             pred, true = int(probs.argmax()), int(input_label)
             if first_input is None:
                 first_input = input_img
 
-            targets = {"pred": pred}
+            targets = { "pred": pred }
             if pred != true:
                 targets["true"] = true          # what was missing for the right answer
 
             mask = digit_mask(img28(position, X_data, size=cfg.IMAGE_SIZE),
                               cfg.MASK_THRESHOLD, cfg.MASK_DILATION)
 
-            row = {"index": original_idx, "pos": position, "true": true, "pred": pred,
-                   "pred_lr": int(y_pred_lr[position]), "prob_pred": float(probs[pred]),
-                   "targets": targets, "maps": {}, "metrics": {}, "meta": {}, "lr_map": {}}
+            row = { "index": original_idx, 
+                    "pos": position, 
+                    "true": true, 
+                    "pred": pred,
+                    "pred_lr": int(y_pred_lr[position]), 
+                    "prob_pred": float(probs[pred]),
+                    "targets": targets, 
+                    "maps": {}, 
+                    "metrics": {}, 
+                    "meta": {}, 
+                    "lr_map": {}
+                }
+            
             for tgt_name, tgt in targets.items():
-                maps, metrics, meta = explain_target(model, techniques, input_img, tgt,
-                                                     mask, fractions, baseline, rng, cfg)
+                maps, metrics, meta = explain_target(model, 
+                                                     techniques, 
+                                                     input_img, 
+                                                     tgt,
+                                                     mask, 
+                                                     fractions, 
+                                                     baseline, 
+                                                     rng, 
+                                                     cfg)
                 row["maps"][tgt_name] = maps
                 row["metrics"][tgt_name] = metrics
                 row["meta"][tgt_name] = meta

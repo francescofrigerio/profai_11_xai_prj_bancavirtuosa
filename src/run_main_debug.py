@@ -18,7 +18,7 @@ from baseline import fit_baseline
 from config import CONFIG 
 
 from data import data_to_input_lr, load_datasets
-from data import  load_images_by_class
+from utility import  load_images_by_class
 
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
@@ -26,7 +26,7 @@ from output import plot_predict_info
 from training import get_device, get_trained_model 
 
 from utility import create_and_save_images_lists  
-from xai.debug_xai import run_exp , make_gradcam_callback
+from xai.explore_xai import run_exp , make_gradcam_callback
 # from xai.debug_xai import make_gradcam_callback
 
 

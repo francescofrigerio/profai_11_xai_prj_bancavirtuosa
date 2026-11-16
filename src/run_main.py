@@ -7,27 +7,32 @@
 """ 
 import argparse
 import json
+import csv
 from pathlib import Path
 import time
 import warnings
-import torch
-
+# import torch
 import numpy as np
 
 from baseline import fit_baseline
 from config import CONFIG 
+from constants import GROUPS_RESULT_OK_KO
 
 from data import data_to_input_lr, load_datasets
-from data import  load_images_by_class
+from utility import  load_images_by_class
 
 from logger import LOGGER
-from metrics import accuracy, confusion, macro_f1, quadrants , create_quadrant_lists
+from metrics import accuracy, confusion, macro_f1, quadrants 
 from output import plot_predict_info 
-from training import get_device, get_trained_model 
+from training import get_device, get_trained_model , evaluate_model
 
-from utility import create_and_save_images_lists , require  
+from utility import create_and_save_images_lists , require , save_quadrant_to_json
 from xai.explore_xai import run_exp , make_gradcam_callback
-from xai.compare_xai import run_group_xai
+from xai.compare_xai import run_compare_group_xai
+
+from xai import build_techniques
+from xai.shap_explainer import make_background
+
 
 # Configuration Warnings 
 warnings.filterwarnings('ignore', category=UserWarning, message=".*pretrained.*")
@@ -91,7 +96,7 @@ def compare_2_xai( cfg,
         raise RuntimeError(f"Attenzione: test di riproducibilità fallito! {failed_checks}")
     
     y_pred_val_lr = lr.predict(X_val_lr)
-    
+
     # from here is different compare to phase 1
     list_img = []
     # if cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_OK:
@@ -113,20 +118,27 @@ def compare_2_xai( cfg,
                                             device,
                                             pretrained=flag_pretrained,
                                             epoch_callback=callback)
+
+    y_pred_cnn_val, y_true_cnn_val, idx_val_cnn = evaluate_model(model, 
+                                                                val_loader_cnn,
+                                                                device)
     
     # here we verifiy the alignment
     # It works because because valloader_lr e valloader_cnn has shuffle=False
-    require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! indici non allineati tra cnn ed lr")
-    
-    create_quadrant_lists( cfg,
+    require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! 1 indici non allineati tra cnn ed lr")
+    require((idx_val_lr == idx_val_cnn).all(),f"Attenzione!! 2 indici non allineati tra cnn ed lr")
+    # assert (y_val_lr == y_true_cnn_val).all()
+    save_quadrant_to_json( cfg,
                            logger, 
-                            history['y_true_val'], 
-                            y_pred_val_lr, 
-                            history['y_pred_val'], 
-                            idx_val_lr,
-                            cfg.CHECK_CLASSES, 
-                            out_path, 
-                            n_per_class=1 )
+                           # history['y_true_val'], 
+                           y_val_lr,
+                           y_pred_val_lr, 
+                           y_pred_cnn_val,
+                           # history['y_pred_val'], 
+                           idx_val_lr,
+                           cfg.CHECK_CLASSES, 
+                           out_path )
+    
     
     list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
     list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
@@ -134,35 +146,50 @@ def compare_2_xai( cfg,
     if len(list_img_ok) == 0 or len(list_img_ko) == 0:
             raise ValueError("list_img non possono essere vuote")
     
-    xai_param_dict_ok = {  "t_start": t_start,
-                        "X_data": X_val_lr,
-                        "y_data": y_val_lr,
-                        "info": info_cnn,
-                        "list_img": list_img_ok,  
-                        "out_path": out_path,   
-                        "transform_cnn": transform_val_cnn,   
-                        "dataloader_cnn": val_loader_cnn,
-                        "flag_error_pred_cnn": False
-                    }
-   
+    
+    ctx_param_dict = {"t_start": t_start, 
+                      "X_data": X_val_lr, 
+                      "y_data": y_val_lr,
+                      "y_pred_lr": y_pred_val_lr, 
+                      "info": info_cnn, 
+                      "out_path": out_path,
+                      "dataloader_cnn": val_loader_cnn
+                      }
 
-    result_ok = run_exp( cfg, logger, model, lr, device , xai_param_dict_ok) 
+    # built ONCE and shared by all groups
+    background = make_background(transform_val_cnn, cfg, logger, device)
+    techniques = build_techniques(model, cfg, background)
 
-    xai_param_dict_ko = {  "t_start": t_start,
-                            "X_data": X_val_lr,
-                            "y_data": y_val_lr,
-                            "info": info_cnn,
-                            "list_img": list_img_ko,  
-                            "out_path": out_path,   
-                            "transform_cnn": transform_val_cnn,   
-                            "dataloader_cnn": val_loader_cnn,
-                            "flag_error_pred_cnn": True
-                        }
+    
+    all_records, all_results = [], {}
+    for group in GROUPS_RESULT_OK_KO:
+        list_images = load_images_by_class(logger, 
+                                           out_path / f"images_{group}.json",
+                                           n_images_for_class=cfg.XAI_IMAGES_PER_CLASS)
+        if not list_images:
+            logger.warning("Gruppo %s vuoto: salto", group)
+            continue
+        
+        results, records = run_compare_group_xai( cfg, 
+                                                 logger, 
+                                                 model, 
+                                                 device,
+                                                 techniques,
+                                                 lr, 
+                                                 ctx_param_dict,
+                                                 group,
+                                                 list_images ) 
 
-       
-    result_ko = run_exp( cfg, logger, model, lr, device , xai_param_dict_ko) 
+        all_results[group] = results
+        all_records += records
 
-    return result_ok , result_ko
+    if all_records:
+        with open(out_path / "xai_metrics_all.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(all_records[0]))
+            w.writeheader()
+            w.writerows(all_records)
+
+    return all_results
 
 
 def explore_2_xai( cfg,

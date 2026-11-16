@@ -12,6 +12,7 @@ from scipy.ndimage import binary_dilation
 
 from config import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 from config import IMAGENET_MEAN_NP , IMAGENET_STD_NP
+from config import CONFIG
 
 
 def require(condition: bool, message: str) -> None:
@@ -22,6 +23,48 @@ def require(condition: bool, message: str) -> None:
             
 def to_numpy(x):
     return torch.as_tensor(x).detach().cpu().numpy()
+
+def save_quadrant_to_json( cfg,
+                           logger, 
+                           y_true, 
+                           y_pred_lr, 
+                           y_pred_cnn, 
+                           idx,
+                           classes, 
+                           out_path ):
+    """
+        Save quadrants on json
+        Quadrants: both_ok, lr_ko_cnn_ok, lr_ok_cnn_ko, both_ko (same split)
+    """
+    
+    n_per_class = cfg.XAI_IMAGES_PER_CLASS
+    y_true, y_pred_lr, y_pred_cnn, idx = map(np.asarray, (y_true, y_pred_lr, y_pred_cnn, idx))
+    
+    lr_ok, cnn_ok = y_pred_lr == y_true, y_pred_cnn == y_true
+
+    groups = { "both_ok": lr_ok & cnn_ok,
+               "lr_ko_cnn_ok": ~lr_ok & cnn_ok,
+               "lr_ok_cnn_ko": lr_ok & ~cnn_ok,
+               "both_ko": ~lr_ok & ~cnn_ok }
+
+    # random but reproducible, not the "first" ones
+    rng = np.random.default_rng(cfg.SEED)       
+    for name, mask in groups.items():
+        items = []
+        for c in classes:
+            cand = np.where(mask & (y_true == c))[0]
+            pick = np.sort(rng.choice(cand, 
+                                      size=min(len(cand), n_per_class), 
+                                      replace=False)) if len(cand) else []
+            
+            items += [{"class": int(c), 
+                       "id_dataset": int(idx[p]), 
+                       "y_true": int(y_true[p]),
+                       "y_pred": int(y_pred_cnn[p]),          
+                       "y_pred_lr": int(y_pred_lr[p])
+                       } for p in pick]
+        save_dict_to_json(out_path / f"images_{name}.json", items)
+        logger.debug("%s: %d candidati, %d salvati", name, int(mask.sum()), len(items))
 
 def save_dict_to_json(file_images, data_dict):
     """
@@ -43,6 +86,63 @@ def load_dict_from_json(logger,path: Path):
     logger.debug("Caricati %d elementi con successo!",len(list_load_dict))
     return list_load_dict
 
+
+def load_one_image_by_class(logger,
+                            json_path: str | Path) -> dict:
+    """
+        to load an image for every input class
+    """
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        list_load_dict = json.load(f)
+
+    images_by_class = {}
+
+    for item in list_load_dict:
+        id_class = item["class"]
+
+        if id_class not in images_by_class:
+            # Warninh this format generate a dict
+            # so in the callback loop we write
+            # item = dict_images[id_class]
+            images_by_class[id_class] = { "id_dataset": item["id_dataset"],
+                                            "y_true": item["y_true"],
+                                            "y_pred": item["y_pred"]
+                                        }
+    return images_by_class
+
+def load_images_by_class( logger , 
+                         path: Path, 
+                         n_images_for_class: int = 1 ) -> dict:
+    """
+         to load N images for every input class    
+    """
+
+    with open(path, "r", encoding="utf-8") as f:
+        list_load_dict = json.load(f)
+
+    images_by_class = {}
+
+    for item in list_load_dict:
+
+        id_class = item["class"]
+
+        if id_class not in images_by_class:
+            images_by_class[id_class] = []
+
+        # Avoid to select more images for the same classes
+        if len(images_by_class[id_class]) >= n_images_for_class:
+            continue
+
+        # Warninh this format generate a list
+        # so in the callback loop we write
+        # item = list_images[id_class][0]
+        images_by_class[id_class].append({ "id_dataset": item["id_dataset"],
+                                            "y_true": item["y_true"],
+                                            "y_pred": item["y_pred"]
+                                        })
+
+    return images_by_class
 
 def normalize_saliency_map(saliency_map: np.ndarray) -> np.ndarray:
     """
@@ -88,6 +188,15 @@ def denormalize_imagenet_old(img_hwc_np):
     # Clip to be sure the range will be strictly [0, 1] for LIME
     return np.clip(img_denorm, 0.0, 1.0)
 
+def black_baseline(device):
+    """
+        black pixel after ImageNet normalization: (0 - mean) / std, shape (1,3,1)
+        Substitute by black_normalized
+    """
+    mean = torch.tensor(IMAGENET_MEAN_TRANSFORM, device=device)
+    std = torch.tensor(IMAGENET_STD_TRANSFORM, device=device)
+    return ((0 - mean) / std).view(1, 3, 1)
+
 def normalize_imagenet(input_img):
     """
         Normalize for ImageNet from pixels view range
@@ -112,14 +221,6 @@ def black_normalized(size: int, device):
         The black of the ORIGINAL image, expressed in the normalized space.
     """
     return normalize_imagenet(torch.zeros(1, 3, size, size, device=device))
-
-def black_baseline(device):
-    """
-        black pixel after ImageNet normalization: (0 - mean) / std, shape (1,3,1)
-    """
-    mean = torch.tensor(IMAGENET_MEAN_TRANSFORM, device=device)
-    std = torch.tensor(IMAGENET_STD_TRANSFORM, device=device)
-    return ((0 - mean) / std).view(1, 3, 1)
 
 def denormalize_imagenet_np(x_data: np.ndarray) -> np.ndarray:
     """
@@ -161,15 +262,21 @@ def digit_mask(input_img28, threshold, dilation):
                            iterations=dilation
                            ) if dilation else mask
 
-
-
 def img28(pos,X_data,size ):
     """
         flat vector (784,) -> image (28, 28) for mask and imshow
     """
     return X_data[pos].reshape(size, size)
 
-def to_grid28(map2d, size, side=28):
+def map_to_28_old(m, size=CONFIG.IMAGE_SIZE):
+    """
+        any map (4x4, 8x8, 128x128) -> size x size, to compare with the digit mask
+        Substitude by to_grid28
+    """
+    t = torch.as_tensor(np.asarray(m), dtype=torch.float32)[None, None]
+    return F.interpolate(t, size=(size, size), mode="area")[0, 0].numpy()
+
+def to_grid28(map2d, size, side=CONFIG.IMAGE_SIZE):
     """
         This Function convert XAI 2dmap  (4x4, 8x8, 128x128) -> size x size, 
         to compare with the digit mask

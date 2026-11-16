@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from utility import to_grid28
+from config import CONFIG
 
 
 def _f(x):
@@ -16,26 +17,29 @@ def _f(x):
     return x if np.isfinite(x) else None
 
     
-def mean_spearman(maps):
+def mean_spearman(maps,cfg=CONFIG):
     """
         mean pairwise rank correlation between techniques (on |map| at 28x28)
     """
-    ranks = [np.argsort(np.argsort(map_to_28(np.abs(r.map)).ravel())).astype(float)
-             for r in maps.values()]
+    # ranks = [np.argsort(np.argsort(map_to_28(np.abs(r.map)).ravel())).astype(float)
+    #         for r in maps.values()]
+    ranks = [np.argsort(np.argsort( 
+                         to_grid28(np.abs(r.map), cfg.DENSENET_SIZE).ravel())).astype(float)
+                         for r in maps.values()]
+    
+
     if len(ranks) < 2:
         return None
     c = np.corrcoef(ranks)
     return _f(np.nanmean(c[np.triu_indices(len(ranks), 1)]))
 
 
-
-
-
 @torch.no_grad()
 def deletion_curve(model, input_img, target, importance, fractions, baseline):
     """
         Probability of the target class while the most important pixels
-        are replaced with black. Faithful map -> probability drops fast.
+        are replaced with black. 
+        Faithful map -> probability drops fast.
     """
     h, w = input_img.shape[-2:]
     imp = F.interpolate(torch.as_tensor(np.asarray(importance), dtype=torch.float32)[None, None],
@@ -51,24 +55,37 @@ def deletion_curve(model, input_img, target, importance, fractions, baseline):
     return probs
 
 
-def explain_target(model, techniques, input_img, target, mask,
-                   fractions, baseline, rng, cfg):
+def explain_target( model, 
+                    techniques, 
+                    input_img, 
+                    target, 
+                    mask,
+                    fractions, 
+                    baseline, 
+                    rng, 
+                    cfg ):
     """
         maps + quantitative metrics for ONE target class
     """
     maps = {name: tech.explain(input_img, target) for name, tech in techniques.items()}
 
     # random order: reference for the deletion test
-    rand_curve = deletion_curve(model, input_img, target,
+    rand_curve = deletion_curve(model, 
+                                input_img, 
+                                target,
                                 rng.random((cfg.IMAGE_SIZE, cfg.IMAGE_SIZE)),
-                                fractions, baseline)
+                                fractions, 
+                                baseline)
+    
     rand_auc = float(np.mean(rand_curve))
     frac_mask = float(mask.mean())
 
     metrics = {}
     for name, res in maps.items():
         m = np.asarray(res.map)
-        g = map_to_28(np.abs(m), cfg.IMAGE_SIZE)
+        # g = map_to_28(np.abs(m), cfg.IMAGE_SIZE)
+        g = to_grid28(np.abs(m), cfg.DENSENET_SIZE)
+
         share = float(g[mask].sum() / max(g.sum(), 1e-12))
 
         imp = np.maximum(m, 0) if res.signed else m   # evidence FOR the class

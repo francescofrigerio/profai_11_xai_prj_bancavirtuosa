@@ -71,9 +71,9 @@ class ConfigConstantsDefault:
     FLAG_RELU_INPLACE: bool = True
 
     # Phase 2 Parameters
-    # NUM_IMAGES_FOR_CLASS: int = 100   # to confirm in phase two
-    NUM_IMAGES_FOR_CLASS: int = 50   # to confirm in phase two
-    NUM_IMAGES_MIN_OK: int = 10       # to confirm in phase two
+    # NUM_IMAGES_FOR_CLASS: int = 100   
+    NUM_IMAGES_FOR_CLASS: int = 50   
+    NUM_IMAGES_MIN_OK: int = 10       
     
     # Grad-CAM
     GRADCAM_LAYER: str = "features.norm5"
@@ -115,6 +115,10 @@ class ConfigConstantsDefault:
     N_QUANT: int = 100                   # quantitative sample; fixed after timing in phase zero
 
     # Comparison
+    # IG_COMPLETENESS_MAX = 0.05
+    IG_MAX_COMPLETENESS_ERROR: float = 0.05
+    XAI_IMAGES_FOR_CLASS: int = 1 
+    DELETION_FRACTIONS: tuple = (0.0, 0.05, 0.1, 0.2, 0.3, 0.5)
     # Spearman and IoU
     COMPUTE_AGREEMENT: bool = True  
     # could be "absolute" or "positive"     
@@ -145,7 +149,7 @@ class ConfigConstantsDefault:
     LIST_IMAGES_SEL_PHASE_1: str = "LR_KO"
     LIST_IMAGES_SEL_PHASE_2: str = "CNN_KO"
 
-    IG_COMPLETENESS_MAX = 0.05
+    
     RELU_MAX_REL_DIFF = 1e-3
     RELU_MAX_REF_DIFF = 1e-3
 
