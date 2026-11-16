@@ -23,7 +23,7 @@ from utility import  load_images_by_class
 
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants 
-from output import plot_predict_info 
+from output import plot_predict_info , plot_quadrants_info
 from training import get_device, get_trained_model , evaluate_model
 
 from utility import create_and_save_images_lists , require , save_quadrant_to_json
@@ -128,17 +128,17 @@ def compare_2_xai( cfg,
     require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! 1 indici non allineati tra cnn ed lr")
     require((idx_val_lr == idx_val_cnn).all(),f"Attenzione!! 2 indici non allineati tra cnn ed lr")
     # assert (y_val_lr == y_true_cnn_val).all()
-    save_quadrant_to_json( cfg,
-                           logger, 
-                           # history['y_true_val'], 
-                           y_val_lr,
-                           y_pred_val_lr, 
-                           y_pred_cnn_val,
-                           # history['y_pred_val'], 
-                           idx_val_lr,
-                           cfg.CHECK_CLASSES, 
-                           out_path )
-    
+    quadrants_info = save_quadrant_to_json( cfg,
+                                            logger, 
+                                            # history['y_true_val'], 
+                                            y_val_lr,
+                                            y_pred_val_lr, 
+                                            y_pred_cnn_val,
+                                            # history['y_pred_val'], 
+                                            idx_val_lr,
+                                            cfg.CHECK_CLASSES, 
+                                            out_path )
+    plot_quadrants_info(out_path , quadrants_info)
     
     list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
     list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)

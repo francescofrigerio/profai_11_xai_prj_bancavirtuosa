@@ -36,6 +36,8 @@ def save_quadrant_to_json( cfg,
     """
         Save quadrants on json
         Quadrants: both_ok, lr_ko_cnn_ok, lr_ok_cnn_ko, both_ko (same split)
+
+        return dict to plot the graph.
     """
     
     n_per_class = cfg.XAI_IMAGES_PER_CLASS
@@ -49,7 +51,8 @@ def save_quadrant_to_json( cfg,
                "both_ko": ~lr_ok & ~cnn_ok }
 
     # random but reproducible, not the "first" ones
-    rng = np.random.default_rng(cfg.SEED)       
+    rng = np.random.default_rng(cfg.SEED)  
+    counts_info = {}     
     for name, mask in groups.items():
         items = []
         for c in classes:
@@ -67,6 +70,11 @@ def save_quadrant_to_json( cfg,
         save_dict_to_json(out_path / f"images_{name}.json", items)
         logger.debug("%s: %d candidati, %d salvati", name, int(mask.sum()), len(items))
 
+        counts_info[name] = { "candidati": int(mask.sum()),
+                         "selezionati": len(items)
+                       }
+    return counts_info
+        
 def save_dict_to_json(file_images, data_dict):
     """
         to save dict on json file

@@ -193,3 +193,30 @@ def plot_logistic_graph(model_,cfg , out_dir , c ):
     fig.suptitle(f"LR global maps (relative coefficients), C={c}")
     save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / "phase0_lr_global_maps.png")
     # save_fig(fig, cfg, out_dir_path)
+
+def plot_quadrants_info(out_path , counts_info):
+    """
+        quadrants plot graph
+    """
+    names = list(counts_info)
+    candidati = [counts_info[n]["candidati"] for n in names]
+    selezionati = [counts_info[n]["selezionati"] for n in names]
+
+    x = np.arange(len(names))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    ax.bar(x - width/2, candidati, width, label="Immagini disponibili")
+    ax.bar(x + width/2, selezionati, width, label="Immagini selezionate")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(names, rotation=15)
+    ax.set_ylabel("Numero immagini")
+    ax.set_title("Distribuzione delle immagini nei quattro quadranti")
+    ax.legend()
+
+    fig.tight_layout()
+    fig.savefig(out_path / "quadrants_distribution.png", dpi=150)
+    plt.close(fig)
+

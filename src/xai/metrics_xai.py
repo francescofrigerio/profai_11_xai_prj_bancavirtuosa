@@ -16,8 +16,7 @@ def to_valid_float(x):
         If the value is:
         - finite: it returns the number;
         - NaN, +Inf, or -Inf: it returns None.
-        This is used to avoid invalid numeric values ​​in JSON results.
-
+        This is used to avoid invalid numeric value in json results
     """
     x = float(x)
     return x if np.isfinite(x) else None
@@ -75,7 +74,12 @@ def mean_spearman_agreement(maps,cfg=CONFIG):
 
 
 @torch.no_grad()
-def deletion_curve_for_faithfulness(model, input_img, target, importance, fractions, baseline):
+def deletion_curve_for_faithfulness(model, 
+                                    input_img, 
+                                    target, 
+                                    importance, 
+                                    fractions, 
+                                    baseline ):
     """
        Its goal is to verify whether removing the most important pixels 
        decreases the probability of the explained class.
@@ -103,6 +107,10 @@ def deletion_curve_for_faithfulness(model, input_img, target, importance, fracti
         It requires a baseline with a shape compatible with (1, 3, k), 
         because it replaces selected pixels via:
         x.view(1, 3, -1)[:, :, order[:k]] = baseline
+
+        A faithful map should lead to a more rapid decrease in probability 
+        compared to random selection.
+
     """
     # It recover high and width of the image
     h, w = input_img.shape[-2:]
@@ -121,10 +129,16 @@ def deletion_curve_for_faithfulness(model, input_img, target, importance, fracti
     # Here we transform the map into a vector and sort the indices 
     # from the most important pixel to the least important.
     for frac in fractions:
+        # For each percentage, we create a copy of the original image 
+        # and replace the selected pixels.
         x = input_img.clone()
         k = int(round(frac * order.numel()))
         if k > 0:
+            # replace selected pixel
             x.view(1, 3, -1)[:, :, order[:k]] = baseline
+
+        # Calculate the probability of the target class after deletion.
+        # The result is a list of probabilities, one for each fraction.
         probs.append(float(F.softmax(model(x), dim=1)[0, target]))
     return probs
 
