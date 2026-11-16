@@ -24,7 +24,7 @@ from utility import black_normalized
 from xai import GradCamCaptum , build_techniques
 from xai.shap_explainer import make_background
 
-from faithfulness import explain_target
+from xai.faithfulness import explain_target , _float_cast
 
 def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, max_rows=10):
     sel = [r for r in rows if target_key in r["maps"]][:max_rows]
@@ -80,9 +80,9 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
 
     names = list(techniques)
     fractions = cfg.DELETION_FRACTIONS
-    
+    ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
     # baseline = black_baseline(device)
-    baseline = black_normalized(device)
+    baseline = black_normalized(cfg.DENSENET_SIZE,device)
     
     rng = np.random.default_rng(cfg.SEED)
     model.eval()
@@ -132,7 +132,7 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
                     "lr_map": {}
                 }
             
-            for tgt_name, tgt in targets.items():
+            for name, tgt in targets.items():
                 maps, metrics, meta = explain_target(model, 
                                                      techniques, 
                                                      input_img, 
@@ -142,14 +142,14 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
                                                      baseline, 
                                                      rng, 
                                                      cfg)
-                row["maps"][tgt_name] = maps
-                row["metrics"][tgt_name] = metrics
-                row["meta"][tgt_name] = meta
-                row["lr_map"][tgt_name] = lr.local_map(X_data[position], tgt)
+                row["maps"][name] = maps
+                row["metrics"][name] = metrics
+                row["meta"][name] = meta
+                row["lr_map"][name] = lr.local_map(X_data[position], tgt)
 
             ig = row["maps"]["pred"].get("integrated_gradients")
             if ig is not None:
-                row["ig_error"] = _f(ig.meta["completeness_error"])
+                row["ig_error"] = _float_cast(ig.meta["completeness_error"])
                 row["ig_unreliable"] = bool(ig.meta["completeness_error"] > ig_max)
             rows.append(row)
             logger.info("[%s] idx %d pos %d true %d CNN %d LR %d",
@@ -175,21 +175,22 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
     summary, records = {}, []
     for n in names:
         vals = [r["metrics"]["pred"][n] for r in rows]
-        summary[n] = {k: _f(np.mean([v[k] for v in vals]))
+        summary[n] = {k: _float_cast(np.mean([v[k] for v in vals]))
                       for k in ("mask_share", "focus_ratio", "del_gain")}
     for r in rows:
-        for tgt_name, tgt in r["targets"].items():
+        for name, tgt in r["targets"].items():
             for n in names:
-                m = r["metrics"][tgt_name][n]
+                m = r["metrics"][name][n]
                 records.append({"group": group, "index": r["index"], "true": r["true"],
                                 "pred": r["pred"], "pred_lr": r["pred_lr"],
-                                "target": tgt_name, "target_class": tgt, "technique": n,
+                                "target": name, "target_class": tgt, "technique": n,
                                 "mask_share": m["mask_share"], "mask_frac": m["mask_frac"],
                                 "focus_ratio": m["focus_ratio"], "del_auc": m["del_auc"],
                                 "del_gain": m["del_gain"],
-                                "agreement": r["meta"][tgt_name]["agreement_spearman"]})
+                                "agreement": r["meta"][name]["agreement_spearman"]})
 
-    results = { "group": group, "label": label,
+    results = { "group": group, 
+               "label": label,
                 "model": {k: ctx["info"].get(k) for k in ("action", "reason", "device")},
                 "n_images": len(rows),
                 "n_cnn_wrong": sum(r["pred"] != r["true"] for r in rows),
@@ -206,3 +207,146 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
     (out_path / f"stage2_results_{group}.json").write_text(json.dumps(results, 
                                                                       indent=2, default=str))
     return results, records
+
+def run_compare_group_xai_single_img(cfg, logger, model, device, techniques, lr, ctx, group, list_images):
+    """
+        XAI on one group (quadrant): maps for PRED class (and TRUE class if CNN is wrong).
+        This is a function designed for individual groups, and runs only for
+        1 images for group
+        We can delete this check to get more simple code.
+    """
+    t0 = time.time()
+    out_path = ctx["out_path"]
+    dataset = ctx["dataloader_cnn"].dataset
+    idx_to_pos = dataset.idx_dataset_position()
+    X_data, y_data, y_pred_lr = ctx["X_data"], ctx["y_data"], ctx["y_pred_lr"]
+
+    names = list(techniques)
+    ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
+    fractions = cfg.DELETION_FRACTIONS
+    
+    # baseline = black_baseline(device)
+    baseline = black_normalized(cfg.DENSENET_SIZE , device)
+    
+    rng = np.random.default_rng(cfg.SEED)
+    model.eval()
+
+    rows, first_input = [], None
+    for id_class in sorted(list_images):
+        for item in list_images[id_class]:
+            original_idx = item["id_dataset"]
+            if original_idx not in idx_to_pos:
+                raise KeyError(f"id_dataset {original_idx} not in this split")
+            position = idx_to_pos[original_idx]
+
+            input_image, input_label, idx = dataset[position]
+            assert idx == original_idx
+
+            # check the target class on record selected
+            assert int(input_label) == int(y_data[position])
+
+            input_img = input_image.unsqueeze(0).to(device)
+            
+            # get the probs with softwmax (multiclass classification)
+            with torch.no_grad():
+                probs = F.softmax(model(input_img), dim=1)[0]
+
+            # get predicted and true class based on the max prob
+            pred, true = int(probs.argmax()), int(input_label)
+            if first_input is None:
+                first_input = input_img
+
+            targets = { "pred": pred }
+            if pred != true:
+                targets["true"] = true          # what was missing for the right answer
+
+            mask = digit_mask(img28(position, X_data, size=cfg.IMAGE_SIZE),
+                              cfg.MASK_THRESHOLD, cfg.MASK_DILATION)
+
+            row = { "index": original_idx, 
+                    "pos": position, 
+                    "true": true, 
+                    "pred": pred,
+                    "pred_lr": int(y_pred_lr[position]), 
+                    "prob_pred": float(probs[pred]),
+                    "targets": targets, 
+                    "maps": {}, 
+                    "metrics": {}, 
+                    "meta": {}, 
+                    "lr_map": {}
+                }
+            
+            for name, tgt in targets.items():
+                maps, metrics, meta = explain_target(model, 
+                                                     techniques, 
+                                                     input_img, 
+                                                     tgt,
+                                                     mask, 
+                                                     fractions, 
+                                                     baseline, 
+                                                     rng, 
+                                                     cfg)
+                row["maps"][name] = maps
+                row["metrics"][name] = metrics
+                row["meta"][name] = meta
+                row["lr_map"][name] = lr.local_map(X_data[position], tgt)
+
+            ig = row["maps"]["pred"].get("integrated_gradients")
+            if ig is not None:
+                row["ig_error"] = _float_cast(ig.meta["completeness_error"])
+                row["ig_unreliable"] = bool(ig.meta["completeness_error"] > ig_max)
+            rows.append(row)
+            logger.info("[%s] idx %d pos %d true %d CNN %d LR %d",
+                        group, original_idx, position, true, pred, row["pred_lr"])
+
+    
+    # These select and transform the first image
+    # already 3x128x128 and normlaized because we begin from transform
+    first_idx = rows[0]["pos"]
+    first, _ , _ = dataset[first_idx]
+    # convert shape from [3,28,28] to [28,28]
+    first = first.unsqueeze(0).to(device)
+    # Just verify that the recalculation using the copy 
+    # of the model produces results sufficiently close 
+    # to the original ones.
+    # it is a consistency check
+    patched = copy.deepcopy(model).eval()
+
+    check_names = ["gradcam", "integrated_gradients"]
+    if "saliency" in techniques:
+        check_names.append("saliency")
+
+    label = GROUPS_RESULT_OK_KO[group]
+    diff_list=[]
+    for name in check_names:
+        # getting the map calculate in the main loop
+        a = rows[0]["maps"][name].map
+        # getting the map recalculated on the same image, 
+        # using the copied model.
+        b = build_techniques(patched, cfg, names=(name,))[name].explain(first, rows[0]["pred"]).map
+            
+        # it measures the maximum absolute difference 
+        # between the two maps, normalized by the 
+        # maximum absolute value of the second map.
+        diff = float(np.abs(a - b).max() / max(np.abs(b).max(), 1e-12))
+        logger.debug("%s check on train: %s, relative difference %.2e",name, diff <= cfg.RELU_MAX_REF_DIFF, diff)
+        diff_list.append((name,diff,diff <= cfg.RELU_MAX_REF_DIFF))
+
+    # save result 
+    results = { "group": group, 
+                "label": label,
+                "model": {k: ctx["info"].get(k) for k in ("action", "reason", "device")},
+                "n_images": len(rows),
+                "n_cnn_wrong": sum(r["pred"] != r["true"] for r in rows),
+                "diff_list": [[name, diff, passed] for name, diff, passed in diff_list], 
+                "images": [{"index": r["index"], "true": r["true"], "pred": r["pred"],
+                            "pred_lr": r["pred_lr"], "prob_pred": r["prob_pred"],
+                            "ig_completeness_error": r.get("ig_error"),
+                            "ig_unreliable": r.get("ig_unreliable"),
+                            "metrics": r["metrics"], "meta": r["meta"]} for r in rows],
+                "total_seconds": time.time() - t0,
+            }
+    
+    
+    return results 
+

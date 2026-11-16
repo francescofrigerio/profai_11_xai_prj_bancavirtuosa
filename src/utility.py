@@ -10,13 +10,14 @@ import torch
 import torch.nn.functional as F
 from scipy.ndimage import binary_dilation
 
-from config import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
-from config import IMAGENET_MEAN_NP , IMAGENET_STD_NP
+from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
+from constants import IMAGENET_MEAN_NP , IMAGENET_STD_NP
 from config import CONFIG
 
 
 def require(condition: bool, message: str) -> None:
     """
+        Wrap raise condition
     """
     if not condition:
         raise ValueError(message)

@@ -9,7 +9,7 @@ from utility import to_grid28
 from config import CONFIG
 
 
-def _f(x):
+def _float_cast(x):
     """
         float JSON-safe (nan/inf -> None)
     """
@@ -31,7 +31,7 @@ def mean_spearman(maps,cfg=CONFIG):
     if len(ranks) < 2:
         return None
     c = np.corrcoef(ranks)
-    return _f(np.nanmean(c[np.triu_indices(len(ranks), 1)]))
+    return _float_cast(np.nanmean(c[np.triu_indices(len(ranks), 1)]))
 
 
 @torch.no_grad()

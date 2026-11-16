@@ -84,6 +84,10 @@ def phase_2_xai( cfg,
                                                  CONFIG.IMAGE_SIZE, 
                                                  CONFIG.IMAGE_SIZE)
 
+
+    # Logistic regression (train indices only)
+    lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
+    
     # run reproducibility check
     repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
 
@@ -96,8 +100,7 @@ def phase_2_xai( cfg,
 
     logger.info("Test di riproducibilità superato con successo!")
 
-    # Logistic regression (train indices only)
-    lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
+    
     
     # from here is different compare to phase 1
    

@@ -14,7 +14,8 @@ from torch.utils.data import Subset , Dataset , DataLoader
 
 from sklearn.model_selection import train_test_split
 from logger import LOGGER
-from config import CONFIG , IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
+from config import CONFIG
+from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 
 class TransformedDataset(Dataset):
     """
