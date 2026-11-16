@@ -40,6 +40,11 @@ def deletion_curve(model, input_img, target, importance, fractions, baseline):
         Probability of the target class while the most important pixels
         are replaced with black. 
         Faithful map -> probability drops fast.
+
+        It requires a baseline with a shape compatible with (1, 3, k), 
+        because it replaces selected pixels via:
+        x.view(1, 3, -1)[:, :, order[:k]] = baseline
+
     """
     h, w = input_img.shape[-2:]
     imp = F.interpolate(torch.as_tensor(np.asarray(importance), dtype=torch.float32)[None, None],

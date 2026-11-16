@@ -193,6 +193,8 @@ def black_baseline(device):
     """
         black pixel after ImageNet normalization: (0 - mean) / std, shape (1,3,1)
         Substitute by black_normalized
+        baseline with a shape compatible with (1, 3, k)
+        It used by deletion curve
     """
     mean = torch.tensor(IMAGENET_MEAN_TRANSFORM, device=device)
     std = torch.tensor(IMAGENET_STD_TRANSFORM, device=device)

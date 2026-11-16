@@ -19,7 +19,7 @@ from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 from constants import TITLES, GROUPS_RESULT_OK_KO
 
 from utility import digit_mask , img28
-from utility import black_normalized
+from utility import black_normalized , black_baseline
 
 from xai import GradCamCaptum , build_techniques
 from xai.shap_explainer import make_background
@@ -63,13 +63,25 @@ def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, ma
 
 def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group, list_images):
     """
+        The general objective of the code is to compare XAI explanations produced 
+        by different techniques, by examining two aspects:
+        1. Where are the explanations focused? Do the maps actually highlight 
+        the region occupied by the digit?
+
+        2. How faithful are they to the model? 
+        If I remove the pixels deemed important, does the probability 
+        of the explained class decrease?
+
+        The results are maps, metrics, and quantitative results for each image.
+
         XAI on one group (quadrant): maps for PRED class (and TRUE class if CNN is wrong).
-        This is a function designed for individual groups, and replaces phase_2_xai 
+        This is a function designed for individual groups,
         with a loop that iterates through the four quadrants. 
         For each image, it provides an explanation 
         for the predicted class—including the true class 
         if the CNN’s prediction is incorrect—and then calculates quantitative metrics, 
         saving them in both JSON and CSV formats.
+
 
     """
     t0 = time.time()
@@ -79,11 +91,16 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
     X_data, y_data, y_pred_lr = ctx["X_data"], ctx["y_data"], ctx["y_pred_lr"]
 
     names = list(techniques)
+    # fractions: percentages of pixels to be removed during the deletion test.
     fractions = cfg.DELETION_FRACTIONS
-    ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
-    # baseline = black_baseline(device)
-    baseline = black_normalized(cfg.DENSENET_SIZE,device)
     
+    ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
+    
+    # baseline: the value that will replace the removed pixels.
+    # baseline = black_normalized(cfg.DENSENET_SIZE,device)
+    baseline = black_baseline(device)
+
+     rng: a random number generator with a fixed seed.
     rng = np.random.default_rng(cfg.SEED)
     model.eval()
 
@@ -224,9 +241,10 @@ def run_compare_group_xai_single_img(cfg, logger, model, device, techniques, lr,
     names = list(techniques)
     ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
     fractions = cfg.DELETION_FRACTIONS
+
+    # baseline = black_normalized(cfg.DENSENET_SIZE , device)
+    baseline = black_baseline(device)
     
-    # baseline = black_baseline(device)
-    baseline = black_normalized(cfg.DENSENET_SIZE , device)
     
     rng = np.random.default_rng(cfg.SEED)
     model.eval()

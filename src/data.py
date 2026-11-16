@@ -54,6 +54,19 @@ class TransformedDataset(Dataset):
     def idx_dataset_position(self):
         """
             original idx -> position inside this dataset
+
+            - id_dataset: the original identifier of the image within the dataset.
+            - position: the position of the image within the current dataset.(Subset)
+            
+            They are both needed because the images will be selected and saved 
+            using their original identifiers. 
+            To retrieve them from the current dataset, we must convert the identifier 
+            into the actual position.
+
+            Example:
+            idx_to_pos = dataset.idx_dataset_position()
+            position = idx_to_pos[original_idx]
+
         """
         dict_result = {}
         if self.original_indices is None:
