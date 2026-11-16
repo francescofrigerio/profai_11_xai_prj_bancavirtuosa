@@ -63,8 +63,8 @@ from captum.attr import Occlusion
 import shap
 from lime import lime_image
 
-from utility import normalize_saliency_map ,  normalize_imagenet , normalize_imagenet_np
-from utility import denormalize_imagenet , black_normalized
+from utility import normalize_imagenet , normalize_imagenet_np
+from utility import denormalize_imagenet , black_normalized , to_grid28
 
 try:
     import torch
@@ -74,6 +74,8 @@ try:
 except Exception as exc:                     # reported by check 1, not a crash
     torch = nn = F = None
     _TORCH_ERROR = exc
+
+from faithfulness import deletion_curve_for_faithfulness, mean_spearman_agreement
 
 def explain_gradcam(model, input_img, input_label, layer_name, relu=True):
     """
@@ -462,3 +464,62 @@ def explain_lime_man(model, input_img, input_label, cfg, device):
         # negative weight → the segment disfavors the class.
         out[segments == seg] = weight
     return out
+
+def explain_target( model, 
+                    techniques, 
+                    input_img, 
+                    target, 
+                    mask,
+                    fractions, 
+                    baseline, 
+                    rng, 
+                    cfg ):
+    """
+        maps + quantitative metrics for ONE target class
+
+        Faithfulness seeks to measure whether an XAI explanation truly 
+        represents the model's behavior.
+
+        We have defined two families of measures:
+        -Mask-based measures: examines where importance 
+        is concentrated in relation to the region occupied by the digit.
+
+        -Deletion-based measures: examines what happens to the prediction 
+        when the most important pixels are removed.
+    """
+    # This next runs explaination over the different technique
+    maps = {name: technique.explain(input_img, target) for name, technique in techniques.items()}
+
+    # random order: reference for the deletion test
+    rand_curve = deletion_curve_for_faithfulness(model, 
+                                                input_img, 
+                                                target,
+                                                rng.random((cfg.IMAGE_SIZE, cfg.IMAGE_SIZE)),
+                                                fractions, 
+                                                baseline)
+    
+    rand_auc = float(np.mean(rand_curve))
+    frac_mask = float(mask.mean())
+
+    metrics = {}
+    for name, res in maps.items():
+        m = np.asarray(res.map)
+        # g = map_to_28(np.abs(m), cfg.IMAGE_SIZE)
+        g = to_grid28(np.abs(m), cfg.DENSENET_SIZE)
+
+        share = float(g[mask].sum() / max(g.sum(), 1e-12))
+
+        imp = np.maximum(m, 0) if res.signed else m   # evidence FOR the class
+        if imp.max() <= 0:
+            imp = np.abs(m)
+        curve = deletion_curve(model, input_img, target, imp, fractions, baseline)
+        auc = float(np.mean(curve))
+
+        metrics[name] = {"mask_share": share,
+                         "mask_frac": frac_mask,
+                         "focus_ratio": share / max(frac_mask, 1e-12),
+                         "del_auc": auc,
+                         "del_gain": rand_auc - auc,      # > 0: better than random
+                         "del_curve": curve}
+    meta = {"agreement_spearman": mean_spearman_agreement(maps), "del_auc_random": rand_auc}
+    return maps, metrics, meta
