@@ -72,7 +72,8 @@ class ConfigConstantsDefault:
 
     # Phase 2 Parameters
     # NUM_IMAGES_FOR_CLASS: int = 100   
-    NUM_IMAGES_FOR_CLASS: int = 50   
+    NUM_IMAGES_FOR_CLASS: int = 50  
+    NUM_IMAGES_LOAD_FOR_CLASS: int = 7  
     NUM_IMAGES_MIN_OK: int = 10       
     
     # Grad-CAM

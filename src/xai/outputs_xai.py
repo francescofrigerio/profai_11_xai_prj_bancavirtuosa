@@ -22,6 +22,7 @@ def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, ma
                               f"explained: {row['targets'][target_key]}", fontsize=7)
         cells = [(row["maps"][target_key][n].map, row["maps"][target_key][n].signed)
                  for n in names] + [(row["lr_map"][target_key], True)]
+        # mind the sign is False for GradCam and True for each other
         for c, (m, signed) in enumerate(cells, start=1):
             a = float(np.abs(m).max()) or 1.0
             axes[r, c].imshow(m, cmap="seismic" if signed else "viridis",
@@ -43,7 +44,10 @@ def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, ma
         fig.clear()
 
 
-def plot_deletion_curves(metrics, meta, fractions, out_path):
+def plot_deletion_curves(metrics, meta, fractions, path,logger):
+    """
+        plot deletion curves 
+    """
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
@@ -68,6 +72,12 @@ def plot_deletion_curves(metrics, meta, fractions, out_path):
     ax.legend()
     ax.grid(True, alpha=0.3)
 
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
+    try:
+        fig.tight_layout()
+        fig.savefig(path, dpi=150)
+        try:
+            display(Image(str(path)))
+        except Exception:
+            logger.exception("Impossibile mostrare %s", path)
+    finally:
+            fig.clear()

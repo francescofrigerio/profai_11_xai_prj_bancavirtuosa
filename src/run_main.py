@@ -106,8 +106,10 @@ def compare_2_xai( cfg,
     # from here is different compare to phase 1
     list_img = []
     
-    list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+    list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
 
+    logger.info( f"after load_images_by_class len list images ={len(list_img)}")
+    
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
 
@@ -123,7 +125,7 @@ def compare_2_xai( cfg,
                                             pretrained=flag_pretrained,
                                             epoch_callback=callback)
 
-    _ ,  y_pred_cnn_val, y_true_cnn_val, idx_val_cnn = evaluate_model(model, 
+    _ ,  y_pred_cnn_val , y_true_cnn_val, idx_val_cnn = evaluate_model(model, 
                                                                 val_loader_cnn,
                                                                 device)
     
@@ -143,10 +145,12 @@ def compare_2_xai( cfg,
                                             idx_val_lr,
                                             cfg.CHECK_CLASSES, 
                                             out_path )
-    plot_quadrants_info(out_path , quadrants_info)
     
-    list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
-    list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+    plot_quadrants_info(out_path / "quadrants_distribution.png" , quadrants_info , logger)
+    
+    list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
+    
+    list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO ,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS )
 
     if len(list_img_ok) == 0 or len(list_img_ko) == 0:
             raise ValueError("list_img non possono essere vuote")
@@ -258,7 +262,7 @@ def explore_2_xai( cfg,
     
     # from here is different compare to phase 1
     list_img = []
-    list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+    list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO, n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
 
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
@@ -280,8 +284,8 @@ def explore_2_xai( cfg,
     # not works very well : TypeError list indices must be integers or slices, not str
     # require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! indici non allineati tra cnn ed lr")
     
-    list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
-    list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
+    list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
+    list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
 
     if len(list_img_ok) == 0 or len(list_img_ko) == 0:
             raise ValueError("list_img non possono essere vuote")
@@ -428,9 +432,9 @@ def phase_1_train(cfg,
     
     list_img = []
     if cfg.LIST_IMAGES_SEL_PHASE_1 == cfg.LIST_IMAGES_SEL_LR_OK:
-        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_OK)
+        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_OK,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
     elif cfg.LIST_IMAGES_SEL_PHASE_1 == cfg.LIST_IMAGES_SEL_LR_KO:
-        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
+        list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
 
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")

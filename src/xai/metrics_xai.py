@@ -54,6 +54,7 @@ def mean_spearman_agreement(maps,cfg=CONFIG):
     # we gets the ranking position of the item that we have in this cell?"
     ranks = [np.argsort(np.argsort( 
                          # flat numpy array return from to_grid28
+                         # abs to avoid sign impact on this metrics
                          to_grid28(np.abs(r.map), cfg.DENSENET_SIZE).ravel())).astype(float)
                          for r in maps.values()]
     

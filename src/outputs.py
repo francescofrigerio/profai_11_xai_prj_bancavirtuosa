@@ -13,7 +13,7 @@ import torch
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 
-from IPython.display import display, HTML
+from IPython.display import Image, display , HTML
 
 def section_display_title(title, description=""):
     html = f"""<div style="margin-top: 35px; margin-bottom: 15px; padding: 12px 16px; 
@@ -258,7 +258,7 @@ def plot_logistic_graph(model_,cfg , out_dir , c ):
     save_fig(fig,cfg,Path(cfg.OUTPUT_DIR) / "phase0_lr_global_maps.png")
     # save_fig(fig, cfg, out_dir_path)
 
-def plot_quadrants_info(out_path , counts_info):
+def plot_quadrants_info(path , counts_info , logger):
     """
         quadrants plot graph
     """
@@ -280,7 +280,14 @@ def plot_quadrants_info(out_path , counts_info):
     ax.set_title("Distribuzione delle immagini nei quattro quadranti")
     ax.legend()
 
-    fig.tight_layout()
-    fig.savefig(out_path / "quadrants_distribution.png", dpi=150)
-    plt.close(fig)
+    try:
+        fig.tight_layout()
+        # fig.savefig(out_path / "quadrants_distribution.png", dpi=150)
+        fig.savefig(path, dpi=150)
+        try:
+            display(Image(str(path)))
+        except Exception:
+            logger.exception("Impossibile mostrare %s", path)
+    finally:
+        fig.clear()
 

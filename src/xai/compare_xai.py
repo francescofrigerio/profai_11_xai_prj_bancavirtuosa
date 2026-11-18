@@ -153,7 +153,11 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
                                                      rng, 
                                                      cfg)
 
-                plot_deletion_curves(metrics, meta, fractions, out_path)
+                plot_deletion_curves(metrics, 
+                                     meta, 
+                                     fractions, 
+                                     out_path / f"deletion_curves_{name}.png",
+                                     logger  )
 
                 row["maps"][name] = maps
                 row["metrics"][name] = metrics
