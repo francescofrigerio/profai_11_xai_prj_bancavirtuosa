@@ -26,6 +26,9 @@ def section_display_title(title, description=""):
     display(HTML(html))
 
 def section_display_content(title, content_html=""):
+    """
+         view html content txt 
+    """
     html = f"""
             <style>
                 .xai-box table 
@@ -69,58 +72,7 @@ def section_display_content(title, content_html=""):
     """
     display(HTML(html))
 
-# --- ESEMPIO DI UTILIZZO CON IL TUO TESTO ---
 
-descrizione_metriche = """
-<p>L'obiettivo generale del codice è confrontare le spiegazioni XAI (<i>Explainable AI</i>) prodotte da diverse tecniche, esaminando due aspetti principali:</p>
-<ol>
-    <li><strong>Su cosa si concentrano le spiegazioni?</strong> Le mappe evidenziano effettivamente la regione occupata dalla cifra?</li>
-    <li><strong>Quanto sono fedeli al modello?</strong> Se rimuovo i pixel considerati importanti, la probabilità associata alla classe spiegata diminuisce?</li>
-</ol>
-
-<table>
-    <thead>
-        <tr>
-            <th>Metrica</th>
-            <th>Domanda a cui risponde</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><code>mask_share</code></td>
-            <td>Quanta importanza viene attribuita alla cifra?</td>
-        </tr>
-        <tr>
-            <td><code>mask_frac</code></td>
-            <td>Quanto spazio occupa la cifra?</td>
-        </tr>
-        <tr>
-            <td><code>focus_ratio</code></td>
-            <td>Quanto è concentrata l'importanza sulla cifra rispetto alla sua area?</td>
-        </tr>
-        <tr>
-            <td><code>del_auc</code></td>
-            <td>Quanto rimane alta la probabilità quando vengono rimossi i pixel importanti?</td>
-        </tr>
-        <tr>
-            <td><code>del_gain</code></td>
-            <td>Quanto è migliore la tecnica rispetto a una selezione casuale?</td>
-        </tr>
-        <tr>
-            <td><code>agreement_spearman</code></td>
-            <td>In che misura le diverse tecniche concordano tra loro?</td>
-        </tr>
-    </tbody>
-</table>
-
-<p>Stiamo misurando tre diverse proprietà delle spiegazioni:</p>
-<ul>
-    <li><strong>Localizzazione spaziale:</strong> <code>mask_share</code>, <code>focus_ratio</code></li>
-    <li><strong>Fedeltà al comportamento della CNN:</strong> <code>del_auc</code>, <code>del_gain</code></li>
-    <li><strong>Concordanza tra le tecniche:</strong> <code>agreement_spearman</code></li>
-</ul>
-<p style="margin-bottom: 0;"><em>Nota: Queste metriche non sono intercambiabili; una determinata tecnica potrebbe ottenere buoni risultati in una dimensione, ma prestazioni inferiori in un'altra.</em></p>
-"""
 
 
 

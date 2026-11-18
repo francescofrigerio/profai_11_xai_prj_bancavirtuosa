@@ -134,6 +134,9 @@ class ConfigConstantsDefault:
 
     # Execution and outputs ONLY on Notebook
     OUTPUT_DIR: str = ROOT_DIR / "outputs"
+    INPUT_DIR: str = ROOT_DIR / "inputs"
+
+    FILE_TXT_CONTENTS_XAI: str = "contents_metrics_xai.txt" 
 
     # found and confirmed by visual control
     CHECK_CLASSES: tuple[int, ...] = (2, 3, 5, 8)

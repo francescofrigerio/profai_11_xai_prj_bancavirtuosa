@@ -320,6 +320,7 @@ def explore_2_xai( cfg,
 
 def phase_2_xai( cfg,
                  logger,
+                 inp_path,
                  out_path,
                  flag_pretrained = True ) -> None :
     """
@@ -336,8 +337,8 @@ def phase_2_xai( cfg,
     section_display_title( "Fase2:Comparazione Tecniche XAI - Immagini da Quadrante", 
                      "Confronto metriche Xai"
                         )
-    txt_content = read_text_for_html(path)
-    section_display_content("Fase2:Metriche Xai", content_html=txt_content)
+    content_txt = read_text_for_html(inp_path / cfg.FILE_TXT_CONTENTS_XAI)
+    section_display_content("Fase2:Metriche Xai", content_html=content_txt)
    
     compare_2_xai(cfg,logger,out_path,flag_pretrained)
 
@@ -568,9 +569,14 @@ def main(cfg=CONFIG, logger=LOGGER):
     else:
         raise ValueError(f"Attenzione!! Numero fase da eseguire non valido: {flag_phase_to_run}")
 
-    # dir and file output
+    # dir and file input/output
+    inp = Path(cfg.INPUT_DIR) 
+    inp.mkdir(parents=True, exist_ok=True)
+    
     out = Path(cfg.OUTPUT_DIR) 
     out.mkdir(parents=True, exist_ok=True)
+
+ 
 
     # Esecuzione condizionale o sequenziale basata sulla fase
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_1 ):
@@ -580,7 +586,7 @@ def main(cfg=CONFIG, logger=LOGGER):
         phase_1_train(cfg, logger, out, flag_pretrained)
         
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_2 ):
-        phase_2_xai(cfg, logger, out)
+        phase_2_xai(cfg, logger, inp, out)
 
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_3 ):
         logger.info("------------------------------------------------------------------")
