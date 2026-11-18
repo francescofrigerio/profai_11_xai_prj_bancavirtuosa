@@ -41,7 +41,7 @@ def make_background(transform_train, cfg,logger, device):
         input_images	All trainval images shape (N, 1, 28, 28)
         Output Shape : (N, 3, 128, 128)
     """
-    logger.info(f" transform_train len {len(transform_train)}")
+    logger.debug(f" transform_train len {len(transform_train)}")
     rng = np.random.RandomState(cfg.SEED) # pylint: disable=no-member
     pick = rng.choice(len(transform_train),
                      cfg.SHAP_NUM_BACKGROUND,
@@ -49,7 +49,7 @@ def make_background(transform_train, cfg,logger, device):
                     )
     # Load images selected with pick
     input_images = torch.stack([transform_train[int(i)][0] for i in pick])
-    logger.info(f" input_images shape {input_images.shape}")
+    logger.debug(f" input_images shape {input_images.shape}")
     # not run other select with pick and other normalization 
     return input_images.to(device)
 

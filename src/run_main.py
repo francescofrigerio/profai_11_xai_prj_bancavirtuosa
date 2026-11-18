@@ -326,12 +326,12 @@ def phase_2_xai( cfg,
     section_display( "Fase2:Esplorazione Tecniche XAI - Immagini da Training LR", 
                      "Confronto visivo tra Grad-CAM, Integrated Gradients , Occlusion Map Lime Shap sulla griglia 28x28."
                     )
-    explore_2_xai(cfg,logger,out_path,flag_pretrained)
+    # explore_2_xai(cfg,logger,out_path,flag_pretrained)
 
     section_display( "Fase2:Comparazione Tecniche XAI - Immagini da Quadrante", 
                      "Confronto metriche Xai"
                    )
-    # compare_2_xai(cfg,logger,out_path,flag_pretrained)
+    compare_2_xai(cfg,logger,out_path,flag_pretrained)
 
 def phase_1_train(cfg,
                 logger,
@@ -566,24 +566,18 @@ def main(cfg=CONFIG, logger=LOGGER):
 
     # Esecuzione condizionale o sequenziale basata sulla fase
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_1 ):
-        # logger.info("------------------------------------------------------------------")
-
         section_display( "Fase2:Training CNN - Eseguire solo con GPU", 
                          "Debug GradCam , Metriche , Matrice di Confusione , Grafico a Barre F1_SCORE per Classi"
                         )
         phase_1_train(cfg, logger, out, flag_pretrained)
-        # logger.info("------------------------------------------------------------------")
         
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_2 ):
-        logger.info("------------------------------------------------------------------")
         phase_2_xai(cfg, logger, out)
-        logger.info("------------------------------------------------------------------")
 
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_3 ):
         logger.info("------------------------------------------------------------------")
         # phase_2_xai(cfg, logger, out,flag_pretrained)
         
-        logger.info("------------------------------------------------------------------")
 
     logger.debug("Programma Terminato")
 

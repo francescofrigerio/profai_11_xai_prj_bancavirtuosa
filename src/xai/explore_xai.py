@@ -346,8 +346,12 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     names = list(techniques)
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(rows)))
 
-    fig.suptitle(f"XAI - IMMAGINI({type_list}) PREDETTE(VALIDATION) CON ERRORE DENSENET" 
-                 if flag_error_pred_cnn else "XAI - IMMAGINI({type_list}) PREDETTE(VALIDATION) CON ERRORE LR",
+    if flag_error_pred_cnn:
+        str_title = f"XAI - IMMAGINI({type_list}) PREDETTE(VALIDATION) CON ERRORE DENSENET" 
+    else:
+        str_title = f"XAI - IMMAGINI({type_list}) PREDETTE(VALIDATION) CON ERRORE LR"
+    
+    fig.suptitle(str_title,
                 fontsize=14,
                 fontweight="bold",
                 y=1.02

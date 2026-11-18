@@ -85,7 +85,6 @@ def save_checkpoint(path, model, cfg, history) -> str:
 
 
 def read_checkpoint(path,device="cpu") -> dict:
-    print("start read_checkpoint with weights_only=False ")
     # return torch.load(path, map_location="cpu", weights_only=True)
     # return torch.load(path, map_location=device, weights_only=True)
     return torch.load(path, map_location=device, weights_only=False)
@@ -342,7 +341,7 @@ def get_trained_model(cfg,
 
     X_test , y_pred, y_true , idx_test = evaluate_model( model,test_loader_cnn ,device)
     test_accuracy = accuracy(y_true,y_pred)
-    logger.info(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
+    logger.debug(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
 
     if action == "load" and epoch_callback is not None :
         epoch_callback(model,cfg.NUM_EPOCHS+1,flag_test=True)
