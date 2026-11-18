@@ -181,6 +181,7 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     transform_cnn = xai_param_dict["transform_cnn"] 
     dataloader_cnn = xai_param_dict["dataloader_cnn"]
     flag_error_pred_cnn = xai_param_dict["flag_error_pred_cnn"]
+    type_list = xai_param_dict["type_list"]
 
     dataset = dataloader_cnn.dataset
     # original idx (saved in the json) -> position in the dataset
@@ -342,8 +343,8 @@ def run_exp( cfg, logger, model, lr, device , xai_param_dict) -> None :
     names = list(techniques)
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(rows)))
 
-    fig.suptitle("XAI - IMMAGINI PREDETTE(VALIDATION) CON ERRORE DENSENET" 
-                 if flag_error_pred_cnn else "XAI - IMMAGINI PREDETTE(VALIDATION) CON ERRORE LR",
+    fig.suptitle(f"XAI - IMMAGINI({type_list}) PREDETTE(VALIDATION) CON ERRORE DENSENET" 
+                 if flag_error_pred_cnn else "XAI - IMMAGINI({type_list}) PREDETTE(VALIDATION) CON ERRORE LR",
                 fontsize=14,
                 fontweight="bold",
                 y=1.02

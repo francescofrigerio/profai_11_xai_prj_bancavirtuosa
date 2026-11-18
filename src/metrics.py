@@ -68,9 +68,10 @@ def print_final_metrics(out_path , file_name="xai_metrics_all.csv") -> dict:
         mask_share and focus_ratio: 
         1- mask_share represents the attribution share within the digit. 
         
-        2- focus_ratio divides this by the area of ​​the digit; thus, a value of 1 indicates 
-        uniform distribution, while values ​​significantly greater than 1 signify 
-        that attention is concentrated on the stroke itself. 
+        2- focus_ratio divides this by the area of the digiti;
+        thus,a value of 1 indicates uniform distribution , while value 
+        significantly greater than 1 signifythat attention is concentrated 
+        on the stroke itself. 
         A CNN that makes an incorrect prediction may still exhibit a high focus value—
         it is simply focusing on the wrong part of the stroke.
         

@@ -1,16 +1,29 @@
-
+"""
+    Plot graph on main
+"""
 import numpy as np
 import pandas as pd
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-# from PIL import Image
+from IPython.display import display , HTML
 import torch
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 
+from IPython.display import display, HTML
+
+def section_display(title, description=""):
+    html = f"""<div style="margin-top: 35px; margin-bottom: 15px; padding: 12px 16px; 
+                border-left: 5px solid #1a73e8; background-color: #f1f3f4; 
+                border-radius: 4px; color: #202124;">
+                <h3 style="margin: 0 0 5px 0; font-family: sans-serif;">{title}</h3>
+                <p style="margin: 0; font-size: 14px; color: #5f6368;">{description}</p>
+            </div>
+            """
+    display(HTML(html))
 
 def save_fig(fig, cfg, path: Path) -> None:
     """

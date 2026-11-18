@@ -23,7 +23,7 @@ from utility import  load_images_by_class
 
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants 
-from output import plot_predict_info , plot_quadrants_info
+from outputs import plot_predict_info , plot_quadrants_info , section_display
 from training import get_device, get_trained_model , evaluate_model
 
 from utility import create_and_save_images_lists , require , save_quadrant_to_json
@@ -291,7 +291,8 @@ def explore_2_xai( cfg,
                         "out_path": out_path,   
                         "transform_cnn": transform_val_cnn,   
                         "dataloader_cnn": val_loader_cnn,
-                        "flag_error_pred_cnn": False
+                        "flag_error_pred_cnn": False,
+                        "type_list":  cfg.FILE_IMG_LR_OK.split(".")[0]
                     }
    
 
@@ -305,7 +306,8 @@ def explore_2_xai( cfg,
                             "out_path": out_path,   
                             "transform_cnn": transform_val_cnn,   
                             "dataloader_cnn": val_loader_cnn,
-                            "flag_error_pred_cnn": True
+                            "flag_error_pred_cnn": True ,
+                            "type_list":  cfg.FILE_IMG_LR_OK.split(".")[0]
                         }
 
        
@@ -322,9 +324,16 @@ def phase_2_xai( cfg,
          1 - explore and debug images with Xai ( not valid for decision)
          2 - compare images with Xai (valid for decision)
     """
+    # ESPLORAZIONE
+    section_display( "Fase2:Esplorazione Tecniche XAI - Immagini da Training LR", 
+                     "Confronto visivo tra Grad-CAM, Integrated Gradients , Occlusion Map Lime Shap sulla griglia 28x28."
+                    )
     explore_2_xai(cfg,logger,out_path,flag_pretrained)
 
-    compare_2_xai(cfg,logger,out_path,flag_pretrained)
+    section_display( "Fase2:Comparazione Tecniche XAI - Immagini da Quadrante", 
+                     "Confronto metriche Xai"
+                   )
+    # compare_2_xai(cfg,logger,out_path,flag_pretrained)
 
 def phase_1_train(cfg,
                 logger,
@@ -559,9 +568,13 @@ def main(cfg=CONFIG, logger=LOGGER):
 
     # Esecuzione condizionale o sequenziale basata sulla fase
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_1 ):
-        logger.info("------------------------------------------------------------------")
+        # logger.info("------------------------------------------------------------------")
+
+        section_display( "Fase2:Training CNN - Eseguire solo con GPU", 
+                         "Debug GradCam , Metriche , Matrice di Confusione , Grafico a Barre F1_SCORE per Classi"
+                        )
         phase_1_train(cfg, logger, out, flag_pretrained)
-        logger.info("------------------------------------------------------------------")
+        # logger.info("------------------------------------------------------------------")
         
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_2 ):
         logger.info("------------------------------------------------------------------")

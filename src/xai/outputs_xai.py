@@ -1,5 +1,12 @@
+"""
+     Plot Graph for Xai
+"""
+import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from IPython.display import Image, display
+from utility import img28
+from constants import TITLES
 
 def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, max_rows=10):
     sel = [r for r in rows if target_key in r["maps"]][:max_rows]

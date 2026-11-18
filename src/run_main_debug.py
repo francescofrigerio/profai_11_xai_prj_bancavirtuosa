@@ -22,7 +22,7 @@ from utility import  load_images_by_class
 
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants
-from output import plot_predict_info 
+from outputs import plot_predict_info 
 from training import get_device, get_trained_model 
 
 from utility import create_and_save_images_lists  
@@ -208,6 +208,9 @@ def phase_1_train(cfg,
                                                  CONFIG.IMAGE_SIZE)
         
     
+    # Logistic regression (train indices only)
+    lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
+    
     # run reproducibility check
     repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
     
@@ -217,12 +220,8 @@ def phase_1_train(cfg,
         raise RuntimeError(f"Attenzione: Il test di riproducibilità è fallito! "
                            f"Controlli non superati: {failed_checks}"
                            )
-    
     logger.info("Test di riproducibilità superato con successo!")
     
-    # Logistic regression (train indices only)
-    lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
-
     y_pred_val_lr = lr.predict(X_val_lr)
     val_accuracy_lr = accuracy(y_val_lr,y_pred_val_lr)
 
