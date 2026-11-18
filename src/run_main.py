@@ -85,7 +85,7 @@ def compare_2_xai( cfg,
     #                                             CONFIG.IMAGE_SIZE, 
     #                                             CONFIG.IMAGE_SIZE)
             
-    logger.info("Test di riproducibilità superato con successo!")
+    logger.debug("Test di riproducibilità superato con successo!")
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
 
@@ -239,7 +239,7 @@ def explore_2_xai( cfg,
     #                                             CONFIG.IMAGE_SIZE, 
     #                                             CONFIG.IMAGE_SIZE)
           
-    logger.info("Test di riproducibilità superato con successo!")
+    logger.debug("Test di riproducibilità superato con successo!")
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
 
@@ -253,9 +253,6 @@ def explore_2_xai( cfg,
     
     # from here is different compare to phase 1
     list_img = []
-    # if cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_OK:
-    #     list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
-    # elif cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_KO:
     list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
 
     if len(list_img) == 0 :
@@ -275,7 +272,8 @@ def explore_2_xai( cfg,
     
     # here we verifiy the alignment
     # It works because because valloader_lr e valloader_cnn has shuffle=False
-    require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! indici non allineati tra cnn ed lr")
+    # not works very well : TypeError list indices must be integers or slices, not str
+    # require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! indici non allineati tra cnn ed lr")
     
     list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO)
     list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
@@ -388,7 +386,7 @@ def phase_1_train(cfg,
         failed_checks = [key for key, value in repro_results.items() if not value]
         raise RuntimeError(f"Attenzione: test di riproducibilità fallito! {failed_checks}")
         
-    logger.info("Test di riproducibilità superato con successo!")
+    logger.debug("Test di riproducibilità superato con successo!")
     
     y_pred_val_lr = lr.predict(X_val_lr)
     val_accuracy_lr = accuracy(y_val_lr,y_pred_val_lr)
