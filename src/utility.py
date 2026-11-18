@@ -40,7 +40,7 @@ def save_quadrant_to_json( cfg,
         return dict to plot the graph.
     """
     
-    n_per_class = cfg.XAI_IMAGES_PER_CLASS
+    n_per_class = cfg.XAI_IMAGES_FOR_CLASS
     y_true, y_pred_lr, y_pred_cnn, idx = map(np.asarray, (y_true, y_pred_lr, y_pred_cnn, idx))
     
     lr_ok, cnn_ok = y_pred_lr == y_true, y_pred_cnn == y_true

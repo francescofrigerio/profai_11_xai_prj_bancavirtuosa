@@ -164,7 +164,7 @@ def compare_2_xai( cfg,
     for group in GROUPS_RESULT_OK_KO:
         list_images = load_images_by_class(logger, 
                                            out_path / f"images_{group}.json",
-                                           n_images_for_class=cfg.XAI_IMAGES_PER_CLASS)
+                                           n_images_for_class=cfg.XAI_IMAGES_FOR_CLASS)
         if not list_images:
             logger.warning("Gruppo %s vuoto: salto", group)
             continue
