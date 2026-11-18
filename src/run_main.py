@@ -119,7 +119,7 @@ def compare_2_xai( cfg,
                                             pretrained=flag_pretrained,
                                             epoch_callback=callback)
 
-    y_pred_cnn_val, y_true_cnn_val, idx_val_cnn = evaluate_model(model, 
+    _ ,  y_pred_cnn_val, y_true_cnn_val, idx_val_cnn = evaluate_model(model, 
                                                                 val_loader_cnn,
                                                                 device)
     
