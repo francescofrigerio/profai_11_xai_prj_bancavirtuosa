@@ -19,11 +19,12 @@ from config import CONFIG
 from constants import GROUPS_RESULT_OK_KO
 
 from data import data_to_input_lr, load_datasets
-from utility import  load_images_by_class
+from utility import  load_images_by_class , read_text_for_html
 
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants 
-from outputs import plot_predict_info , plot_quadrants_info , section_display
+from outputs import plot_predict_info , plot_quadrants_info 
+from outputs import section_display_title , section_display_content
 from training import get_device, get_trained_model , evaluate_model
 
 from utility import create_and_save_images_lists , require , save_quadrant_to_json
@@ -89,6 +90,11 @@ def compare_2_xai( cfg,
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
 
+    logger.info( f"LogisticRegression fitted | "
+                    f"n_iter={lr.diagnostics['n_iter']} | "
+                    f"val_acc={lr.diagnostics['val_accuracy']:.6f}"
+                )
+    
     # run reproducibility check
     repro_results = lr.check_reproducibility(X_train_lr, y_train_lr, cfg)
     if not all(repro_results.values()):
@@ -322,14 +328,17 @@ def phase_2_xai( cfg,
          2 - compare images with Xai (valid for decision)
     """
     # ESPLORAZIONE
-    section_display( "Fase2:Esplorazione Tecniche XAI - Immagini da Training LR", 
+    section_display_title( "Fase2:Esplorazione Tecniche XAI - Immagini da Training LR", 
                      "Confronto visivo tra Grad-CAM, Integrated Gradients , Occlusion Map Lime Shap sulla griglia 28x28."
-                    )
+                        )
     # explore_2_xai(cfg,logger,out_path,flag_pretrained)
 
-    section_display( "Fase2:Comparazione Tecniche XAI - Immagini da Quadrante", 
+    section_display_title( "Fase2:Comparazione Tecniche XAI - Immagini da Quadrante", 
                      "Confronto metriche Xai"
-                   )
+                        )
+    txt_content = read_text_for_html(path)
+    section_display_content("Fase2:Metriche Xai", content_html=txt_content)
+   
     compare_2_xai(cfg,logger,out_path,flag_pretrained)
 
 def phase_1_train(cfg,
@@ -565,7 +574,7 @@ def main(cfg=CONFIG, logger=LOGGER):
 
     # Esecuzione condizionale o sequenziale basata sulla fase
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_1 ):
-        section_display( "Fase2:Training CNN - Eseguire solo con GPU", 
+        section_display_title( "Fase2:Training CNN - Eseguire solo con GPU", 
                          "Debug GradCam , Metriche , Matrice di Confusione , Grafico a Barre F1_SCORE per Classi"
                         )
         phase_1_train(cfg, logger, out, flag_pretrained)

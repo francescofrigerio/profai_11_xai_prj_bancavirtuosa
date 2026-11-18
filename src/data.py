@@ -8,7 +8,9 @@ from pathlib import Path
 import torch
 
 # preprocessd dataset with pytorch
+from IPython.utils.io import capture_output
 from torchvision import datasets , transforms 
+
 # computer vision with pytorch
 from torch.utils.data import Subset , Dataset , DataLoader
 
@@ -130,18 +132,19 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
                                         std  =IMAGENET_STD_TRANSFORM
                                         )
                                         ])
-    
-    trainval_base = datasets.MNIST(root="./data",
-                                    train=True,
-                                    download=True,
-                                    transform=None
-                                )
 
-    test_base = datasets.MNIST(root="./data",
-                                train=False,
-                                download=True,
-                                transform=None
-                            )
+    with capture_output():
+        trainval_base = datasets.MNIST(root="./data",
+                                       train=True,
+                                       download=True,
+                                       transform=None
+                                      )
+
+        test_base = datasets.MNIST(root="./data",
+                                   train=False,
+                                   download=True,
+                                   transform=None
+                                    )
 
     # (dataset Torch standard function as MNIST)
     targets = trainval_base.targets

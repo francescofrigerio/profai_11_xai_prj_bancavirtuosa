@@ -9,11 +9,29 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from scipy.ndimage import binary_dilation
+import html
 
 from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 from constants import IMAGENET_MEAN_NP , IMAGENET_STD_NP
 from config import CONFIG
 
+
+def read_text_for_html(path):
+    """
+    It reads file .txt and return a text html,
+    preserves (\n) and space.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        txt_raw = f.read()
+    
+    # Run escape (<, >, &) to avoid failure on HTML
+    txt_fine = html.escape(txt_raw)
+    
+    # Substitutr newline with <br> and use white-space: 
+    # pre-wrap to maint newline and table align 
+    content_html = f'<div style="white-space: pre-wrap; font-family: inherit;">{txt_fine}</div>'
+    
+    return content_html
 
 def require(condition: bool, message: str) -> None:
     """

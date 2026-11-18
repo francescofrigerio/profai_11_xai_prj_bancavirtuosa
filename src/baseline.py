@@ -249,7 +249,7 @@ def fit_baseline(X_t, y_t, X_v, y_v, cfg, logger) -> "LRBaseline":
                     ),
                  }
 
-    logger.info( f"LogisticRegression fitted | "
+    logger.debug( f"LogisticRegression fitted | "
                 f"n_iter={diagnostics['n_iter']} | "
                 f"val_acc={diagnostics['val_accuracy']:.6f}"
                 )

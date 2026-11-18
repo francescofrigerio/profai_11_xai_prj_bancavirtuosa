@@ -15,7 +15,7 @@ from sklearn.metrics import classification_report
 
 from IPython.display import display, HTML
 
-def section_display(title, description=""):
+def section_display_title(title, description=""):
     html = f"""<div style="margin-top: 35px; margin-bottom: 15px; padding: 12px 16px; 
                 border-left: 5px solid #1a73e8; background-color: #f1f3f4; 
                 border-radius: 4px; color: #202124;">
@@ -24,6 +24,105 @@ def section_display(title, description=""):
             </div>
             """
     display(HTML(html))
+
+def section_display_content(title, content_html=""):
+    html = f"""
+            <style>
+                .xai-box table 
+                {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 15px 0;
+                    font-size: 14px;
+                    background-color: #ffffff;
+                }}
+                .xai-box th, .xai-box td 
+                {{
+                    border: 1px solid #dadce0;
+                    padding: 8px 12px;
+                    text-align: left;
+                }}
+                .xai-box th 
+                {{
+                    background-color: #e8f0fe;
+                    color: #1967d2;
+                    font-weight: bold;
+                }}
+                .xai-box code 
+                {{
+                    background-color: #f1f3f4;
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                    font-family: monospace;
+                    color: #d93025;
+                }}     
+            </style>
+
+            <div class="xai-box" style="margin-top: 30px; margin-bottom: 20px; padding: 18px 22px; 
+                border-left: 5px solid #1a73e8; background-color: #f8f9fa; 
+                border-radius: 6px; color: #202124; font-family: sans-serif; line-height: 1.5;">
+                <h3 style="margin: 0 0 12px 0; color: #1a73e8;">{title}</h3>
+                <div style="font-size: 14.5px; color: #3c4043;">
+                    {content_html}
+                </div>
+            </div>
+    """
+    display(HTML(html))
+
+# --- ESEMPIO DI UTILIZZO CON IL TUO TESTO ---
+
+descrizione_metriche = """
+<p>L'obiettivo generale del codice è confrontare le spiegazioni XAI (<i>Explainable AI</i>) prodotte da diverse tecniche, esaminando due aspetti principali:</p>
+<ol>
+    <li><strong>Su cosa si concentrano le spiegazioni?</strong> Le mappe evidenziano effettivamente la regione occupata dalla cifra?</li>
+    <li><strong>Quanto sono fedeli al modello?</strong> Se rimuovo i pixel considerati importanti, la probabilità associata alla classe spiegata diminuisce?</li>
+</ol>
+
+<table>
+    <thead>
+        <tr>
+            <th>Metrica</th>
+            <th>Domanda a cui risponde</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>mask_share</code></td>
+            <td>Quanta importanza viene attribuita alla cifra?</td>
+        </tr>
+        <tr>
+            <td><code>mask_frac</code></td>
+            <td>Quanto spazio occupa la cifra?</td>
+        </tr>
+        <tr>
+            <td><code>focus_ratio</code></td>
+            <td>Quanto è concentrata l'importanza sulla cifra rispetto alla sua area?</td>
+        </tr>
+        <tr>
+            <td><code>del_auc</code></td>
+            <td>Quanto rimane alta la probabilità quando vengono rimossi i pixel importanti?</td>
+        </tr>
+        <tr>
+            <td><code>del_gain</code></td>
+            <td>Quanto è migliore la tecnica rispetto a una selezione casuale?</td>
+        </tr>
+        <tr>
+            <td><code>agreement_spearman</code></td>
+            <td>In che misura le diverse tecniche concordano tra loro?</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>Stiamo misurando tre diverse proprietà delle spiegazioni:</p>
+<ul>
+    <li><strong>Localizzazione spaziale:</strong> <code>mask_share</code>, <code>focus_ratio</code></li>
+    <li><strong>Fedeltà al comportamento della CNN:</strong> <code>del_auc</code>, <code>del_gain</code></li>
+    <li><strong>Concordanza tra le tecniche:</strong> <code>agreement_spearman</code></li>
+</ul>
+<p style="margin-bottom: 0;"><em>Nota: Queste metriche non sono intercambiabili; una determinata tecnica potrebbe ottenere buoni risultati in una dimensione, ma prestazioni inferiori in un'altra.</em></p>
+"""
+
+
 
 def save_fig(fig, cfg, path: Path) -> None:
     """
