@@ -345,7 +345,7 @@ def get_trained_model(cfg,
     logger.info(f"Test Accuracy (DenseNet Cnn): {test_accuracy}")
 
     if action == "load" and epoch_callback is not None :
-        epoch_callback(model,cfg.NUM_EPOCHS+1)
+        epoch_callback(model,cfg.NUM_EPOCHS+1,flag_test=True)
         
     info = {
         "action": action, 

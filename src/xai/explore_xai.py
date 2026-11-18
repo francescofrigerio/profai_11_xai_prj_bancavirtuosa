@@ -53,7 +53,7 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
     # built once: original idx (saved in the json) -> position in the dataset
     idx_to_pos = dataset.idx_dataset_position()
 
-    def callback(model, epoch):
+    def callback(model, epoch , flag_test=False):
         logger.debug("Start Callback Grad-CAM epoch:%d",epoch)
         model.eval()
         explainer = GradCamCaptum(model, cfg)
@@ -126,8 +126,11 @@ def make_gradcam_callback(cfg,dataloader, device, out_path , list_images , logge
                
             for row in (0, 1):
                 axes[row, i].axis("off")
-           
-        fig.suptitle(f"Grad-CAM Debug Validation, epoch {epoch+1}")
+
+        if (flag_test): 
+            fig.suptitle(f"Grad-CAM View Debug Validation, epoch {epoch+1}")
+        else:
+            fig.suptitle(f"Grad-CAM View Debug Test")
         out_path.mkdir(parents=True, exist_ok=True)
         
        
