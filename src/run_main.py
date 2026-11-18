@@ -99,9 +99,7 @@ def compare_2_xai( cfg,
 
     # from here is different compare to phase 1
     list_img = []
-    # if cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_OK:
-    #     list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_OK)
-    # elif cfg.LIST_IMAGES_SEL_PHASE_2 == cfg.LIST_IMAGES_SEL_CNN_KO:
+    
     list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO)
 
     if len(list_img) == 0 :
@@ -125,7 +123,8 @@ def compare_2_xai( cfg,
     
     # here we verifiy the alignment
     # It works because because valloader_lr e valloader_cnn has shuffle=False
-    require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! 1 indici non allineati tra cnn ed lr")
+    # not works :TypeError list indices must be integers or slices, not str
+    # require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! 1 indici non allineati tra cnn ed lr")
     require((idx_val_lr == idx_val_cnn).all(),f"Attenzione!! 2 indici non allineati tra cnn ed lr")
     # assert (y_val_lr == y_true_cnn_val).all()
     quadrants_info = save_quadrant_to_json( cfg,
