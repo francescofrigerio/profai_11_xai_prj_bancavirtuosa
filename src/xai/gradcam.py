@@ -15,6 +15,7 @@ class GradCamCaptum(Explainer):
     """
     name = "gradcam"
     # never negative for Relu
+    # never negative as costruction
     signed = False                      # relu_attributions=True: only what pushes the class UP
 
     def __init__(self, model, cfg, layer_name=None):

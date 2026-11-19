@@ -40,6 +40,9 @@ class LimeExplainer(Explainer):
         Lime Explainer
     """
     name = "lime"
+    # NB:
+    # indicates that the map can contain positive and negative values, 
+    # but does not define what the sign represents
     signed = True
     output_space = "probability"
 
@@ -131,6 +134,7 @@ class LimeExplainer(Explainer):
 
         # Extract NumPy Image in the format (H, W, 3)
         img = denormalize_imagenet(input_img)[0].permute(1, 2, 0).clamp(0, 1).cpu().numpy().astype(np.float64)
+        # It don't work on every pixel but on cell of grid
         segments = grid_segments(size, cfg.LIME_GRID_CELLS)
 
         def classifier_fn(batch): 
@@ -148,12 +152,20 @@ class LimeExplainer(Explainer):
             return torch.cat(out).numpy()
 
         explainer = lime_image.LimeImageExplainer(random_state=cfg.SEED)
-        kwargs = dict(labels=(input_label,), top_labels=None, hide_color=0, num_samples=cfg.LIME_NUM_SAMPLES,
-                      batch_size=64, segmentation_fn=lambda im: segments, random_seed=cfg.SEED)
+        kwargs = dict(labels=(input_label,), 
+                      top_labels=None, 
+                      hide_color=0, 
+                      num_samples=cfg.LIME_NUM_SAMPLES,
+                      batch_size=64, 
+                      segmentation_fn=lambda im: segments, random_seed=cfg.SEED)
+        
         if "progress_bar" in inspect.signature(explainer.explain_instance).parameters:
-            kwargs["progress_bar"] = False           # absent in lime 0.2.0.1
+            kwargs["progress_bar"] = False    
+        # Generate cloud predict with perturbate img       
         explanation = explainer.explain_instance(img, classifier_fn, **kwargs)
         out = np.zeros((size, size))
+        # LIME build a linear model and associate
+        # to every segment a weight/coefficient:
         for segment, weight in dict(explanation.local_exp[input_label]).items():
             out[segments == segment] = weight
         return out

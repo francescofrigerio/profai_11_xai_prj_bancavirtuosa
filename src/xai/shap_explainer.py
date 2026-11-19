@@ -85,6 +85,9 @@ class ShapExplainer(Explainer):
         Shap explainer
     """
     name = "shap"
+    # NB:
+    # indicates that the map can contain positive and negative values, 
+    # but does not define what the sign represents
     signed = True
 
     def __init__(self, model, cfg, background):

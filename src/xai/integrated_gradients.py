@@ -17,6 +17,9 @@ class IntegratedGradientsCaptum(Explainer):
             get Captum IntegratedGradients map
     """
     name = "integrated_gradients"
+    # NB:
+    # indicates that the map can contain positive and negative values, 
+    # but does not define what the sign represents
     signed = True
     # if near 0 then the approssimate with n_steps was been accurate
     conv_delta = 0.0

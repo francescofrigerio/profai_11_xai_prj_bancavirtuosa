@@ -30,6 +30,9 @@ class OcclusionCaptum(Explainer):
         get Captum Occlusion map
     """
     name = "occlusion"
+    # NB:
+    # indicates that the map can contain positive and negative values, 
+    # but does not define what the sign represents
     signed = True
 
     def attribute(self, input_img, input_label):
@@ -38,7 +41,9 @@ class OcclusionCaptum(Explainer):
         """
         win, stride = self.cfg.OCCLUSION_WINDOW, self.cfg.OCCLUSION_STRIDE
         occ_attr = Occlusion(self.model).attribute(
-                            input_img, sliding_window_shapes=(3, win, win), strides=(3, stride, stride),
+                            input_img, 
+                            sliding_window_shapes=(3, win, win), 
+                            strides=(3, stride, stride),
                             baselines=black_normalized(self.cfg.DENSENET_SIZE, input_img.device), 
                             target=input_label,
                             perturbations_per_eval=32, 

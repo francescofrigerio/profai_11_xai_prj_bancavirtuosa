@@ -77,6 +77,22 @@ except Exception as exc:                     # reported by check 1, not a crash
 
 from xai.metrics_xai import deletion_curve_for_faithfulness, mean_spearman_agreement
 
+def signed_diags(m):
+    m = np.asarray(m, dtype=float)
+
+    pos = np.maximum(m, 0)
+    neg = np.minimum(m, 0)
+
+    return {
+        "positive_fraction": float(np.mean(m > 0)),
+        "negative_fraction": float(np.mean(m < 0)),
+        "positive_sum": float(pos.sum()),  # somma dei contributi positivi
+        "negative_sum": float(neg.sum()),  # somma con segno, quindi <= 0
+        "negative_abs_sum": float(np.abs(neg).sum()),  # magnitudine dei contributi negativi
+        "net_sum": float(m.sum()),
+        "absolute_sum": float(np.abs(m).sum()),
+}
+
 def explain_gradcam(model, input_img, input_label, layer_name, relu=True):
     """
         input_img (B, C, H, W) (1,3,128,128)
@@ -663,15 +679,6 @@ def explain_target_1( techniques,
 
         mask_share = float(g[mask].sum() / max(g.sum(), 1e-12))
 
-        # Here we manage signed maps 
-        # If the map is signed, consider only the positive contributions—that is, 
-        # those that provide evidence in favor of the target class.
-        # If no positive contributions exist, use the absolute value.
-        # This avoids performing the deletion test on an entirely negative map.
-        imp = np.maximum(m, 0) if res.signed else m   # evidence FOR the class
-        if imp.max() <= 0:
-            imp = np.abs(m)
-
         metrics[name] = { "mask_share": mask_share,
                           "mask_frac": frac_mask,
                           # This metric compares the concentration of importance with 
@@ -679,8 +686,7 @@ def explain_target_1( techniques,
                           # FocusRatio = MaskShare / MaskFraction
                           "focus_ratio": mask_share / max(frac_mask, 1e-12) }
     
-    meta = { "agreement_spearman": mean_spearman_agreement(maps)
-    }
+    meta = { "agreement_spearman": mean_spearman_agreement(maps)}
     
     return maps, metrics, meta
 
@@ -752,7 +758,7 @@ def explain_target_2( model,
         # If no positive contributions exist, use the absolute value.
         # This avoids performing the deletion test on an entirely negative map.
         imp = np.maximum(m, 0) if res.signed else m   # evidence FOR the class
-        if imp.max() <= 0:
+        if imp.max() <= 0: # remove negative value
             imp = np.abs(m)
 
         # Calculate the deletion curve for each XAI technique and compute its mean.

@@ -16,6 +16,7 @@ class SaliencyCaptum(Explainer):
             Could be exclude this captum on production
     """
     name = "saliency"
+    # never negative
     signed = False
 
     def attribute(self, input_img, input_label):
