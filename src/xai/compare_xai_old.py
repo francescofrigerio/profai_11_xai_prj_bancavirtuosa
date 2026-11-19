@@ -1,0 +1,336 @@
+"""
+     This module implement run function with Xai code
+"""
+# import os
+import json
+import time
+import copy
+
+import torch
+import torch.nn.functional as F
+
+import numpy as np
+from matplotlib.figure import Figure
+from IPython.display import Image, display
+from xai.outputs_xai import plot_maps_grid , plot_deletion_curves
+
+from config import CONFIG
+# from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
+from constants import TITLES, GROUPS_RESULT_OK_KO
+
+from utility import digit_mask , img28
+# from utility import black_normalized , black_baseline
+from utility import black_baseline
+
+from xai import GradCamCaptum , build_techniques
+from xai.shap_explainer import make_background
+
+from xai.explain import explain_target 
+from xai.metrics_xai import to_valid_float
+
+
+
+def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group, list_images):
+    """
+        The general objective of the code is to compare XAI explanations produced 
+        by different techniques, by examining two aspects:
+        1. Where are the explanations focused? Do the maps actually highlight 
+        the region occupied by the digit?
+
+        2. How faithful(fedele) are they to the model? 
+        If I remove the pixels deemed important, does the probability 
+        of the explained class decrease?
+
+        The results are maps, metrics, and quantitative results for each image.
+
+        XAI on one group (quadrant): maps for PRED class (and TRUE class if CNN is wrong).
+        This is a function designed for individual groups,
+        with a loop that iterates through the four quadrants. 
+        For each image, it provides an explanation 
+        for the predicted class—including the true class 
+        if the CNN’s prediction is incorrect—and then calculates quantitative metrics, 
+        saving them in both JSON and CSV formats.
+
+
+    """
+    t0 = time.time()
+    out_path = ctx["out_path"]
+    dataset = ctx["dataloader_cnn"].dataset
+    idx_to_pos = dataset.idx_dataset_position()
+    X_data, y_data, y_pred_lr = ctx["X_data"], ctx["y_data"], ctx["y_pred_lr"]
+
+    names_tech = list(techniques)
+    # fractions: percentages of pixels to be removed during the deletion test.
+    fractions = cfg.DELETION_FRACTIONS
+    
+    ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
+    
+    # baseline: the value that will replace the removed pixels.
+    baseline = black_baseline(device)
+
+    # a random number generator with a fixed seed.
+    rng = np.random.default_rng(cfg.SEED)
+    model.eval()
+
+    rows, first_input = [], None
+    for id_class in sorted(list_images):
+        for item in list_images[id_class]:
+            original_idx = item["id_dataset"]
+            if original_idx not in idx_to_pos:
+                raise KeyError(f"id_dataset {original_idx} not in this split")
+            position = idx_to_pos[original_idx]
+
+            # get X and y for the current image
+            input_image, input_label, idx = dataset[position]
+            assert idx == original_idx
+
+            # check the target class on record selected
+            assert int(input_label) == int(y_data[position])
+
+            # add the batch dimension to the image
+            # from (3,H,W) to (1,3,H,W)
+            input_img = input_image.unsqueeze(0).to(device)
+            
+            # The CNN produces logits, 
+            # which are transformed into probabilities via Softmax.
+            with torch.no_grad():
+                # (multiclass classification)
+                probs = F.softmax(model(input_img), dim=1)[0]
+
+            # get predicted and real class based on the max prob
+            pred_cnn, true = int(probs.argmax()), int(input_label)
+            pred_lr = int(y_pred_lr[position])
+
+            if first_input is None:
+                first_input = input_img
+
+            # If the CNN is correct, we run an explanation only for the predicted class.         
+            # If the CNN is incorrect, we run 2 explanations:
+            # - pred_cnn: why did the CNN choose the wrong class?
+            # - pred_lr: why did the LR choose the wrong class?
+            # - true: which parts of the image support the correct class?
+            targets_cnn = { "pred_cnn": pred_cnn }
+            targets_lr = {"pred_lr": pred_lr}
+
+            if pred_cnn != true or pred_lr != true:
+                # what was missing for the right answer
+                targets_cnn["true"] = true  
+                targets_lr["true"] = true        
+
+            # The next code builds a binary mask that approximately identifies 
+            # the region occupied by the digit.
+            # The mask contains:
+            # - True: pixels belonging to the digit;
+            # - False: pixels belonging to the background.
+            # Dilation allows for the inclusion of a small margin around the strokes.
+            # This mask will be used to verify whether the XAI maps concentrate 
+            # their importance within the region actually occupied by the digit.
+            mask = digit_mask(img28(position, X_data, size=cfg.IMAGE_SIZE),
+                              cfg.MASK_THRESHOLD, 
+                              cfg.MASK_DILATION)
+
+            row = { "index": original_idx, 
+                    "pos": position, 
+                    "true": true, 
+                    "pred_cnn": pred_cnn,
+                    "pred_lr": pred_lr, 
+                    "prob_pred": float(probs[pred_cnn]),
+                    "targets_cnn": targets_cnn, 
+                    "targets_lr": targets_lr, 
+                    "maps_cnn": {}, 
+                    "metrics_cnn": {}, 
+                    "meta_cnn": {}, 
+                    "maps_lr": {}, 
+                    "metrics_lr": {},               
+                    "meta_lr": {}, 
+                    "lr_map": {}
+                }
+
+            # for each target in cnn_targets, 
+            # it generate maps using XAI techniques applied to the CNN;
+            for name, tgt in targets_cnn.items():
+                # Run Explanations for all techniques on current image
+                # alwais passing pred on targets
+                # only for error passing true on targets
+                # We get as results:
+                # maps	Maps generated by XAI techniques
+                # metrics	Quantitative metrics for faithfulness and localization
+                # meta	Additional information, such as agreement and random baseline
+                maps_cnn, metrics_cnn, meta_cnn = explain_target(model, 
+                                                     techniques, 
+                                                     input_img, 
+                                                     tgt,
+                                                     mask, 
+                                                     fractions, 
+                                                     baseline, 
+                                                     rng, 
+                                                     cfg)
+
+            # for each target in lr_targets, 
+            # it generate an LR map using lr.local_map(...).
+            for name, tgt in targets_lr.items():
+                # Run Explanations for all techniques on current image
+                # alwais passing pred on targets
+                # only for error passing true on targets
+                # We get as results:
+                # maps	Maps generated by XAI techniques
+                # metrics	Quantitative metrics for faithfulness and localization
+                # meta	Additional information, such as agreement and random baseline
+                maps_lr, metrics_lr, meta_lr = explain_target(lr, 
+                                                        techniques, 
+                                                        input_img, 
+                                                        tgt,
+                                                        mask, 
+                                                        fractions, 
+                                                        baseline, 
+                                                        rng, 
+                                                        cfg)
+                                
+            # For instance, if the CNN predicts 5 and the LR predicts 8, 
+            # you would obtain CNN maps for 5 and 2, and LR maps for 8 and 2. 
+            # You do not calculate a CNN map for 8—that would constitute 
+            # an additional analysis of the CNN for a target it did not predict, 
+            # rather than an explanation of its actual decision.
+
+            plot_deletion_curves(metrics_cnn, 
+                                     meta_cnn, 
+                                     fractions, 
+                                     out_path / f"deletion_curves_{name}_cnn.png",
+                                     logger  )
+
+            row["maps_cnn"][name] = maps_cnn
+            row["metrics_cnn"][name] = metrics_cnn
+            row["meta_cnn"][name] = meta_cnn
+
+            row["maps_lr"][name] = maps_lr
+            row["metrics_lr"][name] = metrics_lr
+            row["meta_lr"][name] = meta_lr
+            # Also generate the map of the Logistic Regression coefficients 
+            # for the same target.
+            # This allows us to compare the explanations provided by the CNN 
+            # with the linear representation of the LR.
+            row["lr_map"][name] = lr.local_map(X_data[position], tgt)
+
+            # completeness_error ony for cnn: This is a specific check for Integrated Gradients, 
+            # not a general metric applicable to all maps. 
+            # It verifies how closely the sum of the attributions approaches the difference 
+            # between the model’s output for the image and its output for the chosen baseline. 
+            # It does not measure 
+            # how “correct” the map is, nor the extent to which it aligns with LR.
+            ig = row["maps_cnn"]["pred_cnn"].get("integrated_gradients")
+            if ig is not None:
+                row["ig_error"] = to_valid_float(ig.meta["completeness_error"])
+                row["ig_unreliable"] = bool(ig.meta["completeness_error"] > ig_max)
+            rows.append(row)
+            logger.info("[%s] idx %d pos %d true %d CNN %d LR %d",
+                        group, original_idx, position, true, pred_cnn,pred_lr)
+
+    # Lime Shap stability of Explanation
+    # stochastic techniques: same image explained twice
+    # Check whether LIME and SHAP produce the same explanation 
+    # when run twice on the same image.
+    stability_cnn = {} 
+    for name in ("lime", "shap"):
+        if name in techniques:
+            again = techniques[name].explain(first_input, rows[0]["pred_cnn"]).map
+            diff = float(np.abs(again - rows[0]["maps_cnn"]["pred_cnn"][name].map).max())
+            # Of the difference is less than RELU_MAX_REF_DIFF, 
+            # the check is considered passed.
+            stability_cnn[name] = {"max_abs_diff": diff, "ok": bool(diff <= cfg.RELU_MAX_REF_DIFF)}
+
+    #  generates map visualizations;
+    label = GROUPS_RESULT_OK_KO[group]
+    plot_maps_grid(rows, "pred_cnn", names_tech, cfg, X_data,
+                   f"XAI validation [{label}] - explained: CNN PREDICTED class",
+                   out_path / f"maps_grid_{group}_pred_cnn.png", logger)
+
+    plot_maps_grid(rows, "pred_lr", names_tech, cfg, X_data,
+                       f"XAI validation [{label}] - explained: LR PREDICTED class",
+                       out_path / f"maps_grid_{group}_pred_lr.png", logger)
+    
+    plot_maps_grid(rows, "true", names_tech, cfg, X_data,
+                   f"XAI validation [{label}] - explained: CNN wrong TRUE class ",
+                   out_path / f"maps_grid_{group}_true.png", logger)
+
+    summary_cnn,summary_lr, records = {},{}, []
+    for name in names_tech:
+        # calculates metric averages;
+        vals_cnn = [r["metrics_cnn"]["pred_cnn"][name] for r in rows]
+        vals_lr = [r["metrics_lr"]["pred_lr"][name] for r in rows]
+        # summary and records (csv)
+        summary_cnn[name] = {k: to_valid_float(np.mean([v[k] for v in vals_cnn]))
+                      for k in ("mask_share", "focus_ratio", "del_gain")}
+        summary_lr[name] = {k: to_valid_float(np.mean([v[k] for v in vals_lr]))
+                              for k in ("mask_share", "focus_ratio", "del_gain")}
+    
+    # creates records for the CSV;
+    for r in rows:
+        for name_pred_true, tgt in r["targets_cnn"].items():
+            for name in names_tech:
+                m = r["metrics_cnn"][name_pred_true][name]
+                records.append({"group": group, 
+                                "index": r["index"], 
+                                "true": r["true"],
+                                "pred": r["pred_cnn"], 
+                                "pred_lr": r["pred_lr"],
+                                "target": name_pred_true, 
+                                "target_class": tgt, 
+                                "technique": name,
+                                "mask_share": m["mask_share"], 
+                                "mask_frac": m["mask_frac"],
+                                "focus_ratio": m["focus_ratio"], 
+                                "del_auc": m["del_auc"],
+                                "del_gain": m["del_gain"],
+                                "agreement": r["meta"][name_pred_true]["agreement_spearman"]})
+        
+        for name_pred_true, tgt in r["targets_lr"].items():
+            for name in names_tech:
+                m = r["metrics_lr"][name_pred_true][name]
+                records.append({"group": group, 
+                                "index": r["index"], 
+                                "true": r["true"],
+                                "pred": r["pred_cnn"], 
+                                "pred_lr": r["pred_lr"],
+                                "target": name_pred_true, 
+                                "target_class": tgt, 
+                                "technique": name,
+                                "mask_share": m["mask_share"], 
+                                "mask_frac": m["mask_frac"],
+                                "focus_ratio": m["focus_ratio"], 
+                                "del_auc": m["del_auc"],
+                                "del_gain": m["del_gain"],
+                                "agreement": r["meta"][name_pred_true]["agreement_spearman"]})
+        
+
+    
+    # saves the results in JSON format.
+    # The final structure contains information 
+    # for each image, target, and XAI technique.
+    results = { "group": group, 
+               "label": label,
+                "model": {k: ctx["info"].get(k) for k in ("action", "reason", "device")},
+                "n_images": len(rows),
+                "n_cnn_wrong": sum(r["pred_cnn"] != r["true"] for r in rows),
+                "stability_cnn": stability_cnn,
+                "summary_pred_target_cnn": summary_cnn,
+                "n_cnn_wrong": sum(r["pred_cnn"] != r["true"] for r in rows),
+                "n_lr_wrong": sum(r["pred_lr"] != r["true"] for r in rows),
+                "summary_pred_target_lr": summary_lr,
+                "images": [{"index": r["index"], 
+                            "true": r["true"], 
+                            "pred_cnn": r["pred_cnn"],
+                            "pred_lr": r["pred_lr"], 
+                            "prob_pred": r["prob_pred"],
+                            "ig_completeness_error": r.get("ig_error"),
+                            "ig_unreliable": r.get("ig_unreliable"),
+                            "metrics_cnn": r["metrics_cnn"], 
+                            "meta_cnn": r["meta_cnn"],
+                            "metrics_lr": r["metrics_lr"], 
+                            "meta_lr": r["meta_lr"] 
+                            } for r in rows],
+                            "total_seconds": time.time() - t0
+                        }
+    
+    (out_path / f"stage2_results_{group}.json").write_text(json.dumps(results, 
+                                                                      indent=2, default=str))
+    return results, records

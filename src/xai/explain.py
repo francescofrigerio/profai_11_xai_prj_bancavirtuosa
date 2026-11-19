@@ -574,7 +574,12 @@ def explain_target( model,
         # this is an arithmetic mean of the curve values, not a trapezoidal integration. 
         # If the fractions are equally spaced, it serves as a consistent indicator 
         # for comparing the curves, though it does not represent the exact geometric area.
-        curve = deletion_curve_for_faithfulness(model, input_img, target, imp, fractions, baseline)
+        curve = deletion_curve_for_faithfulness(model, 
+                                                input_img, 
+                                                target, 
+                                                imp, 
+                                                fractions, 
+                                                baseline)
         
         # This is the metric that compares the XAI technique with random selection.
         # DelGain = AUC_random - AUC_XAI
@@ -596,3 +601,184 @@ def explain_target( model,
     }
     
     return maps, metrics, meta
+
+
+def explain_target_1( techniques, 
+                    input_img, 
+                    target, 
+                    mask,
+                    cfg ):
+    """
+        maps + quantitative metrics for ONE target class
+
+        Metric	Question answered
+        mask_share	How much importance is attributed to the digit?
+        mask_frac	How much space does the digit occupy?
+        focus_ratio	How concentrated is the importance on the digit relative to its area?
+        agreement_spearman	To what extent do different techniques agree?
+
+        We are measuring three different properties of the explanations:
+        - spatial localization (mask_share, focus_ratio);
+        - agreement between techniques (agreement_spearman).
+        These metrics are not interchangeable, and a given technique may perform 
+        well in one dimension while performing worse in another.
+
+        We have defined a families of measures:
+        -Mask-based measures: examines where importance 
+        is concentrated in relation to the region occupied by the digit.
+
+        Focus Ratio Interpretation:
+        - focus_ratio > 1: importance concentrated on the figure, 
+        to a greater extent than would be expected from a uniform distribution;
+        - focus_ratio = 1: concentration proportional to the area;
+        - focus_ratio < 1: importance relatively concentrated outside the figure.
+
+    """
+    # This next runs explaination over the different technique
+    # his output is a generation maps
+    # Each technique generate his explanation
+    maps = {name: technique.explain(input_img, target) for name, technique in techniques.items()}
+
+    # This next get 
+    # the Percentage of area occupied by the digit   
+    # The mask contains Boolean values.
+    # Therefore, the mean corresponds 
+    # to the percentage of pixels identified as belonging to the digit.
+    frac_mask = float(mask.mean())
+
+    # This is one of the most interesting metrics.
+    # It measures how much of the map’s total importance falls 
+    # within the mask of the digit.
+    # The formula is: Mask Share = Σiε-mask |Mi| /  Σi |Mi|
+    # For example Esempio:
+    # Total importance of the map: 100
+    # Total importance within the digit: 80
+    # Mask Share = 80/100 = 0.80
+    # It means that 80% is focused on the digit figure
+    metrics = {}
+    for name, res in maps.items():
+        m = np.asarray(res.map)
+        # g = map_to_28(np.abs(m), cfg.IMAGE_SIZE)
+        g = to_grid28(np.abs(m), cfg.DENSENET_SIZE)
+
+        mask_share = float(g[mask].sum() / max(g.sum(), 1e-12))
+
+        # Here we manage signed maps 
+        # If the map is signed, consider only the positive contributions—that is, 
+        # those that provide evidence in favor of the target class.
+        # If no positive contributions exist, use the absolute value.
+        # This avoids performing the deletion test on an entirely negative map.
+        imp = np.maximum(m, 0) if res.signed else m   # evidence FOR the class
+        if imp.max() <= 0:
+            imp = np.abs(m)
+
+        metrics[name] = { "mask_share": mask_share,
+                          "mask_frac": frac_mask,
+                          # This metric compares the concentration of importance with 
+                          # the surface area occupied by the figure.
+                          # FocusRatio = MaskShare / MaskFraction
+                          "focus_ratio": mask_share / max(frac_mask, 1e-12) }
+    
+    meta = { "agreement_spearman": mean_spearman_agreement(maps)
+    }
+    
+    return maps, metrics, meta
+
+
+
+def explain_target_2( model, 
+                     techniques, 
+                     input_img, 
+                     target, 
+                     fractions, 
+                     baseline, 
+                     rng, 
+                     cfg ):
+    """
+        maps + quantitative metrics for ONE target class
+
+        Metric	Question answered
+        focus_ratio	How concentrated is the importance on the digit relative to its area?
+        del_auc	    How high does the probability remain when important pixels are removed?
+        del_gain	How much better is the technique compared to random selection?
+       
+        We are measuring three different properties of the explanations:
+        - fidelity to the CNN's behavior (del_auc, del_gain);
+        These metrics are not interchangeable, and a given technique may perform 
+        well in one dimension while performing worse in another.
+
+        Faithfulness seeks to measure whether an XAI explanation truly 
+        represents the model's behavior.
+
+        We have a family of measures:
+        -Deletion-based measures: examines what happens to the prediction 
+        when the most important pixels are removed.
+
+        DelGai Interpretation:
+        DelGain     Meaning
+        Positive	XAI performs better than random
+        Zero	    XAI performs the same as random
+        Negative	XAI performs worse than random
+
+        In the deletion test, a lower curve is generally better than higher.
+
+    """
+    # This next runs explaination over the different technique
+    # his output is a generation maps
+    # Each technique generate his explanation
+    maps = {name: technique.explain(input_img, target) for name, technique in techniques.items()}
+
+    # Here, we perform a deletion test using a random importance map.
+    # This serves as a benchmark against which XAI techniques can be compared.
+    # The random baseline does not represent a random image; rather, 
+    # it represents a random ordering of the pixels to be deleted.
+    rand_curve = deletion_curve_for_faithfulness(model, 
+                                                 input_img, 
+                                                 target,
+                                                 rng.random((cfg.IMAGE_SIZE, cfg.IMAGE_SIZE)),
+                                                 fractions, 
+                                                 baseline)
+
+    # Calculate the average of the probabilities obtained along the random curve.
+    rand_auc = float(np.mean(rand_curve))
+
+    metrics = {}
+    for name, res in maps.items():
+        m = np.asarray(res.map)
+        
+        # Here we manage signed maps 
+        # If the map is signed, consider only the positive contributions—that is, 
+        # those that provide evidence in favor of the target class.
+        # If no positive contributions exist, use the absolute value.
+        # This avoids performing the deletion test on an entirely negative map.
+        imp = np.maximum(m, 0) if res.signed else m   # evidence FOR the class
+        if imp.max() <= 0:
+            imp = np.abs(m)
+
+        # Calculate the deletion curve for each XAI technique and compute its mean.
+        #  This metric is referred to as del_auc.
+        # this is an arithmetic mean of the curve values, not a trapezoidal integration. 
+        # If the fractions are equally spaced, it serves as a consistent indicator 
+        # for comparing the curves, though it does not represent the exact geometric area.
+        curve = deletion_curve_for_faithfulness(model, 
+                                                input_img, 
+                                                target, 
+                                                imp, 
+                                                fractions, 
+                                                baseline)
+        
+        # This is the metric that compares the XAI technique with random selection.
+        # DelGain = AUC_random - AUC_XAI
+        auc = float(np.mean(curve))
+
+        metrics[name] = { "del_auc": auc,
+                          "del_gain": rand_auc - auc,      # > 0: better than random
+                          "del_curve": curve }
+    
+    meta = { "del_auc_random": rand_auc,
+             "del_curve_random": rand_curve
+    }
+    
+    return maps, metrics, meta
+
+
