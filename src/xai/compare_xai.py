@@ -650,30 +650,22 @@ def run_compare_group_xai_1(cfg,
                 "total_seconds": time.time() - t0
             }
     
-    (out_path / f"stage2_compare1_results_{group}.json").write_text(json.dumps(results, 
-                                                                      indent=2, default=str))
+    (out_path / f"stage2_compare1_results_{group}.json").write_text(json.dumps(results,
+                                                                                   indent=2, 
+                                                                                   default=str),
+                                                                        encoding="utf-8"
+                                                                        )
+          
+    # Salva il CSV da records
+    if records:
+        pd.DataFrame(records).to_csv(out_path / f"stage2_compare1_records_{group}.csv",
+                                        index=False,
+                                        encoding="utf-8"
+                                        )                                                            
     return results, records
 
-def run_compare_group_xai_2(cfg, logger, model, device, techniques, lr, ctx, group, list_images):
-    """
-        The general objective of the code is to compare XAI explanations produced 
-        by different techniques, by examining :
-        How faithful(fedele) are they to the model? 
-        If I remove the pixels deemed important, does the probability 
-        of the explained class decrease?
-
-        The results are maps, metrics, and quantitative results for each image.
-
-        XAI on one group (quadrant): maps for PRED class (and TRUE class if CNN is wrong).
-        This is a function designed for individual groups,
-        with a loop that iterates through the four quadrants. 
-        For each image, it provides an explanation 
-        for the predicted class—including the true class 
-        if the CNN’s prediction is incorrect—and then calculates quantitative metrics, 
-        saving them in both JSON and CSV formats.
-
-
-    """
+def run_compare_group_xai_2_old(cfg, logger, model, device, techniques, lr, ctx, group, list_images):
+    
     t0 = time.time()
     out_path = ctx["out_path"]
     dataset = ctx["dataloader_cnn"].dataset
@@ -725,11 +717,6 @@ def run_compare_group_xai_2(cfg, logger, model, device, techniques, lr, ctx, gro
             if first_input is None:
                 first_input = input_img
 
-            # If the CNN is correct, we run an explanation only for the predicted class.         
-            # If the CNN is incorrect, we run 2 explanations:
-            # - pred_cnn: why did the CNN choose the wrong class?
-            # - pred_lr: why did the LR choose the wrong class?
-            # - true: which parts of the image support the correct class?
             targets_cnn = { "pred_cnn": pred_cnn }
             targets_lr = {"pred_lr": pred_lr}
 
@@ -738,14 +725,6 @@ def run_compare_group_xai_2(cfg, logger, model, device, techniques, lr, ctx, gro
                 targets_cnn["true"] = true  
                 targets_lr["true"] = true        
 
-            # The next code builds a binary mask that approximately identifies 
-            # the region occupied by the digit.
-            # The mask contains:
-            # - True: pixels belonging to the digit;
-            # - False: pixels belonging to the background.
-            # Dilation allows for the inclusion of a small margin around the strokes.
-            # This mask will be used to verify whether the XAI maps concentrate 
-            # their importance within the region actually occupied by the digit.
             mask = digit_mask(img28(position, X_data, size=cfg.IMAGE_SIZE),
                               cfg.MASK_THRESHOLD, 
                               cfg.MASK_DILATION)
@@ -910,13 +889,173 @@ def run_compare_group_xai_2(cfg, logger, model, device, techniques, lr, ctx, gro
                                                                     encoding="utf-8"
                                                                     )
 
-    # Salva il CSV da records
-    if records:
-        pd.DataFrame(records).to_csv(out_path / f"stage2_compare1_records_{group}.csv",
-                                    index=False,
-                                    encoding="utf-8"
-                                    )
-                                                   
+                                           
     return results, records
+
+
+
+def run_compare_group_xai_2(cfg, 
+                            logger, 
+                            model, 
+                            device, 
+                            techniques, 
+                            lr, 
+                            ctx, 
+                            group, 
+                            list_images ):
+    """
+        The general objective of the code is to compare XAI explanations produced 
+        by different techniques, by examining :
+        How faithful(fedele) are they to the model? 
+        If I remove the pixels deemed important, does the probability 
+        of the explained class decrease?
+
+        The results are maps, metrics, and quantitative results for each image.
+
+        XAI on one group (quadrant): maps for PRED class (and TRUE class if CNN is wrong).
+        This is a function designed for individual groups,
+        with a loop that iterates through the four quadrants. 
+        For each image, it provides an explanation 
+        for the predicted class—including the true class 
+        if the CNN’s prediction is incorrect—and then calculates quantitative metrics, 
+        saving them in both JSON and CSV formats.
+       
+    """
+    
+    t0 = time.time()
+    out_path = ctx["out_path"]
+    dataset = ctx["dataloader_cnn"].dataset
+    idx_to_pos = dataset.idx_dataset_position()
+    X_data, y_data, y_pred_lr = ctx["X_data"], ctx["y_data"], ctx["y_pred_lr"]
+
+    names_tech = list(techniques)
+    ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
+
+    # fractions: percentages of pixels to be removed during the deletion test.
+    fractions = cfg.DELETION_FRACTIONS
+            
+    # baseline: the value that will replace the removed pixels.
+    baseline = black_baseline(device)
+    
+    # a random number generator with a fixed seed.
+    rng = np.random.default_rng(cfg.SEED)
+    
+    model.eval()
+
+    rows, first_input = [], None
+    for id_class in sorted(list_images):
+        for item in list_images[id_class]:
+            original_idx = item["id_dataset"]
+            if original_idx not in idx_to_pos:
+                raise KeyError(f"id_dataset {original_idx} not in this split")
+            position = idx_to_pos[original_idx]
+
+            # get X and y for the current image
+            input_image, input_label, idx = dataset[position]
+            assert idx == original_idx
+
+            # check the target class on record selected
+            assert int(input_label) == int(y_data[position])
+
+            # add the batch dimension to the image
+            # from (3,H,W) to (1,3,H,W)
+            input_img = input_image.unsqueeze(0).to(device)
+            
+            # The CNN produces logits, 
+            # which are transformed into probabilities via Softmax.
+            with torch.no_grad():
+                probs = F.softmax(model(input_img), dim=1)[0]
+
+            # get predicted and real class based on the max prob
+            pred_cnn, true = int(probs.argmax()), int(input_label)
+            pred_lr = int(y_pred_lr[position])
+
+            if first_input is None:
+                first_input = input_img
+
+            targets_cnn = { "pred_cnn": pred_cnn }
+            targets_lr = {"pred_lr": pred_lr}
+
+            if pred_cnn != true:
+                # what was missing for the right answer
+                targets_cnn["true"] = true    
+            if pred_lr != true:
+                # what was missing for the right answer
+                targets_lr["true"] = true               
+
+            mask = digit_mask(img28(position, X_data, size=cfg.IMAGE_SIZE),
+                              cfg.MASK_THRESHOLD, 
+                              cfg.MASK_DILATION)
+
+            row = { "index": original_idx, 
+                    "pos": position, 
+                    "true": true, 
+                    "pred_cnn": pred_cnn,
+                    "pred_lr": pred_lr, 
+                    "prob_pred": float(probs[pred_cnn]),
+                    "targets_cnn": targets_cnn, 
+                    "targets_lr": targets_lr, 
+                    "maps_cnn": {}, 
+                    "metrics_cnn": {}, 
+                    "meta_cnn": {}, 
+                    "maps_lr": {}, 
+                    "metrics_lr": {},  
+                    "meta_lr": {},             
+                    "signed_diags": {"cnn": {}, "lr": {} }
+                }
+
+            # for each target in cnn_targets, 
+            # it generate maps using XAI techniques applied to the CNN;
+            for target_name, target_class in targets_cnn.items():
+                
+                maps_cnn, metrics_cnn, meta_cnn = explain_target_2(model, 
+                                                                    techniques, 
+                                                                    input_img, 
+                                                                    target_class,
+                                                                    fractions, 
+                                                                    baseline, 
+                                                                    rng, 
+                                                                    cfg)
+                
+                
+                # For instance, if the CNN predicts 5 and the LR predicts 8, 
+                # you would obtain CNN maps for 5 and 2, and LR maps for 8 and 2. 
+                # You do not calculate a CNN map for 8—that would constitute 
+                # an additional analysis of the CNN for a target it did not predict, 
+                # rather than an explanation of its actual decision.
+                plot_deletion_curves(metrics_cnn, 
+                                    meta_cnn, 
+                                    fractions, 
+                                    out_path / f"deletion_curves_{target_name}_cnn.png",
+                                    logger  )
+                
+                row["maps_cnn"][target_name] = maps_cnn
+                row["metrics_cnn"][target_name] = metrics_cnn
+                row["meta_cnn"][target_name] = meta_cnn
+                row["signed_diags"]["cnn"][target_name] = {technique_name: signed_diags(res.map)
+                                                           for technique_name, res in maps_cnn.items()
+                                                           }
+                
+
+            # for each target in lr_targets, 
+            # it generate an LR map using lr.local_map(...).
+            for target_name, target_class in targets_lr.items():
+                maps_lr = lr.local_map(X_data[position], target_class)
+               
+                row["maps_lr"][target_name] = maps_lr
+                row["signed_diags"]["lr"][target_name] = {"lr_local_map": signed_diags(maps_lr)}
+                row["metrics_lr"][target_name] = compute_lr_metrics(maps_lr, mask)
+
+            
+                
+            rows.append(row)
+            logger.info("[%s] idx %d pos %d true %d CNN %d LR %d",
+                        group, original_idx, position, true, pred_cnn,pred_lr)
+
+    
+
+    
+    return 
+
 
 
