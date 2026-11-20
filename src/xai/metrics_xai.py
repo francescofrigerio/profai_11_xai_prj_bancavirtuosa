@@ -9,6 +9,51 @@ from utility import to_grid28
 from config import CONFIG
 
 
+def signed_diags(m):
+    m = np.asarray(m, dtype=float)
+
+    pos = np.maximum(m, 0)
+    neg = np.minimum(m, 0)
+
+    return {
+        "positive_fraction": float(np.mean(m > 0)),
+        "negative_fraction": float(np.mean(m < 0)),
+        "positive_sum": float(pos.sum()),  # somma dei contributi positivi
+        "negative_sum": float(neg.sum()),  # somma con segno, quindi <= 0
+        "negative_abs_sum": float(np.abs(neg).sum()),  # magnitudine dei contributi negativi
+        "net_sum": float(m.sum()),
+        "absolute_sum": float(np.abs(m).sum()),
+    }
+
+def compute_lr_metrics(lr_map, mask):
+    """
+         compute metrics for lr
+         lr_map and mask have to be strictly 28 x 28
+    """
+    importance = np.abs(np.asarray(lr_map, dtype=np.float64))
+    mask = np.asarray(mask, dtype=bool)
+
+    if importance.shape != mask.shape:
+        raise ValueError(f"Shape mismatch: LR map {importance.shape}, mask {mask.shape}")
+
+    mask_frac = float(mask.mean())
+    total_importance = float(importance.sum())
+
+    mask_share = (float(importance[mask].sum() / total_importance)
+                    if total_importance > 0
+                    else 0.0
+                )
+
+    focus_ratio = ( mask_share / mask_frac
+                    if mask_frac > 0
+                        else 0.0
+                    )
+
+    return { "mask_share": mask_share,
+             "mask_frac": mask_frac,
+            "focus_ratio": focus_ratio,
+           }
+
 def to_valid_float(x):
     """
         float JSON-safe (nan/inf -> None)

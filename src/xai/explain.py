@@ -77,21 +77,7 @@ except Exception as exc:                     # reported by check 1, not a crash
 
 from xai.metrics_xai import deletion_curve_for_faithfulness, mean_spearman_agreement
 
-def signed_diags(m):
-    m = np.asarray(m, dtype=float)
 
-    pos = np.maximum(m, 0)
-    neg = np.minimum(m, 0)
-
-    return {
-        "positive_fraction": float(np.mean(m > 0)),
-        "negative_fraction": float(np.mean(m < 0)),
-        "positive_sum": float(pos.sum()),  # somma dei contributi positivi
-        "negative_sum": float(neg.sum()),  # somma con segno, quindi <= 0
-        "negative_abs_sum": float(np.abs(neg).sum()),  # magnitudine dei contributi negativi
-        "net_sum": float(m.sum()),
-        "absolute_sum": float(np.abs(m).sum()),
-}
 
 def explain_gradcam(model, input_img, input_label, layer_name, relu=True):
     """

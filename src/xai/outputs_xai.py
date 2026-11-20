@@ -8,10 +8,67 @@ from IPython.display import Image, display
 from utility import img28
 from constants import TITLES
 
-def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, max_rows=10):
-    sel = [r for r in rows if target_key in r["maps"]][:max_rows]
+def plot_maps_grid_dinamic(rows, target_key, maps_key, names, cfg, X_data, title, path, logger, max_rows=10):
+    sel = [r for r in rows if target_key in r[maps_key]][:max_rows]
     if not sel:
         return
+
+    is_cnn = (maps_key == "maps_cnn")
+    targets_dict_key = "targets_cnn" if is_cnn else "targets_lr"
+    n_map_cols = len(names) if is_cnn else 1
+    total_cols = n_map_cols + 1  # Colonna 0 = immagine originale + colonne mappe
+
+    fig = Figure(figsize=(2.1 * total_cols, 2.1 * len(sel)))
+    fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
+    axes = np.atleast_2d(fig.subplots(len(sel), total_cols))
+
+    for r, row in enumerate(sel):
+        axes[r, 0].imshow(img28(row["pos"], X_data, size=cfg.IMAGE_SIZE), cmap="gray")
+        # pred_cnn and  dinamic targets_dict_key 
+        axes[r, 0].set_ylabel(
+            f"true {row['true']} | CNN {row['pred_cnn']} | LR {row['pred_lr']}\n"
+            f"explained: {row[targets_dict_key][target_key]}",
+            fontsize=7
+        )
+
+        if is_cnn:
+            cells = [(row["maps_cnn"][target_key][n].map, row["maps_cnn"][target_key][n].signed)
+                     for n in names]
+        else:
+            cells = [(row["maps_lr"][target_key], True)]
+
+        for c, (m, signed) in enumerate(cells, start=1):
+            a = float(np.abs(m).max()) or 1.0
+            axes[r, c].imshow(
+                m,
+                cmap="seismic" if signed else "viridis",
+                vmin=-a if signed else 0,
+                vmax=a,
+                interpolation="nearest" if m.shape[0] <= 8 else "bilinear"
+            )
+
+        for c in range(total_cols):
+            axes[r, c].set_xticks([])
+            axes[r, c].set_yticks([])
+
+    col_titles = ["image"] + ([TITLES[n] for n in names] if is_cnn else ["LR local\n(w * x)"])
+    for c, t in enumerate(col_titles):
+        axes[0, c].set_title(t, fontsize=9)
+
+    try:
+        fig.savefig(path, dpi=90, bbox_inches="tight")
+        try:
+            display(Image(str(path)))
+        except Exception:
+            logger.exception("Impossibile mostrare %s", path)
+    finally:
+        fig.clear()
+
+def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, max_rows=10):
+
+    # sel = [r for r in rows if target_key in r["maps"]][:max_rows]
+    sel = [r for r in rows if target_key in r[maps_key]][:max_rows]
+
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(sel)))
     fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
     axes = np.atleast_2d(fig.subplots(len(sel), len(names) + 2))

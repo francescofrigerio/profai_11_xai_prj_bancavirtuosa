@@ -12,7 +12,7 @@ import torch.nn.functional as F
 import numpy as np
 from matplotlib.figure import Figure
 from IPython.display import Image, display
-from xai.outputs_xai import plot_maps_grid , plot_deletion_curves
+from xai.outputs_xai import plot_maps_grid , plot_deletion_curves ,plot_maps_grid_dinamic
 
 from config import CONFIG
 # from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
@@ -25,8 +25,8 @@ from utility import black_baseline
 from xai import GradCamCaptum , build_techniques
 from xai.shap_explainer import make_background
 
-from xai.explain import explain_target , explain_target_1 , explain_target_2 , signed_diags
-from xai.metrics_xai import to_valid_float
+from xai.explain import explain_target , explain_target_1 , explain_target_2 
+from xai.metrics_xai import to_valid_float , compute_lr_metrics , signed_diags
 
 
 
@@ -366,16 +366,8 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
     X_data, y_data, y_pred_lr = ctx["X_data"], ctx["y_data"], ctx["y_pred_lr"]
 
     names_tech = list(techniques)
-    # fractions: percentages of pixels to be removed during the deletion test.
-    fractions = cfg.DELETION_FRACTIONS
-    
     ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
     
-    # baseline: the value that will replace the removed pixels.
-    baseline = black_baseline(device)
-
-    # a random number generator with a fixed seed.
-    rng = np.random.default_rng(cfg.SEED)
     model.eval()
 
     rows, first_input = [], None
@@ -418,10 +410,19 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
             targets_cnn = { "pred_cnn": pred_cnn }
             targets_lr = {"pred_lr": pred_lr}
 
-            if pred_cnn != true or pred_lr != true:
+            # oldsol we duplicate explain not necessary
+            # for cnn when only lr is wrong
+            # for lr when only cnn is wrong
+            # if pred_cnn != true or pred_lr != true:
+            #    targets_cnn["true"] = true  
+            #    targets_lr["true"] = true  
+
+            if pred_cnn != true:
                 # what was missing for the right answer
-                targets_cnn["true"] = true  
-                targets_lr["true"] = true        
+                targets_cnn["true"] = true    
+            if pred_lr != true:
+                # what was missing for the right answer
+                targets_lr["true"] = true               
 
             # The next code builds a binary mask that approximately identifies 
             # the region occupied by the digit.
@@ -447,9 +448,9 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
                     "metrics_cnn": {}, 
                     "meta_cnn": {}, 
                     "maps_lr": {}, 
-                    "metrics_lr": {},               
-                    "meta_lr": {}, 
-                    "lr_map": {}
+                    "metrics_lr": {},  
+                    "meta_lr": {},             
+                    "signed_diags": {"cnn": {}, "lr": {} }
                 }
 
             # for each target in cnn_targets, 
@@ -487,16 +488,14 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
             # for name, tgt in targets_lr.items():
             #    maps_lr, metrics_lr, meta_lr = explain_target_1(techniques, input_img, tgt,mask,cfg)
             for target_name, target_class in targets_lr.items():
-                lr_map = lr.local_map(X_data[position], target_class)
-
-                row["maps_lr"][target_name] = lr_map
-                row["signed_diags"]["lr"][target_name] = {"lr_local_map": signed_diags(lr_map)}
-
+                maps_lr = lr.local_map(X_data[position], target_class)
                 # Also generate the map of the Logistic Regression coefficients 
                 # for the same target.
                 # This allows us to compare the explanations provided by the CNN 
                 # with the linear representation of the LR.
-                row["lr_map"][target_name] = lr_map
+                row["maps_lr"][target_name] = maps_lr
+                row["signed_diags"]["lr"][target_name] = {"lr_local_map": signed_diags(maps_lr)}
+                row["metrics_lr"][target_name] = compute_lr_metrics(maps_lr, mask)
 
             # completeness_error ony for cnn: This is a specific check for Integrated Gradients, 
             # not a general metric applicable to all maps. 
@@ -504,10 +503,20 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
             # between the model’s output for the image and its output for the chosen baseline. 
             # It does not measure 
             # how “correct” the map is, nor the extent to which it aligns with LR.
-            ig = row["maps_cnn"]["pred_cnn"].get("integrated_gradients")
-            if ig is not None:
-                row["ig_error"] = to_valid_float(ig.meta["completeness_error"])
-                row["ig_unreliable"] = bool(ig.meta["completeness_error"] > ig_max)
+            ig_pred = row["maps_cnn"]["pred_cnn"].get("integrated_gradients")
+            if ig_pred is not None:
+                if ig_pred.meta["completeness_error"] is not None:
+                    row["ig_error_pred"] = to_valid_float(ig_pred.meta["completeness_error"])
+                    row["ig_unreliable_pred"] = bool(ig_pred.meta["completeness_error"] > ig_max)
+
+            # exist only if cnn has wrong
+            if "true" in row["maps_cnn"]:
+                ig_true = row["maps_cnn"]["true"].get("integrated_gradients")
+                if ig_true:
+                    if ig_true.meta["completeness_error"]:
+                        row["ig_error_true"] = to_valid_float(ig_true.meta["completeness_error"])
+                        row["ig_unreliable_true"] = bool(ig_true.meta["completeness_error"] > ig_max)
+
             rows.append(row)
             logger.info("[%s] idx %d pos %d true %d CNN %d LR %d",
                         group, original_idx, position, true, pred_cnn,pred_lr)
@@ -517,38 +526,73 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
     # Check whether LIME and SHAP produce the same explanation 
     # when run twice on the same image.
     stability_cnn = {} 
-    for name in ("lime", "shap"):
-        if name in techniques:
-            again = techniques[name].explain(first_input, rows[0]["pred_cnn"]).map
-            diff = float(np.abs(again - rows[0]["maps_cnn"]["pred_cnn"][name].map).max())
-            # Of the difference is less than RELU_MAX_REF_DIFF, 
-            # the check is considered passed.
-            stability_cnn[name] = {"max_abs_diff": diff, "ok": bool(diff <= cfg.RELU_MAX_REF_DIFF)}
+    if rows:
+        for name in ("lime", "shap"):
+            if name in techniques:
+                again = techniques[name].explain(first_input, rows[0]["pred_cnn"]).map
+                diff = float(np.abs(again - rows[0]["maps_cnn"]["pred_cnn"][name].map).max())
+                # Of the difference is less than RELU_MAX_REF_DIFF, 
+                # the check is considered passed.
+                stability_cnn[name] = {"max_abs_diff": diff, "ok": bool(diff <= cfg.RELU_MAX_REF_DIFF)}
 
     #  generates map visualizations;
     label = GROUPS_RESULT_OK_KO[group]
-    plot_maps_grid(rows, "pred_cnn", names_tech, cfg, X_data,
+    plot_maps_grid_dinamic(rows, "pred_cnn","maps_cnn", names_tech, cfg, X_data,
                    f"XAI validation [{label}] - explained: CNN PREDICTED class",
                    out_path / f"maps_grid_{group}_pred_cnn.png", logger)
 
-    plot_maps_grid(rows, "pred_lr", names_tech, cfg, X_data,
+    plot_maps_grid_dinamic(rows, "pred_lr","maps_lr", names_tech, cfg, X_data,
                        f"XAI validation [{label}] - explained: LR PREDICTED class",
                        out_path / f"maps_grid_{group}_pred_lr.png", logger)
     
-    plot_maps_grid(rows, "true", names_tech, cfg, X_data,
+    if any("true" in r["maps_cnn"] for r in rows):
+        plot_maps_grid_dinamic(rows, "true" , "maps_cnn", names_tech, cfg, X_data,
                    f"XAI validation [{label}] - explained: CNN wrong TRUE class ",
-                   out_path / f"maps_grid_{group}_true.png", logger)
+                   out_path / f"maps_grid_{group}_cnn_true.png", logger)
 
-    summary_cnn,summary_lr, records = {},{}, []
-    for name in names_tech:
-        # calculates metric averages;
-        vals_cnn = [r["metrics_cnn"]["pred_cnn"][name] for r in rows]
-        vals_lr = [r["metrics_lr"]["pred_lr"][name] for r in rows]
-        # summary and records (csv)
-        summary_cnn[name] = {k: to_valid_float(np.mean([v[k] for v in vals_cnn]))
-                      for k in ("mask_share", "focus_ratio", "del_gain")}
-        summary_lr[name] = {k: to_valid_float(np.mean([v[k] for v in vals_lr]))
-                              for k in ("mask_share", "focus_ratio", "del_gain")}
+    if any("true" in r["maps_lr"] for r in rows):
+            plot_maps_grid_dinamic(rows, "true","maps_lr" names_tech, cfg, X_data,
+                       f"XAI validation [{label}] - explained: CNN wrong TRUE class ",
+                       out_path / f"maps_grid_{group}_lr_true.png", logger)
+            
+    
+    summary_cnn = {"pred_cnn": {}, "true": {}}
+    summary_lr = {"pred_lr": {}, "true": {}}
+    records = []
+
+    if rows:
+        # Summary LR on pred_lr 
+        # (no ["lr_local_map"], compute_lr_metrics retunr  dict flat)
+        vals_lr_pred = [r["metrics_lr"]["pred_lr"] for r in rows]
+        summary_lr["pred_lr"]["lr_local_map"] = { k: to_valid_float(np.mean([v[k] 
+                                                    for v in vals_lr_pred]))
+                                                        for k in ("mask_share", "focus_ratio")
+                                                }
+
+        # Summary LR on true (only if exist)
+        rows_lr_true = [r for r in rows if "true" in r["metrics_lr"]]
+        if rows_lr_true:
+            vals_lr_true = [r["metrics_lr"]["true"] for r in rows_lr_true]
+            summary_lr["true"]["lr_local_map"] = { k: to_valid_float(np.mean([v[k] 
+                                                    for v in vals_lr_true]))
+                                                       for k in ("mask_share", "focus_ratio")
+                                                 }
+
+        # Summary CNN on pred_cnn and true
+        rows_cnn_true = [r for r in rows if "true" in r["metrics_cnn"]]
+        for name in names_tech:
+            vals_cnn_pred = [r["metrics_cnn"]["pred_cnn"][name] for r in rows]
+            summary_cnn["pred_cnn"][name] = { k: to_valid_float(np.mean([v[k] 
+                                                for v in vals_cnn_pred]))
+                                                    for k in ("mask_share", "focus_ratio")
+                                            }
+            if rows_cnn_true:
+                vals_cnn_true = [r["metrics_cnn"]["true"][name] for r in rows_cnn_true]
+                summary_cnn["true"][name] = { k: to_valid_float(np.mean([v[k] 
+                                              for v in vals_cnn_true]))
+                                                for k in ("mask_share", "focus_ratio")
+                }
+        
     
     # creates records for the CSV;
     for r in rows:
@@ -561,59 +605,65 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
                                 "pred": r["pred_cnn"], 
                                 "pred_lr": r["pred_lr"],
                                 "model": "cnn",
-                                "target": target_name, 
+                                "target_name": target_name, 
                                 "target_class": target_class , 
                                 "technique": name,
                                 "mask_share": m["mask_share"], 
                                 "mask_frac": m["mask_frac"],
                                 "focus_ratio": m["focus_ratio"], 
-                                "agreement": r["meta"][target_name]["agreement_spearman"]})
+                                # meta_cnn not present if only lr is wrong
+                                "agreement": r["meta_cnn"].get(target_name, {}).get("agreement_spearman")
+                                })
         
         for target_name, target_class in r["targets_lr"].items():
             m = r["metrics_lr"][target_name]
-            records.append({"group": group, 
-                        "index": r["index"], 
-                        "true": r["true"],
-                        "pred": r["pred_cnn"], 
-                        "pred_lr": r["pred_lr"],
-                        "model": "lr",
-                        "target_name": target_name, 
-                        "target_class": target_class, 
-                        "technique": "lr_local_map",
-                        "mask_share": m["mask_share"], 
-                        "mask_frac": m["mask_frac"],
-                        "focus_ratio": m["focus_ratio"], 
-                        "agreement": r["meta"][target_name]["agreement_spearman"]})
+            records.append({ "group": group, 
+                            "index": r["index"], 
+                            "true": r["true"],
+                            "pred": r["pred_cnn"], 
+                            "pred_lr": r["pred_lr"],
+                            "model": "lr",
+                            "target_name": target_name, 
+                            "target_class": target_class, 
+                            "technique": "lr_local_map",
+                            "mask_share": m["mask_share"],
+                            "mask_frac": m["mask_frac"],
+                            "focus_ratio": m["focus_ratio"],
+                            "agreement": r["meta_lr"].get(target_name, {}).get("agreement_spearman")
+                        })
         
-
-    
     # saves the results in JSON format.
     # The final structure contains information 
     # for each image, target, and XAI technique.
     results = { "group": group, 
-               "label": label,
+                "label": label,
                 "model": {k: ctx["info"].get(k) for k in ("action", "reason", "device")},
                 "n_images": len(rows),
                 "n_cnn_wrong": sum(r["pred_cnn"] != r["true"] for r in rows),
-                "stability_cnn": stability_cnn,
-                "summary_pred_target_cnn": summary_cnn,
-                "n_cnn_wrong": sum(r["pred_cnn"] != r["true"] for r in rows),
                 "n_lr_wrong": sum(r["pred_lr"] != r["true"] for r in rows),
-                "summary_pred_target_lr": summary_lr,
-                "images": [{"index": r["index"], 
-                            "true": r["true"], 
-                            "pred_cnn": r["pred_cnn"],
-                            "pred_lr": r["pred_lr"], 
-                            "prob_pred": r["prob_pred"],
-                            "ig_completeness_error": r.get("ig_error"),
-                            "ig_unreliable": r.get("ig_unreliable"),
-                            "metrics_cnn": r["metrics_cnn"], 
-                            "meta_cnn": r["meta_cnn"],
-                            "metrics_lr": r["metrics_lr"], 
-                            "meta_lr": r["meta_lr"] 
-                            } for r in rows],
-                            "total_seconds": time.time() - t0
-                        }
+                "stability_cnn": stability_cnn,
+                "summary_cnn": summary_cnn,
+                "summary_lr": summary_lr,
+                "images": [
+                    {
+                        "index": r["index"], 
+                        "true": r["true"], 
+                        "pred_cnn": r["pred_cnn"],
+                        "pred_lr": r["pred_lr"], 
+                        "prob_pred": r["prob_pred"],
+                        "ig_completeness_error_pred": r.get("ig_error_pred"),
+                        "ig_unreliable_pred": r.get("ig_unreliable_pred"),
+                        "ig_completeness_error_true": r.get("ig_error_true"),
+                        "ig_unreliable_true": r.get("ig_unreliable_true"),
+                        "metrics_cnn": r["metrics_cnn"], 
+                        "meta_cnn": r["meta_cnn"],
+                        "metrics_lr": r["metrics_lr"], 
+                        "meta_lr": r["meta_lr"],
+                        "signed_diags": r["signed_diags"]
+                    } for r in rows
+                ],
+                "total_seconds": time.time() - t0
+            }
     
     (out_path / f"stage2_compare1_results_{group}.json").write_text(json.dumps(results, 
                                                                       indent=2, default=str))
