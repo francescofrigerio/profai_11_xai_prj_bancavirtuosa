@@ -5,7 +5,7 @@
 import json
 import time
 import copy
-
+import pandas as pd
 import torch
 import torch.nn.functional as F
 
@@ -13,6 +13,7 @@ import numpy as np
 from matplotlib.figure import Figure
 from IPython.display import Image, display
 from xai.outputs_xai import plot_maps_grid , plot_deletion_curves ,plot_maps_grid_dinamic
+from xai.outputs_xai import format_json_xai_rows
 
 from config import CONFIG
 # from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
@@ -335,7 +336,17 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
                                                                       indent=2, default=str))
     return results, records
 
-"""
+
+def run_compare_group_xai_1(cfg, 
+                            logger, 
+                            model, 
+                            device, 
+                            techniques, 
+                            lr, 
+                            ctx, 
+                            group, 
+                            list_images ):
+    """
         The general objective of the code is to compare XAI explanations produced 
         by different techniques, by examining two aspects:
         1. Where are the explanations focused? Do the maps actually highlight 
@@ -356,8 +367,7 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
         saving them in both JSON and CSV formats.
 
 
-"""
-def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, group, list_images):
+    """
     
     t0 = time.time()
     out_path = ctx["out_path"]
@@ -367,7 +377,6 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
 
     names_tech = list(techniques)
     ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
-    
     model.eval()
 
     rows, first_input = [], None
@@ -391,8 +400,8 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
             
             # The CNN produces logits, 
             # which are transformed into probabilities via Softmax.
+            # (multiclass classification)
             with torch.no_grad():
-                # (multiclass classification)
                 probs = F.softmax(model(input_img), dim=1)[0]
 
             # get predicted and real class based on the max prob
@@ -409,13 +418,6 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
             # - true: which parts of the image support the correct class?
             targets_cnn = { "pred_cnn": pred_cnn }
             targets_lr = {"pred_lr": pred_lr}
-
-            # oldsol we duplicate explain not necessary
-            # for cnn when only lr is wrong
-            # for lr when only cnn is wrong
-            # if pred_cnn != true or pred_lr != true:
-            #    targets_cnn["true"] = true  
-            #    targets_lr["true"] = true  
 
             if pred_cnn != true:
                 # what was missing for the right answer
@@ -485,8 +487,6 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
 
             # for each target in lr_targets, 
             # it generate an LR map using lr.local_map(...).
-            # for name, tgt in targets_lr.items():
-            #    maps_lr, metrics_lr, meta_lr = explain_target_1(techniques, input_img, tgt,mask,cfg)
             for target_name, target_class in targets_lr.items():
                 maps_lr = lr.local_map(X_data[position], target_class)
                 # Also generate the map of the Logistic Regression coefficients 
@@ -497,25 +497,28 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
                 row["signed_diags"]["lr"][target_name] = {"lr_local_map": signed_diags(maps_lr)}
                 row["metrics_lr"][target_name] = compute_lr_metrics(maps_lr, mask)
 
-            # completeness_error ony for cnn: This is a specific check for Integrated Gradients, 
+            # completeness_error only for cnn and Integrated Gradients: 
             # not a general metric applicable to all maps. 
             # It verifies how closely the sum of the attributions approaches the difference 
             # between the model’s output for the image and its output for the chosen baseline. 
             # It does not measure 
-            # how “correct” the map is, nor the extent to which it aligns with LR.
+            # how “correct” the map is, nor the extent 
+            # to which it aligns with LR.
             ig_pred = row["maps_cnn"]["pred_cnn"].get("integrated_gradients")
             if ig_pred is not None:
-                if ig_pred.meta["completeness_error"] is not None:
-                    row["ig_error_pred"] = to_valid_float(ig_pred.meta["completeness_error"])
-                    row["ig_unreliable_pred"] = bool(ig_pred.meta["completeness_error"] > ig_max)
+                err = ig_pred.meta.get("completeness_error")
+                if err is not None:
+                    row["ig_error_pred"] = to_valid_float(err)
+                    row["ig_unreliable_pred"] = bool(err > ig_max)
 
             # exist only if cnn has wrong
             if "true" in row["maps_cnn"]:
                 ig_true = row["maps_cnn"]["true"].get("integrated_gradients")
-                if ig_true:
-                    if ig_true.meta["completeness_error"]:
-                        row["ig_error_true"] = to_valid_float(ig_true.meta["completeness_error"])
-                        row["ig_unreliable_true"] = bool(ig_true.meta["completeness_error"] > ig_max)
+                if ig_true is not None:
+                    err = ig_true.meta.get("completeness_error")
+                    if err is not None:
+                        row["ig_error_true"] = to_valid_float(err)
+                        row["ig_unreliable_true"] = bool(err > ig_max)
 
             rows.append(row)
             logger.info("[%s] idx %d pos %d true %d CNN %d LR %d",
@@ -547,12 +550,12 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
     
     if any("true" in r["maps_cnn"] for r in rows):
         plot_maps_grid_dinamic(rows, "true" , "maps_cnn", names_tech, cfg, X_data,
-                   f"XAI validation [{label}] - explained: CNN wrong TRUE class ",
+                   f"XAI validation [{label}] - explained: TARGET TRUE FROM CNN MAP ",
                    out_path / f"maps_grid_{group}_cnn_true.png", logger)
 
     if any("true" in r["maps_lr"] for r in rows):
-            plot_maps_grid_dinamic(rows, "true","maps_lr" names_tech, cfg, X_data,
-                       f"XAI validation [{label}] - explained: CNN wrong TRUE class ",
+            plot_maps_grid_dinamic(rows, "true","maps_lr", names_tech, cfg, X_data,
+                       f"XAI validation [{label}] - explained: TARGET TRUE FROM LR MAP ",
                        out_path / f"maps_grid_{group}_lr_true.png", logger)
             
     
@@ -628,8 +631,7 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
                             "technique": "lr_local_map",
                             "mask_share": m["mask_share"],
                             "mask_frac": m["mask_frac"],
-                            "focus_ratio": m["focus_ratio"],
-                            "agreement": r["meta_lr"].get(target_name, {}).get("agreement_spearman")
+                            "focus_ratio": m["focus_ratio"]
                         })
         
     # saves the results in JSON format.
@@ -644,24 +646,7 @@ def run_compare_group_xai_1(cfg, logger, model, device, techniques, lr, ctx, gro
                 "stability_cnn": stability_cnn,
                 "summary_cnn": summary_cnn,
                 "summary_lr": summary_lr,
-                "images": [
-                    {
-                        "index": r["index"], 
-                        "true": r["true"], 
-                        "pred_cnn": r["pred_cnn"],
-                        "pred_lr": r["pred_lr"], 
-                        "prob_pred": r["prob_pred"],
-                        "ig_completeness_error_pred": r.get("ig_error_pred"),
-                        "ig_unreliable_pred": r.get("ig_unreliable_pred"),
-                        "ig_completeness_error_true": r.get("ig_error_true"),
-                        "ig_unreliable_true": r.get("ig_unreliable_true"),
-                        "metrics_cnn": r["metrics_cnn"], 
-                        "meta_cnn": r["meta_cnn"],
-                        "metrics_lr": r["metrics_lr"], 
-                        "meta_lr": r["meta_lr"],
-                        "signed_diags": r["signed_diags"]
-                    } for r in rows
-                ],
+                "images": format_json_xai_rows(rows),
                 "total_seconds": time.time() - t0
             }
     
@@ -864,7 +849,7 @@ def run_compare_group_xai_2(cfg, logger, model, device, techniques, lr, ctx, gro
                    out_path / f"maps_grid_{group}_true.png", logger)
 
     # creates records for the CSV;
-    records = {},{}, []
+    records = []
     for r in rows:
         for name_pred_true, tgt in r["targets_cnn"].items():
             for name in names_tech:
@@ -919,8 +904,19 @@ def run_compare_group_xai_2(cfg, logger, model, device, techniques, lr, ctx, gro
                             "total_seconds": time.time() - t0
                         }
     
-    (out_path / f"stage2_compare2_results_{group}.json").write_text(json.dumps(results, 
-                                                                      indent=2, default=str))
+    (out_path / f"stage2_compare1_results_{group}.json").write_text(json.dumps(results,
+                                                                               indent=2, 
+                                                                               default=str),
+                                                                    encoding="utf-8"
+                                                                    )
+
+    # Salva il CSV da records
+    if records:
+        pd.DataFrame(records).to_csv(out_path / f"stage2_compare1_records_{group}.csv",
+                                    index=False,
+                                    encoding="utf-8"
+                                    )
+                                                   
     return results, records
 
 

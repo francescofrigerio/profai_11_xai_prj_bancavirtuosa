@@ -1,12 +1,114 @@
 """
      Plot Graph for Xai
 """
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from IPython.display import Image, display
 from utility import img28
 from constants import TITLES
+import torch
+
+def to_json_value(obj):
+    """
+        Recursive Converts type NumPy/PyTorch into serializable JSON.
+    """
+
+    if obj is None or isinstance(obj, (bool, int, str)):
+        return obj
+
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+
+    if isinstance(obj, np.generic):
+        return to_json_value(obj.item())
+
+    if isinstance(obj, np.ndarray):
+        return to_json_value(obj.tolist())
+
+    if isinstance(obj, torch.Tensor):
+        return to_json_value(obj.detach().cpu().tolist())
+
+    if isinstance(obj, dict):
+        return {str(key): to_json_value(value) for key, value in obj.items()}
+
+    if isinstance(obj, (list, tuple)):
+        return [to_json_value(value) for value in obj]
+
+    raise TypeError(
+        f"Tipo non gestito nella serializzazione JSON: {type(obj).__name__}"
+    )
+
+
+def format_json_xai_rows(rows):
+    """
+        Converts XAI rows into a JSON-serializable structure.
+
+        Includes:
+        CNN maps for each target and technique, containing the map itself, 
+        signed values, and all associated metadata;
+        LR maps for each target;
+        analysis metrics and metadata;
+        sign diagnostics.
+    """
+
+    formatted_images = []
+
+    for row in rows:
+        maps_cnn_json = {}
+
+        for target_name, techniques_results in row.get("maps_cnn", {}).items():
+            maps_cnn_json[target_name] = {}
+
+            for technique_name, res in techniques_results.items():
+                maps_cnn_json[target_name][technique_name] = { "map": to_json_value(res.map),
+                                                            "signed": bool(res.signed),
+                                                            "meta": to_json_value(getattr(res, "meta", {})),
+                                                        }
+
+        maps_lr_json = { target_name: to_json_value(lr_map)
+                        for target_name, lr_map in row.get("maps_lr", {}).items()
+                        }
+
+        img_entry = { "index": to_json_value(row["index"]),
+                    "pos": to_json_value(row["pos"]),
+                    "true": to_json_value(row["true"]),
+                    "pred_cnn": to_json_value(row["pred_cnn"]),
+                    "pred_lr": to_json_value(row["pred_lr"]),
+                    "prob_pred": to_json_value(row.get("prob_pred")),
+
+                    "targets_cnn": to_json_value(row.get("targets_cnn", {})),
+                    "targets_lr": to_json_value(row.get("targets_lr", {})),
+
+                    "maps_cnn": maps_cnn_json,
+                    "maps_lr": maps_lr_json,
+
+                    "metrics_cnn": to_json_value(row.get("metrics_cnn", {})),
+                    "meta_cnn": to_json_value(row.get("meta_cnn", {})),
+                    "metrics_lr": to_json_value(row.get("metrics_lr", {})),
+                    "meta_lr": to_json_value(row.get("meta_lr", {})),
+
+                    "signed_diags": to_json_value(row.get("signed_diags", {})),
+
+                    "ig_completeness_error_pred": to_json_value(
+                        row.get("ig_error_pred")
+                    ),
+                    "ig_unreliable_pred": to_json_value(
+                        row.get("ig_unreliable_pred")
+                    ),
+                    "ig_completeness_error_true": to_json_value(
+                        row.get("ig_error_true")
+                    ),
+                    "ig_unreliable_true": to_json_value(
+                        row.get("ig_unreliable_true")
+                    ),
+        }
+
+        formatted_images.append(img_entry)
+
+    return formatted_images
+
 
 def plot_maps_grid_dinamic(rows, target_key, maps_key, names, cfg, X_data, title, path, logger, max_rows=10):
     sel = [r for r in rows if target_key in r[maps_key]][:max_rows]
@@ -66,9 +168,8 @@ def plot_maps_grid_dinamic(rows, target_key, maps_key, names, cfg, X_data, title
 
 def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, max_rows=10):
 
-    # sel = [r for r in rows if target_key in r["maps"]][:max_rows]
-    sel = [r for r in rows if target_key in r[maps_key]][:max_rows]
-
+    sel = [r for r in rows if target_key in r["maps"]][:max_rows]
+    
     fig = Figure(figsize=(2.1 * (len(names) + 2), 2.1 * len(sel)))
     fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
     axes = np.atleast_2d(fig.subplots(len(sel), len(names) + 2))
