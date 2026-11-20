@@ -2,6 +2,8 @@
     Commont utility for Normalization , Model Cnn and Logistic Regression
 """
 
+import math
+import html
 import json
 import inspect
 from pathlib import Path
@@ -9,7 +11,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from scipy.ndimage import binary_dilation
-import html
+from torchvision.transforms import GaussianBlur
+
 
 from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
 from constants import IMAGENET_MEAN_NP , IMAGENET_STD_NP
@@ -225,6 +228,36 @@ def black_baseline(device):
     mean = torch.tensor(IMAGENET_MEAN_TRANSFORM, device=device)
     std = torch.tensor(IMAGENET_STD_TRANSFORM, device=device)
     return ((0 - mean) / std).view(1, 3, 1)
+
+def make_blurred_baseline(input_img, sigma):
+    """
+        Create a blurred baseline with the same shape as input_img.
+        input_img: tensor [1, C, H, W], already in the space used by the model.
+        
+        Sigma does not act on the importance map, but rather on the image used as a baseline. 
+        With a small sigma, the image remains close to the original; 
+        as sigma increases, details are attenuated and the image becomes more uniform. 
+        During deletion, the selected pixels are replaced by the values ​​from the blurred 
+        baseline at the same coordinates.
+        
+    """
+    if sigma <= 0:
+        raise ValueError("sigma deve essere maggiore di 0")
+
+    h, w = input_img.shape[-2:]
+
+    # Kernel even, near=6*sigma, limit to image size 
+    max_kernel = min(h, w)
+    if max_kernel % 2 == 0:
+        max_kernel -= 1
+
+    kernel_size = min(2 * math.ceil(3 * sigma) + 1, max_kernel)
+
+    blur = GaussianBlur( kernel_size=kernel_size,
+                        sigma=[sigma, sigma],
+                        )
+
+    return blur(input_img)
 
 def normalize_imagenet(input_img):
     """

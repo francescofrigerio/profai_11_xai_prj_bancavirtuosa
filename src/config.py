@@ -120,6 +120,7 @@ class ConfigConstantsDefault:
     IG_MAX_COMPLETENESS_ERROR: float = 0.05
     XAI_IMAGES_FOR_CLASS: int = 5 # 5,6,7 for 20,24,28 each group
     DELETION_FRACTIONS: tuple = (0.0, 0.05, 0.1, 0.2, 0.3, 0.5)
+    DELETION_SIGMA: int = 1 # 1,2,3,.....
     # Spearman and IoU
     COMPUTE_AGREEMENT: bool = True  
     # could be "absolute" or "positive"     

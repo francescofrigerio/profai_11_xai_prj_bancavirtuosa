@@ -75,7 +75,8 @@ except Exception as exc:                     # reported by check 1, not a crash
     torch = nn = F = None
     _TORCH_ERROR = exc
 
-from xai.metrics_xai import deletion_curve_for_faithfulness, mean_spearman_agreement
+from xai.metrics_xai import deletion_curve_for_faithfulness, 
+from xai.metrics_xai import mean_spearman_agreement , deletion_metrics_from_maps
 
 
 
@@ -678,99 +679,19 @@ def explain_target_1( techniques,
 
 
 
-def explain_target_2( model, 
-                     techniques, 
-                     input_img, 
-                     target, 
-                     fractions, 
-                     baseline, 
-                     rng, 
-                     cfg ):
-    """
-        maps + quantitative metrics for ONE target class
-
-        Metric	Question answered
-        focus_ratio	How concentrated is the importance on the digit relative to its area?
-        del_auc	    How high does the probability remain when important pixels are removed?
-        del_gain	How much better is the technique compared to random selection?
-       
-        We are measuring three different properties of the explanations:
-        - fidelity to the CNN's behavior (del_auc, del_gain);
-        These metrics are not interchangeable, and a given technique may perform 
-        well in one dimension while performing worse in another.
-
-        Faithfulness seeks to measure whether an XAI explanation truly 
-        represents the model's behavior.
-
-        We have a family of measures:
-        -Deletion-based measures: examines what happens to the prediction 
-        when the most important pixels are removed.
-
-        DelGai Interpretation:
-        DelGain     Meaning
-        Positive	XAI performs better than random
-        Zero	    XAI performs the same as random
-        Negative	XAI performs worse than random
-
-        In the deletion test, a lower curve is generally better than higher.
-
-    """
-    # This next runs explaination over the different technique
-    # his output is a generation maps
-    # Each technique generate his explanation
-    maps = {name: technique.explain(input_img, target) for name, technique in techniques.items()}
-
-    # Here, we perform a deletion test using a random importance map.
-    # This serves as a benchmark against which XAI techniques can be compared.
-    # The random baseline does not represent a random image; rather, 
-    # it represents a random ordering of the pixels to be deleted.
-    rand_curve = deletion_curve_for_faithfulness(model, 
-                                                 input_img, 
-                                                 target,
-                                                 rng.random((cfg.IMAGE_SIZE, cfg.IMAGE_SIZE)),
-                                                 fractions, 
-                                                 baseline)
-
-    # Calculate the average of the probabilities obtained along the random curve.
-    rand_auc = float(np.mean(rand_curve))
-
-    metrics = {}
-    for name, res in maps.items():
-        m = np.asarray(res.map)
-        
-        # Here we manage signed maps 
-        # If the map is signed, consider only the positive contributions—that is, 
-        # those that provide evidence in favor of the target class.
-        # If no positive contributions exist, use the absolute value.
-        # This avoids performing the deletion test on an entirely negative map.
-        imp = np.maximum(m, 0) if res.signed else m   # evidence FOR the class
-        if imp.max() <= 0: # remove negative value
-            imp = np.abs(m)
-
-        # Calculate the deletion curve for each XAI technique and compute its mean.
-        #  This metric is referred to as del_auc.
-        # this is an arithmetic mean of the curve values, not a trapezoidal integration. 
-        # If the fractions are equally spaced, it serves as a consistent indicator 
-        # for comparing the curves, though it does not represent the exact geometric area.
-        curve = deletion_curve_for_faithfulness(model, 
-                                                input_img, 
-                                                target, 
-                                                imp, 
-                                                fractions, 
-                                                baseline)
-        
-        # This is the metric that compares the XAI technique with random selection.
-        # DelGain = AUC_random - AUC_XAI
-        auc = float(np.mean(curve))
-
-        metrics[name] = { "del_auc": auc,
-                          "del_gain": rand_auc - auc,      # > 0: better than random
-                          "del_curve": curve }
+def explain_target_2( score_fn,
+                      input_img,
+                      maps_for_target,
+                      fractions,
+                      baseline,
+                      rng,
+                    ):
     
-    meta = { "del_auc_random": rand_auc,
-             "del_curve_random": rand_curve
-    }
-    
-    return maps, metrics, meta
-
+    return deletion_metrics_from_maps( score_fn=score_fn,
+                                        input_img=input_img,
+                                        maps_for_target=maps_for_target,
+                                        fractions=fractions,
+                                        baseline=baseline,
+                                        rng=rng,
+                                    )
 

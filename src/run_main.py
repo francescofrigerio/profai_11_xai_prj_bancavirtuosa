@@ -178,8 +178,8 @@ def compare_2_xai( cfg,
         if not list_images:
             logger.warning("Gruppo %s vuoto: salto", group)
             continue
-        
-        results, records = run_compare_group_xai_1( cfg, 
+
+        results_1, records_1 = run_compare_group_xai_1( cfg, 
                                                  logger, 
                                                  model, 
                                                  device,
@@ -188,6 +188,26 @@ def compare_2_xai( cfg,
                                                  ctx_param_dict,
                                                  group,
                                                  list_images ) 
+        
+        results_2, records_2 = run_compare_group_xai_2( cfg, 
+                                                        logger, 
+                                                        records_1,
+                                                        model, 
+                                                        device,
+                                                        techniques,
+                                                        ctx_param_dict,
+                                                        group,
+                                                        list_images )
+
+        results, records = run_compare_group_xai_1( cfg, 
+                                                         logger, 
+                                                         records,
+                                                         model, 
+                                                         device,
+                                                         techniques,
+                                                         ctx_param_dict,
+                                                         group,
+                                                         list_images ) 
 
         all_results[group] = results
         all_records += records

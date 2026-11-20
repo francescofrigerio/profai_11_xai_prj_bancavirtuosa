@@ -94,6 +94,26 @@ def mean_spearman_agreement(maps,cfg=CONFIG):
         This metric measures the agreement between techniques, 
         not their faithfulness with respect to the CNN. 
         Two techniques may be in high agreement while both being incorrect.
+
+
+
+        Here, each map is flattened into a 784-pixel vector in order to compare their ranks.
+
+        For a 5 x 5 average matrix per group, the correct workflow is: 
+        calculate a correlation matrix for each image, 
+        then compute the element-wise average across the images. 
+        The dimensions should be determined by the number of selected techniques—hence, 
+        with five techniques, it will be 5x5. Allowing for an arbitrary, 
+        user-defined dimension could result in a matrix that is inconsistent 
+        with the actual techniques being compared.
+
+        Furthermore, there is a statistical caveat: argsort(argsort(...))
+        assigns distinct ranks even to pixels with the same level of importance. 
+        Consequently, maps containing many identical values 
+        may end up with arbitrary ranks. 
+        For Spearman correlation, it is preferable to assign average ranks 
+        to tied values—for instance, by using scipy.stats.rankdata 
+        and to explicitly handle constant maps, for which the correlation may be undefined.
     """
     # Calling twice np.argsort 
     # we gets the ranking position of the item that we have in this cell?"
@@ -152,7 +172,7 @@ def deletion_curve_for_faithfulness(model,
 
         It requires a baseline with a shape compatible with (1, 3, k), 
         because it replaces selected pixels via:
-        x.view(1, 3, -1)[:, :, order[:k]] = baseline
+        x.view(1, 3, -1)[:, :, order[:k]] = baseline KO
 
         A faithful map should lead to a more rapid decrease in probability 
         compared to random selection.
@@ -181,11 +201,155 @@ def deletion_curve_for_faithfulness(model,
         k = int(round(frac * order.numel()))
         if k > 0:
             # replace selected pixel
-            x.view(1, 3, -1)[:, :, order[:k]] = baseline
+            # x.view(1, 3, -1)[:, :, order[:k]] = baseline
+            # each selected pixel is replaced with the corresponding pixel 
+            # from the blurred baseline.
+            x_flat = x.reshape(1, 3, -1)
+            baseline_flat = baseline.to(input_img.device).reshape(1, 3, -1)
+            x_flat[:, :, order[:k]] = baseline_flat[:, :, order[:k]]
 
         # Calculate the probability of the target class after deletion.
         # The result is a list of probabilities, one for each fraction.
-        probs.append(float(F.softmax(model(x), dim=1)[0, target]))
+        # probs.append(float(F.softmax(model(x), dim=1)[0, target]))
+        probs.append(float(F.softmax(model(x_flat), dim=1)[0, target]))
     return probs
+
+
+
+@torch.no_grad()
+def deletion_curve_for_faithfulness_2( score_fn,
+                                        input_img,
+                                        importance,
+                                        fractions,
+                                        baseline,
+                                    ):
+    """
+    score_fn(x) return the target prob for input x.
+    input_img and baseline has shape [1, C, H, W].
+    importance is a 2D map.
+    """
+    if input_img.ndim != 4 or input_img.shape[0] != 1:
+        raise ValueError("input_img deve avere forma [1, C, H, W]")
+
+    if baseline.shape != input_img.shape:
+        raise ValueError(
+            f"baseline e input_img devono avere la stessa forma: "
+            f"{baseline.shape} != {input_img.shape}"
+        )
+
+    h, w = input_img.shape[-2:]
+
+    imp = torch.as_tensor(importance, dtype=torch.float32, device=input_img.device).squeeze()
+
+    if imp.ndim != 2:
+        raise ValueError(f"importance deve essere 2D, ricevuta shape {tuple(imp.shape)}")
+
+    imp = F.interpolate(imp[None, None],
+                        size=(h, w),
+                        mode="bilinear",
+                        align_corners=False,
+                    )[0, 0]
+
+    order = imp.flatten().argsort(descending=True)
+    baseline = baseline.to(device=input_img.device, dtype=input_img.dtype)
+
+    probs = []
+    for frac in fractions:
+        if not 0 <= frac <= 1:
+            raise ValueError(f"Frazione di deletion non valida: {frac}")
+
+        x = input_img.clone()
+        k = int(round(frac * order.numel()))
+
+        # if k > 0:
+        #    x_flat = x.reshape(1, x.shape[1], -1)
+        #    baseline_flat = baseline.reshape(1, baseline.shape[1], -1)
+        #    selected = order[:k]
+        #    x_flat[:, :, selected] = baseline_flat[:, :, selected]
+
+        # x that has a shape [1, C, H, W], not x_flat.
+        #probs.append(float(score_fn(x)))
+        x = input_img.clone()
+        # from input img t0 CxHxW
+        x_flat = x.reshape(1, x.shape[1], -1)
+        baseline_flat = baseline.reshape(1, baseline.shape[1], -1)
+
+        k = int(round(frac * order.numel()))
+        if k > 0:
+            selected = order[:k]
+            x_flat[:, :, selected] = baseline_flat[:, :, selected]
+
+         # x has to have a shape [1, C, H, W]
+        x_for_model = x_flat.reshape_as(input_img)
+        probs.append(float(score_fn(x_for_model)))
+
+    return probs
+
+
+def deletion_metrics_from_maps(score_fn,
+                                input_img,
+                                maps_for_target,
+                                fractions,
+                                baseline,
+                                rng,
+                            ):
+    """
+    maps_for_target:
+      CNN -> {name_tecnh: res}, res has .map and .signed
+      LR  -> {"lr_local_map": matrix_numpy}
+    """
+    fractions = np.asarray(fractions, dtype=float)
+
+    if fractions.ndim != 1 or len(fractions) < 2:
+        raise ValueError("Servono almeno due frazioni per calcolare l'AUC")
+    if np.any(np.diff(fractions) < 0):
+        raise ValueError("Le frazioni devono essere in ordine crescente")
+
+    h, w = input_img.shape[-2:]
+    random_map = rng.random((h, w))
+
+    random_curve = deletion_curve_for_faithfulness_2(score_fn, 
+                                                     input_img, 
+                                                     random_map, 
+                                                     fractions, 
+                                                     baseline
+                                                    )
+    
+    random_auc = float(np.trapz(random_curve, x=fractions))
+
+    metrics = {}
+    for name, item in maps_for_target.items():
+        if hasattr(item, "map"):       # result explainer CNN
+            m = np.asarray(item.map)
+            signed = bool(item.signed)
+        else:                          # maps LR
+            m = np.asarray(item)
+            signed = True
+
+        # order select evidece for target.
+        # Ig there isn't, use the maps magnitudine .
+        importance = np.maximum(m, 0) if signed else m
+        if not np.any(importance > 0):
+            importance = np.abs(m)
+
+        curve = deletion_curve_for_faithfulness_2(score_fn, 
+                                                  input_img, 
+                                                  importance, 
+                                                  fractions, 
+                                                  baseline
+                                                )
+        auc = float(np.trapz(curve, x=fractions))
+
+        metrics[name] = {"del_auc": auc,
+                        "del_gain": random_auc - auc,
+                        "del_curve": curve,
+                        }
+
+    meta = { "del_auc_random": random_auc,
+                "del_curve_random": random_curve,
+                "fractions": fractions.tolist(),
+            }
+    return metrics, meta
+
 
 
