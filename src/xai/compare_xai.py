@@ -656,13 +656,7 @@ def run_compare_group_xai_1(cfg,
                                                                                    default=str),
                                                                         encoding="utf-8"
                                                                         )
-          
-    # Salva il CSV da records
-    if records:
-        pd.DataFrame(records).to_csv(out_path / f"stage2_compare1_records_{group}.csv",
-                                        index=False,
-                                        encoding="utf-8"
-                                        )                                                            
+                                                                
     return results, records
 
 """
@@ -685,6 +679,7 @@ def run_compare_group_xai_1(cfg,
 """
 def run_compare_group_xai_2(cfg, 
                             logger,
+                            source_results,
                             source_records,
                             model,
                             device,
@@ -757,7 +752,7 @@ def run_compare_group_xai_2(cfg,
 
             if not maps_for_target:
                 raise KeyError( f"Nessuna mappa CNN per target={target_name}, "
-                                f"index={original_idx}"
+                                f"index={org_idx}"
                                 )
 
             # prob explain class on CNN.
@@ -772,64 +767,90 @@ def run_compare_group_xai_2(cfg,
                                                     rng=rng,
                                                 )
 
-        result_row["metrics_cnn_del"][target_name] = metrics_del
-        result_row["meta_cnn_del"][target_name] = meta_del
+            result_row["metrics_cnn_del"][target_name] = metrics_del
+            result_row["meta_cnn_del"][target_name] = meta_del
                   
-        # For instance, if the CNN predicts 5 and the LR predicts 8, 
-        # you would obtain CNN maps for 5 and 2, and LR maps for 8 and 2. 
-        # You do not calculate a CNN map for 8—that would constitute 
-        # an additional analysis of the CNN for a target it did not predict, 
-        # rather than an explanation of its actual decision.
-        plot_deletion_curves(metrics_del, 
-                            meta_del, 
-                            fractions, 
-                            out_path / f"deletion_curves_{group}_{org_idx}_{target_name}_cnn.png",
-                            logger
-                            )
+            # For instance, if the CNN predicts 5 and the LR predicts 8, 
+            # you would obtain CNN maps for 5 and 2, and LR maps for 8 and 2. 
+            # You do not calculate a CNN map for 8—that would constitute 
+            # an additional analysis of the CNN for a target it did not predict, 
+            # rather than an explanation of its actual decision.
+            plot_deletion_curves(metrics_del, 
+                                 meta_del, 
+                                 fractions, 
+                                 out_path / f"deletion_curves_{group}_{org_idx}_{target_name}_cnn.png",
+                                 logger
+                                 )
 
-        rows.append(result_row)
+            rows.append(result_row)
         logger.info("[%s] idx %d pos %d: deletion CNN completata",group,org_idx,position)
         
     # creates records for the CSV;
-    records_2 = []
+    records_dest = []
     for r in rows:
         for target_name, target_class in r["targets_cnn"].items():
             for name in names_tech:
                  m = r["metrics_cnn"][target_name][name]
-                 records_2.append({"group": group, 
-                                    "index": r["index"], 
-                                    "target_name": target_name, 
-                                    "target_class": target_class, 
-                                    "technique": name,
-                                    "del_auc": m["del_auc"],
-                                    "del_gain": m["del_gain"],
-                                    "del_auc_random": r["meta"][target_name]["del_auc_random"],
-                                    "del_curve_random": r["meta"][target_name]["del_curve_random"]})
+                 records_dest.append({"group": group, 
+                                "index": r["index"], 
+                                "true": r["true"],
+                                "pred": r["pred_cnn"], 
+                                "pred_lr": r["pred_lr"],
+                                "model": "cnn",
+                                "target_name": target_name, 
+                                "target_class": target_class , 
+                                "technique": name,
+                                "mask_share": m["mask_share"], 
+                                "mask_frac": m["mask_frac"],
+                                "focus_ratio": m["focus_ratio"], 
+                                # meta_cnn not present if only lr is wrong
+                                "agreement": r["meta_cnn"].get(target_name, {}).get("agreement_spearman"),
+                                "del_auc": m["del_auc"],
+                                "del_gain": m["del_gain"],
+                                "del_auc_random": r["meta"][target_name]["del_auc_random"],
+                                "del_curve_random": r["meta"][target_name]["del_curve_random"]
+                            })
+
+        for target_name, target_class in r["targets_lr"].items():
+            m = r["metrics_lr"][target_name]
+            records_dest.append({ "group": group, 
+                            "index": r["index"], 
+                            "true": r["true"],
+                            "pred": r["pred_cnn"], 
+                            "pred_lr": r["pred_lr"],
+                            "model": "lr",
+                            "target_name": target_name, 
+                            "target_class": target_class, 
+                            "technique": "lr_local_map",
+                            "mask_share": m["mask_share"],
+                            "mask_frac": m["mask_frac"],
+                            "focus_ratio": m["focus_ratio"]
+                        })
+            
 
     # for each image, target, and XAI technique.
     label = GROUPS_RESULT_OK_KO[group]
-    results_2 = { "group": group, 
-                    "label": label,
-                    "model": {k: ctx["info"].get(k) for k in ("action", "reason", "device")},
-                    "n_images": len(rows),
-                    "images": format_json_xai_rows(rows),
-                    "total_seconds": time.time() - t0
-                }
-        
-    (out_path / f"stage2_compare2_results_{group}.json").write_text(json.dumps(results_2,
-                                                                                indent=2, 
-                                                                                default=str),
-                                                                                encoding="utf-8"
-                                                                    )
-              
-    # Salva il CSV da records
-    if records_2:
-        pd.DataFrame(records_2).to_csv(out_path / f"stage2_compare2_records_{group}.csv",
-                                            index=False,
-                                            encoding="utf-8"
-                                            )                                                            
-        
-    return results_2 , records_2 
+    results_dest = { "group": group, 
+                "label": label,
+                "model": {k: ctx["info"].get(k) for k in ("action", "reason", "device")},
+                "n_images": len(rows),
+                "n_cnn_wrong": sum(r["pred_cnn"] != r["true"] for r in rows),
+                "n_lr_wrong": sum(r["pred_lr"] != r["true"] for r in rows),
+                "stability_cnn": source_results["stability_cnn"],
+                "summary_cnn": source_results["summary_cnn"],
+                "summary_lr": source_results["summary_lr"],
+                "n_images": len(rows),
+                "images": format_json_xai_rows(rows),
+                "total_seconds": time.time() - t0
+            }
+                                                                                     
+    (out_path / f"stage2_compare2_results_{group}.json").write_text(json.dumps(results_dest,
+                                                                                       indent=2, 
+                                                                                       default=str),
+                                                                            encoding="utf-8"
+                                                                            )
+    
+    return results_dest , records_dest 
 
 
 
