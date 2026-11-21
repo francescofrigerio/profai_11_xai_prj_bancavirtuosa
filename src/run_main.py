@@ -170,7 +170,9 @@ def compare_2_xai( cfg,
     techniques = build_techniques(model, cfg, background)
 
     
-    all_records, all_results = [], {}
+    all_records_1, all_results_1 = [], {}
+    all_records_2, all_results_2 = [], {}
+
     for group in GROUPS_RESULT_OK_KO:
         list_images = load_images_by_class(logger, 
                                            out_path / f"images_{group}.json",
@@ -199,26 +201,24 @@ def compare_2_xai( cfg,
                                                         group,
                                                         list_images )
 
-        results, records = run_compare_group_xai_1( cfg, 
-                                                         logger, 
-                                                         records,
-                                                         model, 
-                                                         device,
-                                                         techniques,
-                                                         ctx_param_dict,
-                                                         group,
-                                                         list_images ) 
+        all_results_1[group] = results_1
+        all_records_1 += records_1
+        all_results_2[group] = results_2
+        all_records_2 += records_2
 
-        all_results[group] = results
-        all_records += records
-
-    if all_records:
-        with open(out_path / "xai_metrics_all.csv", "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=list(all_records[0]))
+    if all_records_1:
+        with open(out_path / "xai_metrics_all_1.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(all_records_1[0]))
             w.writeheader()
-            w.writerows(all_records)
+            w.writerows(all_records_1)
 
-    return all_results
+    if all_records_2:
+            with open(out_path / "xai_metrics_all_2.csv", "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=list(all_records_2[0]))
+                w.writeheader()
+                w.writerows(all_records_2)
+
+    return all_results_1 , all_results_2
 
 
 def explore_2_xai( cfg,
