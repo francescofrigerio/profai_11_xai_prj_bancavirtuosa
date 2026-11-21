@@ -103,6 +103,8 @@ def format_json_xai_rows(rows):
                     "ig_unreliable_true": to_json_value(
                         row.get("ig_unreliable_true")
                     ),
+                    "metrics_cnn_del": to_json_value(row.get("metrics_cnn_del", {})),
+                    "meta_cnn_del": to_json_value(row.get("meta_cnn_del", {})),
         }
 
         formatted_images.append(img_entry)

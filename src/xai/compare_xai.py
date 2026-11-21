@@ -729,16 +729,6 @@ def run_compare_group_xai_2(cfg,
         # baseline: the value that will replace the removed pixels.
         baseline = make_blurred_baseline(input_img, sigma=cfg.DELETION_SIGMA)
 
-        row = { "index": org_idx, 
-                "pos": position, 
-                "maps_cnn": {}, 
-                "metrics_cnn": {}, 
-                "meta_cnn": {}, 
-                "maps_lr": {}, 
-                "metrics_lr": {},  
-                "meta_lr": {},             
-            }
-
         # not modify source record 
         result_row = dict(source_record)
         result_row["metrics_cnn_del"] = {}
@@ -782,15 +772,17 @@ def run_compare_group_xai_2(cfg,
                                  logger
                                  )
 
-            rows.append(result_row)
+        rows.append(result_row)
         logger.info("[%s] idx %d pos %d: deletion CNN completata",group,org_idx,position)
         
     # creates records for the CSV;
     records_dest = []
     for r in rows:
+        meta_del_target = r["meta_cnn_del"][target_name]
         for target_name, target_class in r["targets_cnn"].items():
             for name in names_tech:
                  m = r["metrics_cnn"][target_name][name]
+                 m_del = r["metrics_cnn_del"][target_name][name]
                  records_dest.append({"group": group, 
                                 "index": r["index"], 
                                 "true": r["true"],
@@ -805,10 +797,11 @@ def run_compare_group_xai_2(cfg,
                                 "focus_ratio": m["focus_ratio"], 
                                 # meta_cnn not present if only lr is wrong
                                 "agreement": r["meta_cnn"].get(target_name, {}).get("agreement_spearman"),
-                                "del_auc": m["del_auc"],
-                                "del_gain": m["del_gain"],
-                                "del_auc_random": r["meta"][target_name]["del_auc_random"],
-                                "del_curve_random": r["meta"][target_name]["del_curve_random"]
+                                "del_auc": m_del["del_auc"],
+                                "del_gain": m_del["del_gain"]
+                                # only into the results dict
+                                #"del_auc_random": r["meta"][target_name]["del_auc_random"],
+                                #"del_curve_random": r["meta"][target_name]["del_curve_random"]
                             })
 
         for target_name, target_class in r["targets_lr"].items():
@@ -827,6 +820,22 @@ def run_compare_group_xai_2(cfg,
                             "focus_ratio": m["focus_ratio"]
                         })
             
+    # save summary_cnn with mean of del_auc and del_gain 
+    summary_cnn_dest = copy.deepcopy(source_results["summary_cnn"])
+    if rows:
+        rows_cnn_true = [r for r in rows if "true" in r["metrics_cnn_del"]]
+        for name in names_tech:
+            vals_del_pred = [r["metrics_cnn_del"]["pred_cnn"][name] for r in rows]
+            summary_cnn_dest["pred_cnn"][name].update({
+                k: to_valid_float(np.mean([v[k] for v in vals_del_pred]))
+                for k in ("del_auc", "del_gain")
+            })
+            if rows_cnn_true:
+                vals_del_true = [r["metrics_cnn_del"]["true"][name] for r in rows_cnn_true]
+                summary_cnn_dest["true"][name].update({k: to_valid_float(np.mean([v[k] 
+                                                           for v in vals_del_true]))
+                                                               for k in ("del_auc", "del_gain")
+                })
 
     # for each image, target, and XAI technique.
     label = GROUPS_RESULT_OK_KO[group]
@@ -839,7 +848,6 @@ def run_compare_group_xai_2(cfg,
                 "stability_cnn": source_results["stability_cnn"],
                 "summary_cnn": source_results["summary_cnn"],
                 "summary_lr": source_results["summary_lr"],
-                "n_images": len(rows),
                 "images": format_json_xai_rows(rows),
                 "total_seconds": time.time() - t0
             }
