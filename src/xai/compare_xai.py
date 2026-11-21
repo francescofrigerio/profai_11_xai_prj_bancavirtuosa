@@ -28,6 +28,7 @@ from xai.shap_explainer import make_background
 
 from xai.explain import explain_target , explain_target_1 , explain_target_2 
 from xai.metrics_xai import to_valid_float , compute_lr_metrics , signed_diags
+from xai.metrics_xai import spearman_agreement_matrix
 
 
 
@@ -484,6 +485,13 @@ def run_compare_group_xai_1(cfg,
                 row["signed_diags"]["cnn"][target_name] = {technique_name: signed_diags(res.map)
                                                            for technique_name, res in maps_cnn.items()
                                                            }
+                agreement = spearman_agreement_matrix(maps_cnn, cfg)
+
+                target_meta = row["meta_cnn"].setdefault(target_name, {})
+                target_meta["agreement_spearman_matrix"] = { "techniques": agreement["techniques"],
+                                                            "matrix": agreement["matrix"],
+                                                            }
+                target_meta["agreement_spearman"] = agreement["mean_off_diagonal"]
                 
 
             # for each target in lr_targets, 
@@ -869,6 +877,213 @@ def run_compare_group_xai_2(cfg,
                                                                             )
     
     return results_dest , records_dest 
+
+
+
+def run_compare_group_xai_2_profai( cfg,
+                            logger,
+                            source_results,
+                            source_records,
+                            model,
+                            techniques,
+                            ctx,
+                            group,
+                        ):
+    t0 = time.time()
+    out_path = ctx["out_path"]
+    dataset = ctx["dataloader_cnn"].dataset
+    idx_to_pos = dataset.idx_dataset_position()
+    names_tech = list(techniques)
+
+    fractions = cfg.DELETION_FRACTIONS
+    rng = np.random.default_rng(cfg.SEED)
+
+    model.eval()
+    rows = []
+
+    for source_record in source_records:
+        org_idx = source_record["index"]
+
+        if org_idx not in idx_to_pos:
+            raise KeyError(f"id_dataset {org_idx} non presente in questo split")
+
+        position = idx_to_pos[org_idx]
+        input_image, input_label, dataset_idx = dataset[position]
+
+        if int(dataset_idx) != int(org_idx):
+            raise ValueError(f"Indice non corrispondente: "
+                            f"record={org_idx}, dataset={dataset_idx}"
+                            )               
+
+        if int(input_label) != int(source_record["true"]):
+            raise ValueError(f"Etichetta non corrispondente per index={org_idx}: "
+                            f"record={source_record['true']}, dataset={input_label}"
+                            )
+
+        input_img = input_image.unsqueeze(0).to(ctx["device"])
+        baseline = make_blurred_baseline(input_img,sigma=cfg.DELETION_SIGMA,)
+
+        # Copia la riga di fase 1 e aggiunge i campi di fase 2.
+        result_row = dict(source_record)
+        result_row["metrics_cnn_del"] = {}
+        result_row["meta_cnn_del"] = {}
+
+        for target_name, target_class in source_record["targets_cnn"].items():
+            maps_for_target = source_record["maps_cnn"].get(target_name)
+
+            if not maps_for_target:
+                raise KeyError(
+                    f"Nessuna mappa CNN per target={target_name}, "
+                    f"index={org_idx}"
+                )
+
+            # Probabilità della classe spiegata, calcolata con la CNN.
+            score_fn = lambda x, cls=int(target_class): float(F.softmax(model(x), 
+                                                                        dim=1)[0, cls].item()
+                                                            )
+
+            metrics_del, meta_del = explain_target_2(score_fn=score_fn,
+                                                    input_img=input_img,
+                                                    maps_for_target=maps_for_target,
+                                                    fractions=fractions,
+                                                    baseline=baseline,
+                                                    rng=rng,
+                                                )
+
+            result_row["metrics_cnn_del"][target_name] = metrics_del
+            result_row["meta_cnn_del"][target_name] = meta_del
+
+            plot_deletion_curves( metrics_del,
+                                    meta_del,
+                                    fractions,
+                                    out_path
+                                    / f"deletion_curves_{group}_{org_idx}_{target_name}_cnn.png",
+                                    logger,
+                                )
+
+        rows.append(result_row)
+
+        logger.info("[%s] idx %d pos %d: deletion CNN completata",group,org_idx,position)
+
+    # Tabella long: una riga per immagine, target e tecnica.
+    records_dest = []
+
+    for result_row in rows:
+        for target_name, target_class in result_row["targets_cnn"].items():
+            for technique_name in names_tech:
+                metric = result_row["metrics_cnn"][target_name][technique_name]
+                deletion_metric = result_row["metrics_cnn_del"][target_name][technique_name]
+                deletion_meta = result_row["meta_cnn_del"][target_name]
+
+                records_dest.append({"group": group,
+                                    "index": result_row["index"],
+                                    "true": result_row["true"],
+                                    "pred_cnn": result_row["pred_cnn"],
+                                    "pred_lr": result_row["pred_lr"],
+                                    "model": "cnn",
+                                    "target_name": target_name,
+                                    "target_class": target_class,
+                                    "technique": technique_name,
+                                    "mask_share": metric["mask_share"],
+                                    "mask_frac": metric["mask_frac"],
+                                    "focus_ratio": metric["focus_ratio"],
+                                    "agreement_spearman_mean": (
+                                        result_row.get("meta_cnn", {})
+                                        .get(target_name, {})
+                                        .get("agreement_spearman")
+                                    ),
+                                    "del_auc": deletion_metric["del_auc"],
+                                    "del_gain": deletion_metric["del_gain"],
+                                    "del_auc_random": deletion_meta["del_auc_random"],
+                                }
+                                )
+
+        # Le righe LR contengono le metriche di localizzazione della fase 1.
+        # La deletion LR non viene calcolata da questa funzione.
+        for target_name, target_class in result_row["targets_lr"].items():
+            metric = result_row["metrics_lr"][target_name]
+
+            records_dest.append({"group": group,
+                                "index": result_row["index"],
+                                "true": result_row["true"],
+                                "pred_cnn": result_row["pred_cnn"],
+                                "pred_lr": result_row["pred_lr"],
+                                "model": "lr",
+                                "target_name": target_name,
+                                "target_class": target_class,
+                                "technique": "lr_local_map",
+                                "mask_share": metric["mask_share"],
+                                "mask_frac": metric["mask_frac"],
+                                "focus_ratio": metric["focus_ratio"],
+                                "agreement_spearman_mean": None,
+                                "del_auc": None,
+                                "del_gain": None,
+                                "del_auc_random": None,
+                            }
+                        )
+
+    # Copia la sintesi di fase 1 e aggiunge le medie della deletion CNN.
+    summary_cnn_dest = copy.deepcopy(source_results["summary_cnn"])
+
+    for technique_name in names_tech:
+        pred_values = [ row["metrics_cnn_del"]["pred_cnn"][technique_name]
+                            for row in rows
+                            if technique_name
+                            in row["metrics_cnn_del"].get("pred_cnn", {})
+                        ]
+
+        if pred_values:summary_cnn_dest["pred_cnn"][technique_name].update(
+                                                        {key: to_valid_float(np.mean([value[key] 
+                                                                                      for value in pred_values])
+                                                                                    )
+                                                                for key in ("del_auc", "del_gain")
+                                                            }
+                                                        )
+
+        true_values = [row["metrics_cnn_del"]["true"][technique_name]
+                        for row in rows
+                            if technique_name in row["metrics_cnn_del"].get("true", {})
+                        ]
+
+        if true_values:
+            summary_cnn_dest["true"][technique_name].update({key: 
+                                                    to_valid_float(
+                                                    np.mean([value[key] for value in true_values])
+                                                    )
+                                                for key in ("del_auc", "del_gain")
+                }
+            )
+
+    label = GROUPS_RESULT_OK_KO[group]
+
+    results_dest = {
+        "group": group,
+        "label": label,
+        "model": {
+            key: ctx["info"].get(key)
+            for key in ("action", "reason", "device")
+        },
+        "n_images": len(rows),
+        "n_cnn_wrong": sum(
+            row["pred_cnn"] != row["true"] for row in rows
+        ),
+        "n_lr_wrong": sum(
+            row["pred_lr"] != row["true"] for row in rows
+        ),
+        "stability_cnn": source_results["stability_cnn"],
+        "summary_cnn": summary_cnn_dest,
+        "summary_lr": source_results["summary_lr"],
+        "images": format_json_xai_rows(rows),
+        "total_seconds": time.time() - t0,
+    }
+
+    json_path = out_path / f"stage2_compare2_results_{group}.json"
+    json_path.write_text(
+        json.dumps(results_dest, indent=2, allow_nan=False),
+        encoding="utf-8",
+    )
+
+    return results_dest, records_dest
 
 
 

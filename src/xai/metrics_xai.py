@@ -5,6 +5,8 @@ import csv
 import numpy as np
 import torch
 import torch.nn.functional as F
+from scipy.stats import rankdata
+
 from utility import to_grid28
 from config import CONFIG
 
@@ -66,7 +68,80 @@ def to_valid_float(x):
     x = float(x)
     return x if np.isfinite(x) else None
 
-    
+
+
+
+
+def spearman_agreement_matrix(maps, cfg=CONFIG):
+    """
+    Calculate the Spearman matrix for the maps produced by the techniques.
+
+    Use abs(map), then compare the ranking of the attribution magnitudes,
+    ignoring their signs.
+
+    Returns:
+      - techniques: names corresponding to the rows and columns;
+      - matrix: an NxN matrix, with None for undefined correlations;
+      - mean_off_diagonal: the mean of the correlations between distinct pairs.
+    """
+    techniques = list(maps)
+    n_techniques = len(techniques)
+
+    if n_techniques == 0:
+        return { "techniques": [],
+                    "matrix": [],
+                    "mean_off_diagonal": None,
+                }
+
+    ranks = []
+
+    for name in techniques:
+        res = maps[name]
+        grid = np.asarray(to_grid28(np.abs(np.asarray(res.map)), cfg.DENSENET_SIZE),dtype=float,)
+
+        if grid.ndim != 2:
+            raise ValueError(f"La mappa di {name} deve essere 2D, "
+                            f"ricevuta shape {grid.shape}"
+                            )
+
+        if not np.isfinite(grid).all():
+            raise ValueError(f"La mappa di {name} contiene NaN o valori infiniti")
+
+        ranks.append(rankdata(grid.ravel(), method="average"))
+
+    # Diagonal set to 1 to indicate the agreement of a technique with itself.
+    matrix = np.full((n_techniques, n_techniques), np.nan, dtype=float)
+    np.fill_diagonal(matrix, 1.0)
+
+    for i in range(n_techniques):
+        for j in range(i + 1, n_techniques):
+            rank_i = ranks[i]
+            rank_j = ranks[j]
+
+            # Correlazione non definita se una delle mappe è costante.
+            if np.ptp(rank_i) == 0 or np.ptp(rank_j) == 0:
+                continue
+
+            corr = float(np.corrcoef(rank_i, rank_j)[0, 1])
+            matrix[i, j] = corr
+            matrix[j, i] = corr
+
+    upper_values = matrix[np.triu_indices(n_techniques, k=1)]
+    finite_values = upper_values[np.isfinite(upper_values)]
+
+    mean_off_diagonal = ( float(finite_values.mean()) if finite_values.size else None )
+
+    # None is better for JSON and remain readable
+    # as not defined correlation
+    matrix_json = [ [float(value) if np.isfinite(value) else None for value in row]
+                    for row in matrix
+                  ]
+
+    return { "techniques": techniques,
+             "matrix": matrix_json,
+             "mean_off_diagonal": mean_off_diagonal,
+            }
+
 def mean_spearman_agreement(maps,cfg=CONFIG):
     """
         mean pairwise rank correlation between techniques (on |map| at 28x28)
