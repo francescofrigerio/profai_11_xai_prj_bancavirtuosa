@@ -21,7 +21,7 @@ from constants import TITLES, GROUPS_RESULT_OK_KO
 
 from utility import digit_mask , img28
 # from utility import black_normalized , black_baseline
-from utility import make_blurred_baseline
+from utility import make_blurred_baseline , black_baseline
 
 from xai import GradCamCaptum , build_techniques
 from xai.shap_explainer import make_background
@@ -383,14 +383,14 @@ def run_compare_group_xai_1(cfg,
     
     for id_class in sorted(list_images):
         for item in list_images[id_class]:
-            original_idx = item["id_dataset"]
-            if original_idx not in idx_to_pos:
-                raise KeyError(f"id_dataset {original_idx} not in this split")
-            position = idx_to_pos[original_idx]
+            org_idx = item["id_dataset"]
+            if org_idx not in idx_to_pos:
+                raise KeyError(f"id_dataset {org_idx} not in this split")
+            position = idx_to_pos[org_idx]
 
             # get X and y for the current image
             input_image, input_label, idx = dataset[position]
-            assert idx == original_idx
+            assert idx == org_idx
 
             # check the target class on record selected
             assert int(input_label) == int(y_data[position])
@@ -439,7 +439,7 @@ def run_compare_group_xai_1(cfg,
                               cfg.MASK_THRESHOLD, 
                               cfg.MASK_DILATION)
 
-            row = { "index": original_idx, 
+            row = { "index": org_idx, 
                     "pos": position, 
                     "true": true, 
                     "pred_cnn": pred_cnn,
@@ -523,7 +523,7 @@ def run_compare_group_xai_1(cfg,
 
             rows.append(row)
             logger.info("[%s] idx %d pos %d true %d CNN %d LR %d",
-                        group, original_idx, position, true, pred_cnn,pred_lr)
+                        group, org_idx, position, true, pred_cnn,pred_lr)
 
     # Lime Shap stability of Explanation
     # stochastic techniques: same image explained twice
@@ -717,7 +717,7 @@ def run_compare_group_xai_2(cfg,
         input_image, input_label, idx = dataset[position]
 
         if int(idx) != int(org_idx):
-            raise ValueError(f"Indice non corrispondente: record={original_idx}, dataset={idx}")
+            raise ValueError(f"Indice non corrispondente: record={org_idx}, dataset={idx}")
 
         if int(input_label) != int(source_record["true"]):
              raise ValueError(f"Etichetta non corrispondente per index={org_idx}: "

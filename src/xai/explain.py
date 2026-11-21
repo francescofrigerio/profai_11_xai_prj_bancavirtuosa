@@ -75,7 +75,7 @@ except Exception as exc:                     # reported by check 1, not a crash
     torch = nn = F = None
     _TORCH_ERROR = exc
 
-from xai.metrics_xai import deletion_curve_for_faithfulness, 
+from xai.metrics_xai import deletion_curve_for_faithfulness 
 from xai.metrics_xai import mean_spearman_agreement , deletion_metrics_from_maps
 
 

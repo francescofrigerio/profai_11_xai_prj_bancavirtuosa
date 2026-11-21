@@ -231,15 +231,14 @@ def black_baseline(device):
 
 def make_blurred_baseline(input_img, sigma):
     """
-        Create a blurred baseline with the same shape as input_img.
-        input_img: tensor [1, C, H, W], already in the space used by the model.
+          Create a blurred baseline with the same shape as input_img.
+        input_img: tensor [1,C,H,W] is the shape used by the model.
         
-        Sigma does not act on the importance map, but rather on the image used as a baseline. 
-        With a small sigma, the image remains close to the original; 
-        as sigma increases, details are attenuated and the image becomes more uniform. 
-        During deletion, the selected pixels are replaced by the values ​​from the blurred 
+        Sigma does not act on the importance ,map but rather the image used as a baseline.
+        With a small sigma , the image remains close to the original;
+        as sigma increased , details are attenuated and the images bevome more uniform.
+        During deletion , the selected pixels are replaced by the valued from the blurred
         baseline at the same coordinates.
-        
     """
     if sigma <= 0:
         raise ValueError("sigma deve essere maggiore di 0")
