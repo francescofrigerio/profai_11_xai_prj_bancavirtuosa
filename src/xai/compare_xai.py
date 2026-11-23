@@ -30,7 +30,9 @@ from xai.explain import explain_target , explain_target_1 , explain_target_2
 from xai.metrics_xai import to_valid_float , compute_lr_metrics , signed_diags
 from xai.metrics_xai import spearman_agreement_matrix , compute_topk_iou
 
-
+from scipy.ndimage import distance_transform_edt
+# install with pip
+from skimage.morphology import skeletonize
 
 def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group, list_images):
     """
@@ -338,23 +340,15 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
     return results, records
 
 
-def pre_compare_group_xai(cfg, 
-                            logger, 
-                            model, 
-                            device, 
-                            techniques, 
-                            lr, 
-                            ctx, 
-                            group, 
-                            list_images ):
+def pre_compare_group_xai_1 (cfg, ctx ):
     """
         analysis before run_compare_xai
     """
-    out_path = ctx["out_path"]
-    dataset = ctx["dataloader_cnn"].dataset
-    idx_to_pos = dataset.idx_dataset_position()
-    X_data, y_data, _ = ctx["X_data"], ctx["y_data"], ctx["y_pred_lr"]
-    names_tech = list(techniques)
+    # out_path = ctx["out_path"]
+    # dataset = ctx["dataloader_cnn"].dataset
+    # idx_to_pos = dataset.idx_dataset_position()
+    X_data, y_data, = ctx["X_data"], ctx["y_data"]
+    # names_tech = list(techniques)
      
     rng = np.random.default_rng(42)
     positions = []
@@ -365,7 +359,82 @@ def pre_compare_group_xai(cfg,
         positions.extend(chosen.tolist())
     
     inspect_digit_masks(positions, X_data, cfg)
+
+def stroke_thickness_score(position, X_data, cfg):
+    """
+         detect stroke_thickness_score
+    """
+    image = img28(position, X_data, size=cfg.IMAGE_SIZE)
+    mask = digit_mask(image, cfg.MASK_THRESHOLD, dilation=0).astype(bool)
+
+    skeleton = skeletonize(mask)
+    if not mask.any() or not skeleton.any():
+        return None
+
+    distances = distance_transform_edt(mask)
+    # thickness estimate: twice mean distance
+    # of skeleton pixels from border of mask 
+    return float(2 * distances[skeleton].mean())
+
+
+def select_thin_thick_examples(X_data, y_data, cfg, quantiles=(0.2, 0.8)):
+    """
+        select_thin_thick_examples
+        select images in which the lines are particularly thin or thick.
+        
+    """
+    labels = np.asarray(y_data).reshape(-1)
+    selected = {}
     
+    for digit in np.unique(labels):
+        candidates = np.flatnonzero(labels == digit)
+        scored = []
+
+        for position in candidates:
+            score = stroke_thickness_score(position, X_data, cfg)
+            if score is not None:
+                scored.append((int(position), score))
+
+        if len(scored) < 2:
+            continue
+
+        positions = np.array([item[0] for item in scored])
+        scores = np.array([item[1] for item in scored])
+
+        thin_target, thick_target = np.quantile(scores, quantiles)
+
+        thin_idx = np.argmin(np.abs(scores - thin_target))
+        thick_idx = np.argmin(np.abs(scores - thick_target))
+
+        selected[int(digit)] = { "thin": int(positions[thin_idx]),
+                                "thick": int(positions[thick_idx]),
+                                "thin_score": float(scores[thin_idx]),
+                                "thick_score": float(scores[thick_idx]),
+                                }
+
+    return selected
+
+
+def pre_compare_group_xai_2(cfg,ctx, quantiles=(0.2, 0.8)):
+    
+    """
+        analysis pre compare group to choice Treshold mask
+        The final print score is a useful estimate for selecting examples, 
+        not a perfect measure of significance: it depends on the threshold.
+    """
+    
+    X_data, y_data, = ctx["X_data"], ctx["y_data"]
+
+    selected = select_thin_thick_examples(X_data, y_data, cfg)
+
+    # positions to pass at view function 
+    positions = [ position
+                    for examples in selected.values()
+                        for position in (examples["thin"], examples["thick"])
+                ]
+    inspect_digit_masks(positions, X_data, cfg)
+    print(selected)
+
 def run_compare_group_xai_1(cfg, 
                             logger, 
                             model, 

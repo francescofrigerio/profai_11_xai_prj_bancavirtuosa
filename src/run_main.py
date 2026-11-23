@@ -29,7 +29,7 @@ from training import get_device, get_trained_model , evaluate_model
 
 from utility import create_and_save_images_lists , require , save_quadrant_to_json
 from xai.explore_xai import run_exp , make_gradcam_callback
-from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai
+from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai_1 , pre_compare_group_xai_2
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
 
 from xai import build_techniques
@@ -82,11 +82,7 @@ def compare_2_xai( cfg,
     X_val_lr , y_val_lr , idx_val_lr = data_to_input_lr(val_loader_lr,1, 
                                                CONFIG.IMAGE_SIZE, 
                                                CONFIG.IMAGE_SIZE)
-
-    # X_test_lr , y_test_lr , idx_test = data_to_input_lr(test_loader_lr,1, 
-    #                                             CONFIG.IMAGE_SIZE, 
-    #                                             CONFIG.IMAGE_SIZE)
-            
+    
     logger.debug("Test di riproducibilità superato con successo!")
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
@@ -171,9 +167,10 @@ def compare_2_xai( cfg,
     techniques = build_techniques(model, cfg, background)
 
     
-    all_records_1, all_results_1 = [], {}
+    # all_records_1, all_results_1 = [], {}
     all_records_2, all_results_2 = [], {}
 
+    flag_inspect = True
     for group in GROUPS_RESULT_OK_KO:
         list_images = load_images_by_class(logger, 
                                            out_path / f"images_{group}.json",
@@ -182,31 +179,23 @@ def compare_2_xai( cfg,
             logger.warning("Gruppo %s vuoto: salto", group)
             continue
 
+        if (flag_inspect):
+            pre_compare_group_xai_1( cfg, ctx_param_dict )
+            pre_compare_group_xai_2( cfg, ctx_param_dict )
+                                    
+        else:
+            results_1, records_1 = run_compare_group_xai_1( cfg, 
+                                                            logger, 
+                                                            model, 
+                                                            device,
+                                                            techniques,
+                                                            lr, 
+                                                            ctx_param_dict,
+                                                            group,
+                                                            list_images ) 
 
-        pre_compare_group_xai( cfg, 
-                                logger, 
-                                model, 
-                                device,
-                                techniques,
-                                lr, 
-                                ctx_param_dict,
-                                group,
-                                list_images ) 
         
-        raise ValueError("mi fermo x debug dopo inspect_digit_masks")
-    
-        results_1, records_1 = run_compare_group_xai_1( cfg, 
-                                                 logger, 
-                                                 model, 
-                                                 device,
-                                                 techniques,
-                                                 lr, 
-                                                 ctx_param_dict,
-                                                 group,
-                                                 list_images ) 
-
-        raise ValueError("mi fermo x debug dopo fase1")
-        results_2, records_2 = run_compare_group_xai_2( cfg, 
+            results_2, records_2 = run_compare_group_xai_2( cfg, 
                                                         logger, 
                                                         results_1,
                                                         records_1,
@@ -217,16 +206,16 @@ def compare_2_xai( cfg,
                                                         group,
                                                         list_images )
 
-        all_results_2[group] = results_2
-        all_records_2 += records_2
+            all_results_2[group] = results_2
+            all_records_2 += records_2
     
     if all_records_2:
-            with open(out_path / "xai_metrics_all.csv", "w", newline="", encoding="utf-8") as f:
-                w = csv.DictWriter(f, fieldnames=list(all_records_2[0]))
-                w.writeheader()
-                w.writerows(all_records_2)
+        with open(out_path / "xai_metrics_all.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(all_records_2[0]))
+            w.writeheader()
+            w.writerows(all_records_2)
 
-    return all_results_1 , all_results_2
+    return all_results_2
 
 
 def explore_2_xai( cfg,
