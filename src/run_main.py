@@ -170,7 +170,11 @@ def compare_2_xai( cfg,
     # all_records_1, all_results_1 = [], {}
     all_records_2, all_results_2 = [], {}
 
-    flag_inspect = True
+    flag_inspect_1 = False
+    flag_inspect_2 = True
+    # add assert not possible both True
+    assert not (flag_inspect_1 and flag_inspect_2), "possibile una sola funzione di inspect "
+
     for group in GROUPS_RESULT_OK_KO:
         list_images = load_images_by_class(logger, 
                                            out_path / f"images_{group}.json",
@@ -179,10 +183,10 @@ def compare_2_xai( cfg,
             logger.warning("Gruppo %s vuoto: salto", group)
             continue
 
-        if (flag_inspect):
+        if (flag_inspect_1):
             pre_compare_group_xai_1( cfg, ctx_param_dict )
-            # pre_compare_group_xai_2( cfg, ctx_param_dict )
-                                    
+        elif ( flag_inspect_2):
+            pre_compare_group_xai_2( cfg, ctx_param_dict )                       
         else:
             results_1, records_1 = run_compare_group_xai_1( cfg, 
                                                             logger, 
