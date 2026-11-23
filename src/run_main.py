@@ -29,7 +29,7 @@ from training import get_device, get_trained_model , evaluate_model
 
 from utility import create_and_save_images_lists , require , save_quadrant_to_json
 from xai.explore_xai import run_exp , make_gradcam_callback
-from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai 
+from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
 
 from xai import build_techniques

@@ -338,7 +338,7 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
     return results, records
 
 
-def pre_compare_group_xai_1(cfg, 
+def pre_compare_group_xai(cfg, 
                             logger, 
                             model, 
                             device, 
@@ -693,7 +693,7 @@ def run_compare_group_xai_1(cfg,
                             "mask_frac": m["mask_frac"],
                             "focus_ratio": m["focus_ratio"],
                              "iou_top_05": m["iou_top_05"],
-                            "iou_top_10": m["iou_top_10"]                               "iou_top_20": m["iou_top_20"]
+                            "iou_top_10": m["iou_top_10"],                               "iou_top_20": m["iou_top_20"]
                         })
         
     # saves the results in JSON format.
