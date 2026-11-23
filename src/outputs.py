@@ -299,8 +299,8 @@ def plot_quadrants_balance_info(path, counts_info, logger):
 
     """
     names = list(counts_info)
-    candidates = [counts_info[n]["candidati"] for n in names]
-    selected = [counts_info[n]["selezionati"] for n in names]
+    candidates = [counts_info[n]["candidates"] for n in names]
+    selected = [counts_info[n]["selected"] for n in names]
 
     x = np.arange(len(names))
     width = 0.35
