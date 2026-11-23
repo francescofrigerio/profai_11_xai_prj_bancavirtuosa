@@ -487,7 +487,10 @@ def run_compare_group_xai_1(cfg,
                                                            }
                 agreement = spearman_agreement_matrix(maps_cnn, cfg)
 
+                # setup row["meta_cnn"][target_name] and return reference.
+                # dicts are mutablle object passed by refernce
                 target_meta = row["meta_cnn"].setdefault(target_name, {})
+                # add the next key to row["meta_cnn"][target_name]
                 target_meta["agreement_spearman_matrix"] = { "techniques": agreement["techniques"],
                                                             "matrix": agreement["matrix"],
                                                             }
@@ -576,41 +579,41 @@ def run_compare_group_xai_1(cfg,
         # Summary LR on pred_lr 
         # (no ["lr_local_map"], compute_lr_metrics retunr  dict flat)
         vals_lr_pred = [r["metrics_lr"]["pred_lr"] for r in rows]
-        summary_lr["pred_lr"]["lr_local_map"] = { k: to_valid_float(np.mean([v[k] 
+        summary_lr["pred_lr"]["lr_local_map"] = { key: to_valid_float(np.mean([v[key] 
                                                     for v in vals_lr_pred]))
-                                                        for k in ("mask_share", "focus_ratio")
+                                                        for key in ("mask_share", "focus_ratio")
                                                 }
 
         # Summary LR on true (only if exist)
         rows_lr_true = [r for r in rows if "true" in r["metrics_lr"]]
         if rows_lr_true:
             vals_lr_true = [r["metrics_lr"]["true"] for r in rows_lr_true]
-            summary_lr["true"]["lr_local_map"] = { k: to_valid_float(np.mean([v[k] 
+            summary_lr["true"]["lr_local_map"] = { key: to_valid_float(np.mean([v[key] 
                                                     for v in vals_lr_true]))
-                                                       for k in ("mask_share", "focus_ratio")
+                                                       for key in ("mask_share", "focus_ratio")
                                                  }
 
         # Summary CNN on pred_cnn and true
         rows_cnn_true = [r for r in rows if "true" in r["metrics_cnn"]]
-        for name in names_tech:
-            vals_cnn_pred = [r["metrics_cnn"]["pred_cnn"][name] for r in rows]
-            summary_cnn["pred_cnn"][name] = { k: to_valid_float(np.mean([v[k] 
+        for tech_name in names_tech:
+            vals_cnn_pred = [r["metrics_cnn"]["pred_cnn"][tech_name] for r in rows]
+            summary_cnn["pred_cnn"][tech_name] = { key: to_valid_float(np.mean([v[key] 
                                                 for v in vals_cnn_pred]))
-                                                    for k in ("mask_share", "focus_ratio")
+                                                    for key in ("mask_share", "focus_ratio")
                                             }
             if rows_cnn_true:
                 vals_cnn_true = [r["metrics_cnn"]["true"][name] for r in rows_cnn_true]
-                summary_cnn["true"][name] = { k: to_valid_float(np.mean([v[k] 
+                summary_cnn["true"][name] = { key: to_valid_float(np.mean([v[key] 
                                               for v in vals_cnn_true]))
-                                                for k in ("mask_share", "focus_ratio")
+                                                for key in ("mask_share", "focus_ratio")
                 }
         
     
     # creates records for the CSV;
     for r in rows:
         for target_name, target_class in r["targets_cnn"].items():
-            for name in names_tech:
-                m = r["metrics_cnn"][target_name][name]
+            for tech_name in names_tech:
+                m = r["metrics_cnn"][target_name][tech_name]
                 records.append({"group": group, 
                                 "index": r["index"], 
                                 "true": r["true"],
@@ -806,11 +809,19 @@ def run_compare_group_xai_2(cfg,
                         "mask_share": metric["mask_share"],
                         "mask_frac": metric["mask_frac"],
                         "focus_ratio": metric["focus_ratio"],
-                        "agreement_spearman_mean": (
-                            result_row.get("meta_cnn", {})
-                            .get(target_name, {})
-                            .get("agreement_spearman")
-                        ),
+                        # "agreement_spearman_mean": (
+                        #    result_row.get("meta_cnn", {})
+                        #    .get(target_name, {})
+                        #    .get("agreement_spearman")
+                        #),
+                        "agreement_spearman_matrix": (result_row.get("meta_cnn", {})
+                                                    .get(target_name, {})
+                                                    .get("agreement_spearman_matrix")
+                                                    ),
+                        "agreement_spearman": (result_row.get("meta_cnn", {})
+                                                            .get(target_name, {})
+                                                            .get("agreement_spearman")
+                                                            ),
                         "del_auc": deletion_metric["del_auc"],
                         "del_gain": deletion_metric["del_gain"],
                         "del_auc_random": deletion_meta["del_auc_random"],
@@ -831,7 +842,8 @@ def run_compare_group_xai_2(cfg,
                             "mask_share": metric["mask_share"],
                             "mask_frac": metric["mask_frac"],
                             "focus_ratio": metric["focus_ratio"],
-                            "agreement_spearman_mean": None,
+                            "agreement_spearman_matrix": None,
+                            "agreement_spearman": None,
                             "del_auc": None,
                             "del_gain": None,
                             "del_auc_random": None,
@@ -842,23 +854,23 @@ def run_compare_group_xai_2(cfg,
     if rows:
         rows_cnn_true = [r for r in rows if "true" in r["metrics_cnn_del"]]
         for tech_name in names_tech:
-            vals_del_pred = [r["metrics_cnn_del"]["pred_cnn"][name] for r in rows]
+            vals_del_pred = [r["metrics_cnn_del"]["pred_cnn"][tech_name] for r in rows]
             summary_cnn_dest["pred_cnn"][tech_name].update({
-                k: to_valid_float(np.mean([v[k] for v in vals_del_pred]))
-                for k in ("del_auc", "del_gain")
+                key: to_valid_float(np.mean([v[key] for v in vals_del_pred]))
+                for key in ("del_auc", "del_gain")
             })
             if rows_cnn_true:
                 vals_del_true = [r["metrics_cnn_del"]["true"][tech_name] for r in rows_cnn_true]
-                summary_cnn_dest["true"][tech_name].update({k: to_valid_float(np.mean([v[k] 
+                summary_cnn_dest["true"][tech_name].update({key: to_valid_float(np.mean([v[key] 
                                                            for v in vals_del_true]))
-                                                               for k in ("del_auc", "del_gain")
+                                                               for key in ("del_auc", "del_gain")
                 })
 
     # for each image, target, and XAI technique.
     label = GROUPS_RESULT_OK_KO[group]
     results_dest = { "group": group, 
                 "label": label,
-                "model": {k: ctx["info"].get(k) for k in ("action", "reason", "device")},
+                "model": {key: ctx["info"].get(key) for key in ("action", "reason", "device")},
                 "n_images": len(rows),
                 "n_cnn_wrong": sum(r["pred_cnn"] != r["true"] for r in rows),
                 "n_lr_wrong": sum(r["pred_lr"] != r["true"] for r in rows),
