@@ -176,8 +176,8 @@ def compare_2_xai( cfg,
     # all_records_1, all_results_1 = [], {}
     all_records_2, all_results_2 = [], {}
 
-    flag_inspect_1 = True
-    flag_inspect_2 = False
+    flag_inspect_1 = False
+    flag_inspect_2 = True
     # add assert not possible both True
     assert not (flag_inspect_1 and flag_inspect_2), "possibile una sola funzione di inspect "
 
