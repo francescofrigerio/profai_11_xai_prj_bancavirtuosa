@@ -1,0 +1,21 @@
+L'obiettivo generale di questa fase è confrontare le spiegazioni XAI (Explainable AI) prodotte da diverse tecniche, 
+esaminando due aspetti:
+1. Su cosa si concentrano le spiegazioni? Le mappe evidenziano effettivamente la regione occupata dalla cifra?
+2. Quanto sono fedeli al modello? 
+Se rimuovo i pixel considerati importanti, la probabilità associata alla classe spiegata diminuisce?
+
+Domanda a cui rispondono le diverse metriche XAI
+mask_share	Quanta importanza viene attribuita alla cifra?
+mask_frac	Quanto spazio occupa la cifra?
+focus_ratio	Quanto è concentrata l'importanza sulla cifra rispetto alla sua area?
+del_auc	    Quanto rimane alta la probabilità quando vengono rimossi i pixel importanti?
+del_gain	Quanto è migliore la tecnica rispetto a una selezione casuale?
+agreement_spearman	In che misura le diverse tecniche concordano tra loro?
+
+Stiamo misurando tre diverse proprietà delle spiegazioni:
+- localizzazione spaziale (mask_share, focus_ratio);
+- fedeltà al comportamento della CNN (del_auc, del_gain);
+- concordanza tra le tecniche (agreement_spearman).
+Queste metriche non sono intercambiabili: 
+una determinata tecnica potrebbe ottenere buoni risultati in una dimensione, 
+ma prestazioni inferiori in un'altra.
