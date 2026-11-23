@@ -129,7 +129,7 @@ class ConfigConstantsDefault:
     MASK_MODE: str = "digit"   
     # intensity above which a pixel belongs to the digit          
     MASK_THRESHOLD: float = 0.1          
-    MASK_DILATION: int = 1
+    MASK_DILATION: int = 0   # test 0 and 1
     TOPK_FRACTION: float = 0.2
     COMPUTE_FAITHFULNESS: bool = False   # deletion curves
     DELETION_STEPS: int = 10

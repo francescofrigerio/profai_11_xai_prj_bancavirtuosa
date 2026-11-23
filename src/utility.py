@@ -311,6 +311,38 @@ def digit_mask(input_img28, threshold, dilation):
         with the pixel values in X_train. 
         If the images are normalized or standardized, 
         the threshold must be chosen accordingly.
+
+
+
+
+        Threshold: cfg.MASK_THRESHOLD selecting a value such that the mask provides 
+        a reasonable representation of the digit’s pixels. 
+        Visually inspect a few masks using different values before 
+        settling on one; there is no universal value.
+        
+        Dilation: I would use 0 as the primary setting, provided the function allows it.
+        Dilation expands the mask, making it easier to achieve overlaps; 
+        this can increase the IoU, even if the explanation extends into the background. 
+        I would treat your current dilation setting as a sensitivity analysis rather 
+        than a primary result.
+        For instance, we could take the top 10% IoU results obtained with 
+        a dilation of 0 and recalculate them using a dilation of 1 
+        to see how much the outcome depends on the mask boundaries. 
+        
+        If you are uncertain about the threshold, you could also compare 
+        a second threshold—determined via visual inspection—while keeping 
+        the dilation constant; changing both parameters simultaneously 
+        makes it difficult to determine which one is responsible for any observed differences.
+
+        PAY ATTENTION:To ensures that comparisons between techniques remain valid: every comparison 
+        must use the same threshold and dilation for the same image.
+
+       We will Use the top 10% IoU—with a fixed threshold and no dilation—as 
+       our primary metric, followed by a brief sensitivity analysis using 
+       our current dilation setting. The IoU function itself can remain 
+       independent of these parameters, as it receives the mask only after it has already 
+       been constructed. 
+       The digit_mask MASK_DILATION=0 have to interpret as no dilation.
     """
     mask = np.asarray(input_img28) > threshold
 

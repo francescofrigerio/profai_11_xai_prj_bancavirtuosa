@@ -214,6 +214,100 @@ def spearman_agreement_mean(maps,cfg=CONFIG):
     return to_valid_float(np.nanmean(c[np.triu_indices(len(ranks), 1)]))
 
 
+def compute_topk_iou(map_array, mask, cfg, percentages=(5, 10, 20)):
+    """
+        Iou betwween binary mask of the digit and top-k pixels of xai map magnitude(abs)
+
+        The IoU measures the extent to which the region selected by the explanation 
+        overlaps with the digit’s mask:
+
+        IoU = pixels in common / pixels present in at least one of the two regions
+
+        Values range from 0 to 1 .
+        0: no overlap;
+        1: the selected region coincides exactly with the digit’s mask;
+        
+        intermediate values: partial overlap. For example, 0.30 means that the intersection 
+        accounts for 30% of the union of the two regions.
+
+        "Top-5%," "top-10%," and "top-20%" indicate how many pixels from 
+        the XAI map are selected based on the absolute value—abs(m)—ordered 
+        from most important to least important. 
+        On a 28x28 grid, which contains 784 pixels, these correspond to approximately 
+        40, 79, and 157 pixels, respectively.
+
+        Example: 
+        If the digit’s mask contains 100 pixels and the "top-5%" (40 pixels) 
+        share 30 of them with the mask, the union contains 110 pixels, 
+        and the IoU is 30 / 110 ≈ 0.27.
+
+        In general, a higher IoU indicates that the "top-k" region is more precisely 
+        localized on the digit. 
+        However, the three thresholds represent different scales:
+
+        Top-5%: a tighter focus; it may identify a highly discriminative part, 
+        but might miss a large portion of the digit;
+
+        Top-10%: an intermediate compromise;
+
+        Top-20%: a broader coverage, which may include more of the digit’s pixels 
+        but also more of the background. 
+        It is not guaranteed that the IoU will increase when moving from 5% to 10% or 20%: 
+        expanding the region may include both pixels belonging to the digit 
+        and background pixels, meaning the ratio could either rise or fall. 
+        When comparing different techniques, ensure you use the same images, 
+        targets, masks, and thresholds. 
+        This metric relies on the magnitude of the map; it does not distinguish 
+        between evidence that supports a prediction and evidence that contradicts 
+        it, nor does it measure the agreement between two techniques 
+        or their fidelity to the model.
+
+    """
+    
+    # importance of xai map magnitude
+    importance = np.asarray(to_grid28(np.abs(np.asarray(map_array)), cfg.DENSENET_SIZE),
+                            dtype=float,)
+    
+    # binary mask of the digit
+    binary_mask = np.asarray(mask).squeeze() > 0
+
+    if importance.ndim != 2 or binary_mask.ndim != 2:
+        raise ValueError(f"Mappa e maschera devono essere 2D: "
+                         f"map={importance.shape}, mask={binary_mask.shape}"
+                        )
+
+    if importance.shape != binary_mask.shape:
+        raise ValueError(f"Mappa e maschera devono avere la stessa forma: "
+                        f"map={importance.shape}, mask={binary_mask.shape}"
+                        )
+
+    if not np.isfinite(importance).all():
+        raise ValueError("La mappa contiene NaN o valori infiniti")
+
+    flat_importance = importance.ravel()
+    order = np.argsort(-flat_importance, kind="stable")
+    n_pixels = flat_importance.size
+
+    iou_values = {}
+
+    # iter for 5,10,20
+    for percentage in percentages:
+        if not 0 < percentage <= 100:
+            raise ValueError(f"Percentuale top-k non valida: {percentage}")
+
+        k = max(1, int(np.ceil(percentage * n_pixels / 100)))
+        top_mask = np.zeros(n_pixels, dtype=bool)
+        top_mask[order[:k]] = True
+        top_mask = top_mask.reshape(importance.shape)
+
+        intersection = np.logical_and(top_mask, binary_mask).sum()
+        union = np.logical_or(top_mask, binary_mask).sum()
+
+        key = f"iou_top_{percentage:02d}"
+        iou_values[key] = float(intersection / union) if union else None
+
+    return iou_values
+
 @torch.no_grad()
 def deletion_curve_for_faithfulness(model, 
                                     input_img, 

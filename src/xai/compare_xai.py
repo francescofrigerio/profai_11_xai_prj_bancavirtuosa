@@ -28,7 +28,7 @@ from xai.shap_explainer import make_background
 
 from xai.explain import explain_target , explain_target_1 , explain_target_2 
 from xai.metrics_xai import to_valid_float , compute_lr_metrics , signed_diags
-from xai.metrics_xai import spearman_agreement_matrix
+from xai.metrics_xai import spearman_agreement_matrix , compute_topk_iou
 
 
 
@@ -448,6 +448,8 @@ def run_compare_group_xai_1(cfg,
                     "prob_pred": float(probs[pred_cnn]),
                     "targets_cnn": targets_cnn, 
                     "targets_lr": targets_lr, 
+                    "mask_dilation": cfg.MASK_DILATION, 
+                    "mask_treshold": cfg.MASK_THRESHOLD, 
                     "maps_cnn": {}, 
                     "metrics_cnn": {}, 
                     "meta_cnn": {}, 
@@ -485,8 +487,10 @@ def run_compare_group_xai_1(cfg,
                 row["signed_diags"]["cnn"][target_name] = {technique_name: signed_diags(res.map)
                                                            for technique_name, res in maps_cnn.items()
                                                            }
-                agreement = spearman_agreement_matrix(maps_cnn, cfg)
 
+                # START SPEARMAN
+                agreement = spearman_agreement_matrix(maps_cnn, cfg)
+                
                 # setup row["meta_cnn"][target_name] and return reference.
                 # dicts are mutablle object passed by refernce
                 target_meta = row["meta_cnn"].setdefault(target_name, {})
@@ -495,6 +499,12 @@ def run_compare_group_xai_1(cfg,
                                                             "matrix": agreement["matrix"],
                                                             }
                 target_meta["agreement_spearman"] = agreement["mean_off_diagonal"]
+                # END SPEARMAN
+                
+                # START TOPK IOU
+                for tech_name, res in maps_cnn.items():
+                    metrics_cnn[tech_name].update(compute_topk_iou(res.map, mask, cfg))
+                # END TOPK IOU
                 
             # for each target in lr_targets, 
             # it generate an LR map using lr.local_map(...).
@@ -506,7 +516,12 @@ def run_compare_group_xai_1(cfg,
                 # with the linear representation of the LR.
                 row["maps_lr"][target_name] = maps_lr
                 row["signed_diags"]["lr"][target_name] = {"lr_local_map": signed_diags(maps_lr)}
-                row["metrics_lr"][target_name] = compute_lr_metrics(maps_lr, mask)
+                
+                # row["metrics_lr"][target_name] = compute_lr_metrics(maps_lr, mask)
+                lr_metrics = compute_lr_metrics(maps_lr, mask)
+                lr_metrics.update(compute_topk_iou(maps_lr, mask, cfg))
+                row["metrics_lr"][target_name] = lr_metrics
+
 
             # completeness_error only for cnn and Integrated Gradients: 
             # not a general metric applicable to all maps. 
@@ -601,8 +616,8 @@ def run_compare_group_xai_1(cfg,
                                                     for key in ("mask_share", "focus_ratio")
                                             }
             if rows_cnn_true:
-                vals_cnn_true = [r["metrics_cnn"]["true"][name] for r in rows_cnn_true]
-                summary_cnn["true"][name] = { key: to_valid_float(np.mean([v[key] 
+                vals_cnn_true = [r["metrics_cnn"]["true"][tech_name] for r in rows_cnn_true]
+                summary_cnn["true"][tech_name] = { key: to_valid_float(np.mean([v[key] 
                                               for v in vals_cnn_true]))
                                                 for key in ("mask_share", "focus_ratio")
                 }
@@ -618,6 +633,8 @@ def run_compare_group_xai_1(cfg,
                                 "true": r["true"],
                                 "pred": r["pred_cnn"], 
                                 "pred_lr": r["pred_lr"],
+                                "mask_dilation": r["mask_dilation"],
+                                "mask_treshold": r["mask_treshold"],
                                 "model": "cnn",
                                 "target_name": target_name, 
                                 "target_class": target_class , 
@@ -626,7 +643,10 @@ def run_compare_group_xai_1(cfg,
                                 "mask_frac": m["mask_frac"],
                                 "focus_ratio": m["focus_ratio"], 
                                 # meta_cnn not present if only lr is wrong
-                                # "agreement": r["meta_cnn"].get(target_name, {}).get("agreement_spearman")
+                                "agreement": r["meta_cnn"].get(target_name, {}).get("agreement_spearman"),
+                                "iou_top_05": m["iou_top_05"],
+                                "iou_top_10": m["iou_top_10"],
+                                "iou_top_20": m["iou_top_20"]
                                 })
         
         for target_name, target_class in r["targets_lr"].items():
@@ -636,13 +656,17 @@ def run_compare_group_xai_1(cfg,
                             "true": r["true"],
                             "pred": r["pred_cnn"], 
                             "pred_lr": r["pred_lr"],
+                            "mask_dilation": r["mask_dilation"],
+                            "mask_treshold": r["mask_treshold"],
                             "model": "lr",
                             "target_name": target_name, 
                             "target_class": target_class, 
                             "technique": "lr_local_map",
                             "mask_share": m["mask_share"],
                             "mask_frac": m["mask_frac"],
-                            "focus_ratio": m["focus_ratio"]
+                            "focus_ratio": m["focus_ratio"],
+                             "iou_top_05": m["iou_top_05"],
+                            "iou_top_10": m["iou_top_10"]                               "iou_top_20": m["iou_top_20"]
                         })
         
     # saves the results in JSON format.
@@ -650,6 +674,8 @@ def run_compare_group_xai_1(cfg,
     # for each image, target, and XAI technique.
     results = { "group": group, 
                 "label": label,
+                "mask_dilation": cfg.MASK_DILATION,
+                "mask_treshold": cfg.MASK_TRESHOLD,
                 "model": {k: ctx["info"].get(k) for k in ("action", "reason", "device")},
                 "n_images": len(rows),
                 "n_cnn_wrong": sum(r["pred_cnn"] != r["true"] for r in rows),
