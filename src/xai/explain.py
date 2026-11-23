@@ -76,7 +76,7 @@ except Exception as exc:                     # reported by check 1, not a crash
     _TORCH_ERROR = exc
 
 from xai.metrics_xai import deletion_curve_for_faithfulness 
-from xai.metrics_xai import mean_spearman_agreement , deletion_metrics_from_maps
+from xai.metrics_xai import spearman_agreement_mean , deletion_metrics_from_maps
 
 
 
@@ -598,7 +598,7 @@ def explain_target( model,
                           "del_gain": rand_auc - auc,      # > 0: better than random
                           "del_curve": curve }
     
-    meta = { "agreement_spearman": mean_spearman_agreement(maps),
+    meta = { "agreement_spearman": spearman_agreement_mean(maps),
              "del_auc_random": rand_auc,
              "del_curve_random": rand_curve
     }
@@ -673,7 +673,7 @@ def explain_target_1( techniques,
                           # FocusRatio = MaskShare / MaskFraction
                           "focus_ratio": mask_share / max(frac_mask, 1e-12) }
     
-    meta = { "agreement_spearman": mean_spearman_agreement(maps)}
+    meta = { "agreement_spearman": spearman_agreement_mean(maps)}
     
     return maps, metrics, meta
 

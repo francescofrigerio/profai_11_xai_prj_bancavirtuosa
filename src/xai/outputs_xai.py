@@ -105,13 +105,7 @@ def format_json_xai_rows(rows):
                     ),
                     "metrics_cnn_del": to_json_value(row.get("metrics_cnn_del", {})),
                     "meta_cnn_del": to_json_value(row.get("meta_cnn_del", {})),
-                    "agreement_spearman_matrix": to_json_value(row.get(row.get("meta_cnn", {})
-                                                            .get(target_name, {})
-                                                            .get("agreement_spearman_matrix")
-                                                            .get("matrix"), {})),
-                    "agreement_spearman": to_json_value(row.get(row.get("meta_cnn", {})
-                                                                   .get(target_name, {})
-                                                                   .get("agreement_spearman"), {})),
+                    # spearman is already in  in meta_cnn
                     # "agreement_matrix": row["meta_cnn"][target_name]["agreement_spearman_matrix"]["matrix"],
                     # "agreement_spearman": row["meta_cnn"][target_name]["agreement_spearman_matrix"]["agreement_spearman"],
         }

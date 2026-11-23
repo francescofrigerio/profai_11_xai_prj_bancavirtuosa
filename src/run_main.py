@@ -190,7 +190,8 @@ def compare_2_xai( cfg,
                                                  ctx_param_dict,
                                                  group,
                                                  list_images ) 
-        
+
+        raise ValueError("mi fermo x debug dopo fase1")
         results_2, records_2 = run_compare_group_xai_2( cfg, 
                                                         logger, 
                                                         results_1,

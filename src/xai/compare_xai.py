@@ -496,7 +496,6 @@ def run_compare_group_xai_1(cfg,
                                                             }
                 target_meta["agreement_spearman"] = agreement["mean_off_diagonal"]
                 
-
             # for each target in lr_targets, 
             # it generate an LR map using lr.local_map(...).
             for target_name, target_class in targets_lr.items():
@@ -627,7 +626,7 @@ def run_compare_group_xai_1(cfg,
                                 "mask_frac": m["mask_frac"],
                                 "focus_ratio": m["focus_ratio"], 
                                 # meta_cnn not present if only lr is wrong
-                                "agreement": r["meta_cnn"].get(target_name, {}).get("agreement_spearman")
+                                # "agreement": r["meta_cnn"].get(target_name, {}).get("agreement_spearman")
                                 })
         
         for target_name, target_class in r["targets_lr"].items():
@@ -809,11 +808,11 @@ def run_compare_group_xai_2(cfg,
                         "mask_share": metric["mask_share"],
                         "mask_frac": metric["mask_frac"],
                         "focus_ratio": metric["focus_ratio"],
-                        # "agreement_spearman_mean": (
-                        #    result_row.get("meta_cnn", {})
-                        #    .get(target_name, {})
-                        #    .get("agreement_spearman")
-                        #),
+                        "agreement_spearman_mean": (
+                            result_row.get("meta_cnn", {})
+                            .get(target_name, {})
+                            .get("agreement_spearman")
+                        ),
                         "agreement_spearman_matrix": (result_row.get("meta_cnn", {})
                                                     .get(target_name, {})
                                                     .get("agreement_spearman_matrix")
@@ -1083,7 +1082,8 @@ def run_compare_group_xai_2_profai( cfg,
             row["pred_lr"] != row["true"] for row in rows
         ),
         "stability_cnn": source_results["stability_cnn"],
-        "summary_cnn": summary_cnn_dest,
+        "summary_cnn_1": source_results["summary_cnn"],
+        "summary_cnn_2": summary_cnn_dest,
         "summary_lr": source_results["summary_lr"],
         "images": format_json_xai_rows(rows),
         "total_seconds": time.time() - t0,

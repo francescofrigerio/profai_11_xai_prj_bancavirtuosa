@@ -142,7 +142,7 @@ def spearman_agreement_matrix(maps, cfg=CONFIG):
              "mean_off_diagonal": mean_off_diagonal,
             }
 
-def mean_spearman_agreement(maps,cfg=CONFIG):
+def spearman_agreement_mean(maps,cfg=CONFIG):
     """
         mean pairwise rank correlation between techniques (on |map| at 28x28)
 
