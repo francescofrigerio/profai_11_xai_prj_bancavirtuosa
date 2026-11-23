@@ -174,6 +174,115 @@ def load_images_by_class( logger ,
 
     return images_by_class
 
+def save_quadrant_balance_to_json(cfg, 
+                                  logger, 
+                                  y_true, 
+                                  y_pred_lr, 
+                                  y_pred_cnn, 
+                                  idx, 
+                                  classes, 
+                                  out_path ):
+    """
+        Save candidates for all quadrants with casual order (reproducibile)
+        It maintain a large pool so it can select 
+        n_images_for_class (5, 6, 7...) during load phase without reload json.
+    """
+    max_pool_per_class = max(cfg.XAI_IMAGES_FOR_CLASS, 20)
+    y_true, y_pred_lr, y_pred_cnn, idx = map(np.asarray, (y_true, y_pred_lr, y_pred_cnn, idx))
+
+    lr_ok, cnn_ok = (y_pred_lr == y_true), (y_pred_cnn == y_true)
+
+    groups = {
+        "both_ok": lr_ok & cnn_ok,
+        "lr_ko_cnn_ok": ~lr_ok & cnn_ok,
+        "lr_ok_cnn_ko": lr_ok & ~cnn_ok,
+        "both_ko": ~lr_ok & ~cnn_ok,
+    }
+
+    rng = np.random.default_rng(cfg.SEED)
+    counts_info = {}
+
+    for name, mask in groups.items():
+        items = []
+        for c in classes:
+            cand = np.where(mask & (y_true == c))[0]
+            if len(cand):
+                # casual order riproducibile instead of take alwai the first one
+                shuffled = rng.permutation(cand)[:max_pool_per_class]
+                items.extend([
+                    {
+                        "class": int(c),
+                        "id_dataset": int(idx[p]),
+                        "y_true": int(y_true[p]),
+                        "y_pred": int(y_pred_cnn[p]),
+                        "y_pred_lr": int(y_pred_lr[p]),
+                    }
+                    for p in shuffled
+                ])
+
+        save_dict_to_json(out_path / f"images_{name}.json", items)
+        logger.debug("%s: %d candidati totali, %d salvati nel pool", name, int(mask.sum()), len(items))
+
+        counts_info[name] = { "selected": len(items),       
+                                "candidates": int(mask.sum()),
+                                "save_pool": len(items),
+                                "items": items,               # <-- lista vera e propria
+                            }
+
+    return counts_info
+
+
+def load_images_balance_by_class(logger, 
+                                 path: Path, 
+                                 n_images_for_class: int = 1, 
+                                 balance_total: bool = True) -> dict:
+    """
+        Load N images per class. If balance_total=True and some classes in a quadrant
+        have fewer than N examples available (typical in error quadrants), the missing
+        slots are redistributed among the other available classes to keep the total
+        number of images balanced across the different quadrants.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        list_load_dict = json.load(f)
+
+    # Group by all candidates available for class
+    pool_by_class = {}
+    for item in list_load_dict:
+        c = item["class"]
+        pool_by_class.setdefault(c, []).append({
+            "id_dataset": item["id_dataset"],
+            "y_true": item["y_true"],
+            "y_pred": item["y_pred"],
+        })
+
+    all_classes = sorted(pool_by_class.keys())
+    target_total = n_images_for_class * len(all_classes)
+
+    # Step 1: take until a n_images_for_class for every class
+    images_by_class = {c: pool_by_class[c][:n_images_for_class] for c in all_classes}
+    used_counts = {c: len(images_by_class[c]) for c in all_classes}
+
+    # Passo 2: if loss image compare to target_total, get around to the class that has already errors
+    if balance_total:
+        current_total = sum(used_counts.values())
+        while current_total < target_total:
+            added_in_round = False
+            for c in all_classes:
+                if current_total >= target_total:
+                    break
+                if used_counts[c] < len(pool_by_class[c]):
+                    images_by_class[c].append(pool_by_class[c][used_counts[c]])
+                    used_counts[c] += 1
+                    current_total += 1
+                    added_in_round = True
+            if not added_in_round:
+                # There is not more candidates in this quadrants
+                break
+
+    tot_loaded = sum(len(v) for v in images_by_class.values())
+    logger.info("Caricate %d/%d immagini da %s", tot_loaded, target_total, path.name)
+    return images_by_class
+
 def normalize_saliency_map(saliency_map: np.ndarray) -> np.ndarray:
     """
         Normalize a 2d array in the range [0, 1].

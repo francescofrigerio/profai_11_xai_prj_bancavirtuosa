@@ -12,10 +12,8 @@ del_auc	    Quanto rimane alta la probabilità quando vengono rimossi i pixel im
 del_gain	Quanto è migliore la tecnica rispetto a una selezione casuale?
 
 agreement_spearman/top_k_iou	        In che misura le diverse tecniche concordano tra loro?
-agreement_spearman (accordo globale):   In che misura le diverse tecniche ordinano allo stesso modo l'importanza 
-                                        di tutti i pixel dell'immagine?
-top_k_iou (accordo sui punti chiave):   In che misura le diverse tecniche individuano gli stessi 
-                                        pixel più importanti (la top-K)? 
+agreement_spearman (accordo globale):   In che misura le diverse tecniche ordinano allo stesso modo l'importanza di tutti i pixel dell'immagine?
+top_k_iou (accordo sui punti chiave):   In che misura le diverse tecniche individuano gli stessi pixel più importanti (la top-K)? 
 
 Stiamo misurando tre diverse proprietà delle spiegazioni:
 - localizzazione spaziale (mask_share, focus_ratio);

@@ -23,11 +23,11 @@ from utility import  load_images_by_class , read_text_for_html
 
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants 
-from outputs import plot_predict_info , plot_quadrants_info 
+from outputs import plot_predict_info , plot_quadrants_balance_info
 from outputs import section_display_title , section_display_content
 from training import get_device, get_trained_model , evaluate_model
 
-from utility import create_and_save_images_lists , require , save_quadrant_to_json
+from utility import create_and_save_images_lists , require , save_quadrant_balance_to_json
 from xai.explore_xai import run_exp , make_gradcam_callback
 from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai_1 , pre_compare_group_xai_2
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
@@ -87,7 +87,7 @@ def compare_2_xai( cfg,
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
 
-    logger.info( f"LogisticRegression fitted | "
+    logger.debug( f"LogisticRegression fitted | "
                     f"n_iter={lr.diagnostics['n_iter']} | "
                     f"val_acc={lr.diagnostics['val_accuracy']:.6f}"
                 )
@@ -105,7 +105,7 @@ def compare_2_xai( cfg,
     
     list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
 
-    logger.info( f"after load_images_by_class len list images ={len(list_img)}")
+    logger.debug( f"after load_images_by_class len list images ={len(list_img)}")
     
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
@@ -132,18 +132,24 @@ def compare_2_xai( cfg,
     # require((idx_val_lr == history['idx_val']).all(),f"Attenzione!! 1 indici non allineati tra cnn ed lr")
     require((idx_val_lr == idx_val_cnn).all(),f"Attenzione!! 2 indici non allineati tra cnn ed lr")
     # assert (y_val_lr == y_true_cnn_val).all()
-    quadrants_info = save_quadrant_to_json( cfg,
-                                            logger, 
-                                            # history['y_true_val'], 
-                                            y_val_lr,
-                                            y_pred_val_lr, 
-                                            y_pred_cnn_val,
-                                            # history['y_pred_val'], 
-                                            idx_val_lr,
-                                            cfg.CHECK_CLASSES, 
-                                            out_path )
+    quadrants_info = save_quadrant_balance_to_json( cfg,
+                                                    logger, 
+                                                    y_val_lr,
+                                                    y_pred_val_lr, 
+                                                    y_pred_cnn_val,
+                                                    # history['y_pred_val'], 
+                                                    idx_val_lr,
+                                                    cfg.CHECK_CLASSES, 
+                                                    out_path )
     
-    plot_quadrants_info(out_path / "quadrants_distribution.png" , quadrants_info , logger)
+    # plot_quadrants_info(out_path / "quadrants_distribution.png" , quadrants_info , logger)
+    # quadrants_info["lr_ko_cnn_ok"]["selected"] = sum(len(v) for v in list_img_ok.values())
+    # quadrants_info["lr_ok_cnn_ko"]["selected"] = sum(len(v) for v in list_img_ko.values())
+    # (e lo stesso per gli eventuali altri quadranti caricati)
+    plot_quadrants_balance_info(out_path / "quadrants_distribution.png", 
+                                quadrants_info, 
+                                logger)
+
     
     list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
     
@@ -170,8 +176,8 @@ def compare_2_xai( cfg,
     # all_records_1, all_results_1 = [], {}
     all_records_2, all_results_2 = [], {}
 
-    flag_inspect_1 = False
-    flag_inspect_2 = True
+    flag_inspect_1 = True
+    flag_inspect_2 = False
     # add assert not possible both True
     assert not (flag_inspect_1 and flag_inspect_2), "possibile una sola funzione di inspect "
 

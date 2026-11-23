@@ -291,3 +291,50 @@ def plot_quadrants_info(path , counts_info , logger):
     finally:
         fig.clear()
 
+def plot_quadrants_balance_info(path, counts_info, logger):
+    """
+        Two-panel chart:
+        - Left: Available vs. Selected (logarithmic scale to allow for reading both)
+        - Right: Focus exclusively on the selected images to verify the balance across quadrants
+
+    """
+    names = list(counts_info)
+    candidates = [counts_info[n]["candidati"] for n in names]
+    selected = [counts_info[n]["selezionati"] for n in names]
+
+    x = np.arange(len(names))
+    width = 0.35
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
+
+    # Panel 1: general comparison with logaritmic scale
+    b1 = ax1.bar(x - width / 2, candidates, width, label="Immagini disponibili")
+    b2 = ax1.bar(x + width / 2, selected, width, label="Immagini selezionate")
+    ax1.set_yscale("log")
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(names, rotation=15)
+    ax1.set_ylabel("Numero immagini (scala log)")
+    ax1.set_title("Disponibili vs Selezionate")
+    ax1.legend()
+    ax1.bar_label(b1, padding=2, fontsize=8)
+    ax1.bar_label(b2, padding=2, fontsize=8)
+
+    # Panel 2: Zoom on only selected images (effective balance)
+    b3 = ax2.bar(x, selected, width=0.45, color="#ff7f0e", label="Immagini selezionate")
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(names, rotation=15)
+    ax2.set_ylabel("Numero immagini selezionate")
+    ax2.set_title("Bilanciamento immagini selezionate per quadrante")
+    ax2.set_ylim(0, max(selected) * 1.2 if selected else 10)
+    ax2.bar_label(b3, padding=2, fontsize=9, fontweight="bold")
+
+    try:
+        fig.tight_layout()
+        fig.savefig(path, dpi=150)
+        try:
+            display(Image(str(path)))
+        except Exception:
+            logger.exception("Impossibile mostrare %s", path)
+    finally:
+        fig.clear()
+
