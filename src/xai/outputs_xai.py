@@ -6,8 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from IPython.display import Image, display
-from utility import img28
-from constants import TITLES
+from utility import img28 , digit_mask
+from constants import TITLES , MASK_THRESHOLD_LIST
 import torch
 
 def to_json_value(obj):
@@ -244,3 +244,40 @@ def plot_deletion_curves(metrics, meta, fractions, path,logger):
             logger.exception("Impossibile mostrare %s", path)
     finally:
             fig.clear()
+
+
+def inspect_digit_masks(positions, X_data, cfg):
+    """
+        plot image to inspect_digit_masks and choice treshold param
+    """
+    fig, axes = plt.subplots(
+        len(positions),
+        len(MASK_THRESHOLD_LIST) + 1,
+        figsize=(3 * (len(MASK_THRESHOLD_LIST) + 1), 3 * len(positions)),
+        squeeze=False,
+    )
+
+    for row_idx, position in enumerate(positions):
+        image = img28(position, X_data, size=cfg.IMAGE_SIZE)
+
+        if row_idx == 0:
+            axes[row_idx, 0].set_title("Immagine")
+        axes[row_idx, 0].imshow(image, cmap="gray")
+        axes[row_idx, 0].axis("off")
+
+        for col_idx, threshold in enumerate(MASK_THRESHOLD_LIST, start=1):
+            mask = digit_mask(image, threshold, dilation=0)
+
+            if row_idx == 0:
+                axes[row_idx, col_idx].set_title(f"Soglia {threshold:.2f}")
+            axes[row_idx, col_idx].imshow(mask, cmap="gray", vmin=0, vmax=1)
+            axes[row_idx, col_idx].axis("off")
+
+        print(f"pos={position}, min={np.min(image):.3f}, "
+              f"max={np.max(image):.3f}, "
+              f"percentili={np.percentile(image, [0, 25, 50, 75, 90, 95, 99, 100])}"
+        )
+
+    plt.tight_layout()
+    plt.show()
+

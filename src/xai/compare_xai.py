@@ -13,7 +13,7 @@ import numpy as np
 from matplotlib.figure import Figure
 from IPython.display import Image, display
 from xai.outputs_xai import plot_maps_grid , plot_deletion_curves ,plot_maps_grid_dinamic
-from xai.outputs_xai import format_json_xai_rows
+from xai.outputs_xai import format_json_xai_rows , inspect_digit_masks
 
 from config import CONFIG
 # from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
@@ -338,6 +338,34 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
     return results, records
 
 
+def pre_compare_group_xai_1(cfg, 
+                            logger, 
+                            model, 
+                            device, 
+                            techniques, 
+                            lr, 
+                            ctx, 
+                            group, 
+                            list_images ):
+    """
+        analysis before run_compare_xai
+    """
+    out_path = ctx["out_path"]
+    dataset = ctx["dataloader_cnn"].dataset
+    idx_to_pos = dataset.idx_dataset_position()
+    X_data, y_data, _ = ctx["X_data"], ctx["y_data"], ctx["y_pred_lr"]
+    names_tech = list(techniques)
+     
+    rng = np.random.default_rng(42)
+    positions = []
+    
+    for digit in range(10):
+        candidates = np.flatnonzero(np.asarray(y_data) == digit)
+        chosen = rng.choice(candidates, size=min(3, len(candidates)), replace=False)
+        positions.extend(chosen.tolist())
+    
+    inspect_digit_masks(positions, X_data, cfg)
+    
 def run_compare_group_xai_1(cfg, 
                             logger, 
                             model, 
@@ -366,8 +394,6 @@ def run_compare_group_xai_1(cfg,
         for the predicted class—including the true class 
         if the CNN’s prediction is incorrect—and then calculates quantitative metrics, 
         saving them in both JSON and CSV formats.
-
-
     """
     
     t0 = time.time()
@@ -378,6 +404,7 @@ def run_compare_group_xai_1(cfg,
 
     names_tech = list(techniques)
     ig_max = cfg.IG_MAX_COMPLETENESS_ERROR
+    
     model.eval()
 
     rows, first_input = [], None
