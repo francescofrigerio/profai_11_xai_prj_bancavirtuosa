@@ -181,7 +181,7 @@ def compare_2_xai( cfg,
 
         if (flag_inspect):
             pre_compare_group_xai_1( cfg, ctx_param_dict )
-            pre_compare_group_xai_2( cfg, ctx_param_dict )
+            # pre_compare_group_xai_2( cfg, ctx_param_dict )
                                     
         else:
             results_1, records_1 = run_compare_group_xai_1( cfg, 
