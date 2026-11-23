@@ -267,7 +267,8 @@ def inspect_digit_masks(positions, X_data, cfg):
 
         for col_idx, threshold in enumerate(MASK_THRESHOLD_LIST, start=1):
             mask = digit_mask(image, threshold, dilation=0)
-
+            #  print for each treshold the pixel fraction selected by the mask
+            print("threshold and mask.mean ",threshold, mask.mean())
             if row_idx == 0:
                 axes[row_idx, col_idx].set_title(f"Soglia {threshold:.2f}")
             axes[row_idx, col_idx].imshow(mask, cmap="gray", vmin=0, vmax=1)

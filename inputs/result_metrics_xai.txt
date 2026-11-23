@@ -1,0 +1,25 @@
+1) RESULTS INITIAL TEST ON MASK_THRESHOLD AND MASK_DILATION params
+1.1) RANDOM IMAGE
+
+1.2) THIN AND THICKNESS IMAGE
+I would use MASK_THRESHOLD = 0.1 and MASK_DILATION = 0 as a provisional baseline 
+configuration.
+
+In the grids of "thin" and "thick" images, the masks generated using thresholds 
+between 0.05 and 0.20 appear very similar: the main strokes are preserved, 
+and there is no noticeable loss of thinner digits at a threshold of 0.1. Furthermore, the percentiles indicate that many pixels are zero, while those belonging to the strokes often have intensities well above 0.1. This suggests that, in these examples, the threshold primarily affects only a few edge pixels.
+
+This choice is therefore reasonable as a starting point, 
+though I would consider it provisional until you have compared the mask.mean() values 
+​​across a larger dataset. There is no need to add a print statement before proceeding; 
+instead, you can capture this data during a sensitivity analysis—for instance, 
+by comparing thresholds of 0.05, 0.10, and 0.20. 
+Subsequently, in a separate test, you can compare `dilation=0` versus `dilation=1` 
+while keeping the threshold constant.
+
+Since the "thin" and "thick" images were selected 
+using the mask generated with the current threshold, 
+they are useful for visual inspection but do not constitute an independent 
+verification of the threshold itself. For now, 
+you can proceed with 0.1 and 0, ensuring these parameters are documented 
+in your results.
