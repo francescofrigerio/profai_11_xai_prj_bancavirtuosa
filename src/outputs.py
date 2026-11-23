@@ -263,16 +263,16 @@ def plot_quadrants_info(path , counts_info , logger):
         quadrants plot graph
     """
     names = list(counts_info)
-    candidati = [counts_info[n]["candidati"] for n in names]
-    selezionati = [counts_info[n]["selezionati"] for n in names]
+    candidates = [counts_info[n]["candidates"] for n in names]
+    selected = [counts_info[n]["selected"] for n in names]
 
     x = np.arange(len(names))
     width = 0.35
 
     fig, ax = plt.subplots(figsize=(9, 5))
 
-    ax.bar(x - width/2, candidati, width, label="Immagini disponibili")
-    ax.bar(x + width/2, selezionati, width, label="Immagini selezionate")
+    ax.bar(x - width/2, candidates, width, label="Immagini disponibili")
+    ax.bar(x + width/2, selected, width, label="Immagini selezionate")
 
     ax.set_xticks(x)
     ax.set_xticklabels(names, rotation=15)
