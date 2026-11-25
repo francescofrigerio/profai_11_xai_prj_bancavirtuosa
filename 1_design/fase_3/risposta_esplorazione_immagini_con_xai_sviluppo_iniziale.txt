@@ -1,0 +1,118 @@
+Risposta breve
+
+Per un’esplorazione vanno bene le funzioni gradcam_debug e run_exp del sorgente run_xai.py
+che posso rinominare come debug.py
+
+Come confronto tra predizioni corrette ed errate no, per tre motivi.
+
+Il gruppo non è definito da ciò che dici. 
+La lista LR_KO contiene le immagini dove sbaglia la LR. 
+Che la DenseNet le abbia predette giuste (nei tuoi JSON true == pred su tutte e 4) è una coincidenza, 
+perché nulla lo impone. 
+In un’altra esecuzione potresti trovare immagini sbagliate da entrambe.
+Il campione è sbilanciato. Le immagini difficili per la LR (tratti ambigui, scritture inclinate) 
+sono un sottoinsieme particolare. Se la DenseNet le prevede bene, non puoi dire come si comporta su una “corretta tipica”.
+Le due griglie mostrano immagini diverse. Non puoi confrontare la stessa cifra giusta contro sbagliata, 
+e nemmeno lo stesso esempio spiegato da due modelli.
+
+Soluzione: i 4 quadranti
+
+Hai già quadrants(...) nel codice. 
+Genera quattro liste sulla validation, incrociando le predizioni dei due modelli:
+
+Gruppo	        LR	CNN	Cosa ti insegna
+both_ok	        ok	ok	riferimento “normale”
+lr_ko_cnn_ok	ko	ok	dove la CNN recupera
+lr_ok_cnn_ko	ok	ko	dove la CNN perde
+both_ko	        ko	ko	casi davvero ambigui
+
+Valutare un grafico che riepiloga la situazione dei quadranti.
+
+Non serve un nuovo file in fase 1 per forza: puoi calcolarli in fase 2, 
+perché la LR la riaddestri comunque e per la CNN basta una evaluate_model sul val loader (circa 6 s). 
+Se vuoi riproducibilità, salvali in fase 1.
+
+python
+def create_quadrant_lists(logger, y_true, 
+                          y_pred_lr, 
+                          y_pred_cnn, 
+                          idx,
+                          classes, 
+                          out_path, 
+                          n_per_class=1, 
+                          seed=0):
+    """
+         4 json: both_ok, lr_ko_cnn_ok, lr_ok_cnn_ko, both_ko (same split)
+    """
+    y_true, y_pred_lr, y_pred_cnn, idx = map(np.asarray, (y_true, y_pred_lr, y_pred_cnn, idx))
+    lr_ok, cnn_ok = y_pred_lr == y_true, y_pred_cnn == y_true
+    groups = {"both_ok": lr_ok & cnn_ok,
+              "lr_ko_cnn_ok": ~lr_ok & cnn_ok,
+              "lr_ok_cnn_ko": lr_ok & ~cnn_ok,
+              "both_ko": ~lr_ok & ~cnn_ok}
+    # random but reproducible, not the "first" ones
+    rng = np.random.default_rng(seed)       
+    for name, mask in groups.items():
+        items = []
+        for c in classes:
+            cand = np.where(mask & (y_true == c))[0]
+            pick = np.sort(rng.choice(cand, size=min(len(cand), n_per_class), replace=False)) 
+            if len(cand) else []
+            items += [{"class": int(c), "id_dataset": int(idx[p]), "y_true": int(y_true[p]),
+                       "y_pred": int(y_pred_cnn[p]),          # compat. con load_images_by_class
+                       "y_pred_lr": int(y_pred_lr[p])} for p in pick]
+        
+        save_dict_to_json(out_path / f"images_{name}.json", items)
+        logger.info("%s: %d candidati, %d salvati", name, int(mask.sum()), len(items))
+
+Prima di chiamarla verifica l’allineamento: assert (idx_val_lr == idx_val_cnn).all(). 
+Funziona perché i due val loader hanno shuffle=False e usano lo stesso val_idx.
+
+Un problema collegato: in fase 2 rifai fit_baseline. 
+Se non è deterministico (seed, solver), la LR di fase 2 può differire da quella di fase 1 
+che ha prodotto LR_KO, e quelle immagini potrebbero non essere più errori di questa LR. 
+Aggiungi un controllo assert (lr.predict(X_val_lr[pos]) != y_val_lr[pos]).all() 
+sulle immagini scelte, oppure calcola i quadranti in fase 2.
+
+Come leggere meglio le griglie
+Spiega anche la classe vera sugli errori. 
+Ora spieghi sempre pred. Sui both_ko e lr_ok_cnn_ko chiama explain(img, pred) e explain(img, true) 
+e mostra le due mappe affiancate. 
+Così vedi cosa sostiene il “5” e cosa mancava per il “3”, e il confronto corretto/errato diventa diretto.
+Mostra entrambe le predizioni nell’etichetta. Nella griglia “errore LR” pred è quello della DenseNet, quindi “true 2 / pred 2” sembra un’immagine corretta in una griglia di errori. Usa true 2 | CNN 2 | LR 7.
+Passa da aneddoti a numeri. Un’immagine per classe è un’illustrazione, non una prova. Con 20-30 immagini per gruppo puoi confrontare statistiche invece di guardare mappe:
+la quota di attribuzione dentro la maschera della cifra 
+(hai già shares, ma non la salvi nel JSON né la usi se la Saliency è disattivata: 
+calcolala su IG o Occlusion);
+
+l’accordo tra tecniche (correlazione di Spearman o IoU dei top-k pixel);
+un test di deletion: rimuovi i pixel più importanti e misura il calo della probabilità. 
+
+Dice se la mappa è fedele al modello, cosa che l’aspetto non dice.
+
+Risoluzione Grad-CAM. Con input 128×128 la mappa nativa è 4×4 (lo vedi in native_shapes), quindi l’interpolazione bilineare dà blob larghi.
+ Per cifre MNIST non localizza molto: usa un layer più precoce (8×8) 
+ oppure leggilo solo come indicazione grossolana.
+ 
+LIME. La griglia 8×8 è molto rumorosa. Hai il controllo di stabilità sulla prima immagine, ma salva anche diff nel JSON, 
+così si vede se un’esecuzione cambia le conclusioni.
+IG completeness error. Salvi il valore ma non lo usi. Imposta una soglia (ad esempio 5%) e segna nel JSON 
+le immagini che la superano, che vanno lette con cautela.
+
+Problemi nel codice
+Grad-CAM: epoca incoerente. Il file si chiama epoch6 ma il titolo dice epoch 7: il titolo usa epoch+1, ma il valore passato è già in base 1 
+(vedi la correzione precedente). 
+Usa lo stesso valore in titolo e nome file.
+
+Titoli hardcoded. “VALIDATION” e “ERRORE LR/DENSENET” nel titolo, anche se lo split e il gruppo vengono dai parametri. 
+Passa il nome del gruppo in xai_param_dict (ad esempio "group": "lr_ko_cnn_ok") e usalo per titolo e file, invece del booleano flag_error_pred_cnn.
+Nomi fuorvianti in phase_2_xai. list_img_ok = load_images_by_class(... FILE_IMG_LR_KO) contiene errori della LR. Con i quadranti il problema sparisce.
+
+Codice duplicato. Le due chiamate a run_exp con dizionari quasi uguali si possono ridurre a un ciclo sui gruppi.
+
+Grad-CAM debug. Salva nel titolo anche quale lista usi (LIST_IMAGES_SEL_PHASE_*), altrimenti non distingui le immagini 
+corrette da quelle errate.
+
+Se vuoi, ti scrivo il ciclo su tutti i gruppi con la spiegazione per classe predetta e vera 
+e il salvataggio delle metriche quantitative nel JSON.
+
