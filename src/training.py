@@ -11,7 +11,7 @@ from model import build_densenet, validate_layers
 from model import enter_train_mode ,  freeze_backbone, make_optimizer , define_loss_function
 
 from metrics import accuracy
-from utility import sync
+from utility import sync , set_seed
 
 def timed(fn, device):
     """
@@ -23,12 +23,7 @@ def timed(fn, device):
     sync(device)
     return out, time.perf_counter() - t0
 
-def set_seed(seed: int) -> None:
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+
 
 def get_device(cfg) -> tuple:
     """(device, warning or None). A visible warning on CPU: the full run would be very slow."""

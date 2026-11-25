@@ -19,6 +19,13 @@ from constants import IMAGENET_MEAN_NP , IMAGENET_STD_NP
 from config import CONFIG
 
 
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        
 def read_text_for_html(path):
     """
     It reads file .txt and return a text html,

@@ -19,4 +19,7 @@ GROUPS_RESULT_OK_KO = { "both_ok":      "LR ok / CNN ok",
                         "both_ko":      "LR errata / CNN errata"
                         }
 
+GROUPS_RESULT_BOTH_OK = { "both_ok":      "LR ok / CNN ok"
+                        }
+
 MASK_THRESHOLD_LIST = [0.05, 0.10, 0.15, 0.20]

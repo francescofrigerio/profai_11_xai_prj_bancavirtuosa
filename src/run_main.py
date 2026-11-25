@@ -22,7 +22,7 @@ if not hasattr(np, "trapz"):
 
 from baseline import fit_baseline
 from config import CONFIG 
-from constants import GROUPS_RESULT_OK_KO
+from constants import GROUPS_RESULT_OK_KO , GROUPS_RESULT_BOTH_OK
 
 from data import data_to_input_lr, load_datasets
 from utility import  load_images_by_class , read_text_for_html
@@ -37,6 +37,7 @@ from utility import create_and_save_images_lists , require , save_quadrant_balan
 from xai.explore_xai import run_exp , make_gradcam_callback
 from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai_1 , pre_compare_group_xai_2
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
+from xai.outputs_xai import plot_metrics_all
 
 from xai import build_techniques
 from xai.shap_explainer import make_background
@@ -116,7 +117,9 @@ def compare_2_xai( cfg,
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
 
-    callback = make_gradcam_callback(cfg,val_loader_cnn, device, out_path , list_img , logger)
+    callback = None
+    if ( cfg.PLOT_DEBUG_ON ):
+        callback = make_gradcam_callback(cfg,val_loader_cnn, device, out_path , list_img , logger)
                                       
     # Cnn DenseNet
     model , info_cnn , history = get_trained_model(cfg,
@@ -148,15 +151,11 @@ def compare_2_xai( cfg,
                                                     cfg.CHECK_CLASSES, 
                                                     out_path )
     
-    # plot_quadrants_info(out_path / "quadrants_distribution.png" , quadrants_info , logger)
-    # quadrants_info["lr_ko_cnn_ok"]["selected"] = sum(len(v) for v in list_img_ok.values())
-    # quadrants_info["lr_ok_cnn_ko"]["selected"] = sum(len(v) for v in list_img_ko.values())
-    # (e lo stesso per gli eventuali altri quadranti caricati)
-    plot_quadrants_balance_info(out_path / "quadrants_distribution.png", 
-                                quadrants_info, 
-                                logger)
+    if ( cfg.PLOT_DEBUG_ON ):
+        plot_quadrants_balance_info(out_path / "quadrants_distribution.png", 
+                                    quadrants_info, 
+                                    logger)
 
-    
     list_img_ok = load_images_by_class(logger,out_path / cfg.FILE_IMG_LR_KO,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
     
     list_img_ko = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO ,n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS )
@@ -165,19 +164,22 @@ def compare_2_xai( cfg,
             raise ValueError("list_img non possono essere vuote")
     
     
-    ctx_param_dict = {"t_start": t_start, 
-                      "X_data": X_val_lr, 
-                      "y_data": y_val_lr,
-                      "y_pred_lr": y_pred_val_lr, 
-                      "info": info_cnn, 
-                      "out_path": out_path,
-                      "dataloader_cnn": val_loader_cnn
-                      }
+    
 
     # built ONCE and shared by all groups
     background = make_background(transform_val_cnn, cfg, logger, device)
     techniques = build_techniques(model, cfg, background)
 
+    ctx_param_dict = {"t_start": t_start, 
+                        "X_data": X_val_lr, 
+                        "y_data": y_val_lr,
+                        "y_pred_lr": y_pred_val_lr, 
+                        "info": info_cnn, 
+                        "out_path": out_path,
+                        "dataloader_cnn": val_loader_cnn,
+                        "org_idx_cmp_shap_ig": 3161,
+                        "background" : background
+                        }
     
     # all_records_1, all_results_1 = [], {}
     all_records_2, all_results_2 = [], {}
@@ -187,7 +189,8 @@ def compare_2_xai( cfg,
     # add assert not possible both True
     assert not (flag_inspect_1 and flag_inspect_2), "possibile una sola funzione di inspect "
 
-    for group in GROUPS_RESULT_OK_KO:
+    # for group in GROUPS_RESULT_OK_KO:
+    for group in GROUPS_RESULT_BOTH_OK:
         list_images = load_images_by_class(logger, 
                                            out_path / f"images_{group}.json",
                                            n_images_for_class=cfg.XAI_IMAGES_FOR_CLASS)
@@ -201,7 +204,7 @@ def compare_2_xai( cfg,
             pre_compare_group_xai_2( cfg, ctx_param_dict )                       
         else:
             logger.info("START run_compare_group_xai_1 3 return params")
-            results_1, records_1 , source_row_1 = run_compare_group_xai_1( cfg, 
+            results_1, source_row_1 = run_compare_group_xai_1( cfg, 
                                                             logger, 
                                                             model, 
                                                             device,
@@ -215,14 +218,12 @@ def compare_2_xai( cfg,
             results_2, records_2 = run_compare_group_xai_2( cfg, 
                                                         logger, 
                                                         results_1,
-                                                        records_1,
                                                         source_row_1,
                                                         model, 
                                                         device,
                                                         techniques,
                                                         ctx_param_dict,
-                                                        group,
-                                                        list_images )
+                                                        group )
 
             all_results_2[group] = results_2
             all_records_2 += records_2
@@ -357,6 +358,17 @@ def explore_2_xai( cfg,
 
     return result_ok , result_ko
 
+def phase_3_xai(cfg,
+                 logger,
+                 inp_path,
+                 out_path):
+
+    if (cfg.SECTION_DISPLAY_ON):
+            section_display_title( "Fase3:Report Finale XAI -", 
+                                    "Comparazione tra Grad-CAM, Integrated Gradients , Occlusion Map Lime Shap sulla griglia 28x28."
+                                    )
+    plot_metrics_all(filename="xai_metrics_all.csv")
+
 def phase_2_xai( cfg,
                  logger,
                  inp_path,
@@ -367,17 +379,16 @@ def phase_2_xai( cfg,
          1 - explore and debug images with Xai ( not valid for decision)
          2 - compare images with Xai (valid for decision)
     """
-    # ESPLORAZIONE
-    section_display_title( "Fase2:Esplorazione Tecniche XAI - Immagini da Training LR", 
+    # EXPLORE AND COMPARE
+    if (cfg.SECTION_DISPLAY_ON):
+        section_display_title( "Fase2:Esplorazione Tecniche XAI - Immagini da Training LR", 
                      "Confronto visivo tra Grad-CAM, Integrated Gradients , Occlusion Map Lime Shap sulla griglia 28x28."
                         )
-    # explore_2_xai(cfg,logger,out_path,flag_pretrained)
-
-    section_display_title( "Fase2:Comparazione Tecniche XAI - Immagini da Quadrante", 
+        section_display_title( "Fase2:Comparazione Tecniche XAI - Immagini da Quadrante", 
                      "Confronto metriche Xai"
                         )
-    content_txt = read_text_for_html(inp_path / cfg.FILE_TXT_CONTENTS_XAI)
-    section_display_content("Fase2:Metriche Xai", content_html=content_txt)
+        content_txt = read_text_for_html(inp_path / cfg.FILE_TXT_CONTENTS_XAI)
+        section_display_content("Fase2:Metriche Xai", content_html=content_txt)
    
     compare_2_xai(cfg,logger,out_path,flag_pretrained)
 
@@ -445,13 +456,13 @@ def phase_1_train(cfg,
     logger.debug(f"Val Accuracy (Logistic Regression): {val_accuracy_lr}")
     logger.debug(f"Test Accuracy (Logistic Regression): {test_accuracy_lr}")
 
-    # plot_logistic_graph(lr.get_model(), CONFIG, CONFIG.OUTPUT_DIR, c=CONFIG.LR_C)
-    plot_predict_info(y_test_lr, 
-                      y_pred_test_lr,
-                      "CLASSIFIER LR ON MNIST DATASET " , 
-                      "TEST",
-                      CONFIG,
-                      "lr")
+    if ( cfg.PLOT_DEBUG_ON ):
+        plot_predict_info(y_test_lr, 
+                            y_pred_test_lr,
+                            "CLASSIFIER LR ON MNIST DATASET " , 
+                            "TEST",
+                            CONFIG,
+                            "lr")
 
     create_and_save_images_lists( logger, 
                                 y_val_lr, 
@@ -474,7 +485,14 @@ def phase_1_train(cfg,
     if len(list_img) == 0 :
         raise ValueError("list_img non può essere vuota")
 
-    callback = make_gradcam_callback(cfg,val_loader_cnn, device, out_path , list_img , logger)
+    callback = None
+    if ( cfg.PLOT_DEBUG_ON ):
+        callback = make_gradcam_callback(cfg,
+                                         val_loader_cnn, 
+                                         device, 
+                                         out_path , 
+                                         list_img , 
+                                         logger)
                                     
     # Cnn DenseNet
     _ , info_cnn , history = get_trained_model(cfg,
@@ -505,12 +523,13 @@ def phase_1_train(cfg,
        
 
     # alwais with test data
-    plot_predict_info(info_cnn["y_true"], 
-                    info_cnn["y_pred"],
-                    "CLASSIFIER CNN ON MNIST DATASET " , 
-                    "TEST",
-                    CONFIG,
-                    "cnn")
+    if ( cfg.PLOT_DEBUG_ON ):
+        plot_predict_info(info_cnn["y_true"], 
+                        info_cnn["y_pred"],
+                        "CLASSIFIER CNN ON MNIST DATASET " , 
+                        "TEST",
+                        CONFIG,
+                        "cnn")
         
     y_pred_cnn = info_cnn["y_pred"]
     test_accuracy_cnn = info_cnn["test_accuracy"]
@@ -619,17 +638,17 @@ def main(cfg=CONFIG, logger=LOGGER):
 
     # Esecuzione condizionale o sequenziale basata sulla fase
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_1 ):
-        section_display_title( "Fase2:Training CNN - Eseguire solo con GPU", 
-                         "Debug GradCam , Metriche , Matrice di Confusione , Grafico a Barre F1_SCORE per Classi"
-                        )
+        if (cfg.SECTION_DISPLAY_ON):
+            section_display_title( "Fase2:Training CNN - Eseguire solo con GPU", 
+                                   "Debug GradCam , Metriche , Matrice di Confusione , Grafico a Barre F1_SCORE per Classi"
+                                )
         phase_1_train(cfg, logger, out, flag_pretrained)
         
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_2 ):
         phase_2_xai(cfg, logger, inp, out)
 
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_3 ):
-        logger.info("------------------------------------------------------------------")
-        # phase_2_xai(cfg, logger, out,flag_pretrained)
+        phase_3_xai(cfg, logger, out)
         
 
     logger.debug("Programma Terminato")

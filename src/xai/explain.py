@@ -63,7 +63,10 @@ from captum.attr import Occlusion
 import shap
 from lime import lime_image
 
-from utility import normalize_imagenet , normalize_imagenet_np
+from xai.integrated_gradients import IntegratedGradientsCaptum
+from xai.shap_explainer import ShapExplainer
+
+from utility import normalize_imagenet , normalize_imagenet_np , set_seed
 from utility import denormalize_imagenet , black_normalized , to_grid28
 
 try:
@@ -694,4 +697,40 @@ def explain_target_2( score_fn,
                                         baseline=baseline,
                                         rng=rng,
                                     )
+
+
+def explain_shap_vs_ig( model,background, input_img, target_class, score_fn ,cfg,logger):
+
+    shap_explainer = ShapExplainer(model, cfg, background)
+    ig_explainer = IntegratedGradientsCaptum(model, cfg)
+
+    # Inspect raw output of GradientExplainer before pick_shap_target
+    set_seed(shap_explainer.cfg.SEED)
+    raw_values = shap.GradientExplainer(shap_explainer.model, shap_explainer.background
+    ).shap_values(input_img, nsamples=shap_explainer.cfg.SHAP_NUM_SAMPLES)
+
+    print("target_class:", target_class)
+    print("type(raw_values):", type(raw_values))
+    if isinstance(raw_values, list):
+        print("len(raw_values):",len(raw_values),
+                                "| shapes:",[np.asarray(v).shape for v in raw_values],
+                    )
+    else:
+        print("np.asarray(raw_values).shape:", np.asarray(raw_values).shape)
+
+    # Compare 2D maps build by SHAP and IG
+    m_shap = shap_explainer.attribute(input_img, target_class)
+    m_ig = ig_explainer.attribute(input_img, target_class)
+
+    for name, m in [("shap", m_shap), ("ig", m_ig)]:
+        m = np.asarray(m)
+        pos_frac = float((m > 0).mean())
+        neg_frac = float((m < 0).mean())
+        print(f"[{name}] shape={m.shape} min={m.min():.6f} max={m.max():.6f} "
+              f"mean={m.mean():.6f} pos%={pos_frac*100:.1f}% neg%={neg_frac*100:.1f}%"
+            )
+
+    # 3. Check initial score and importance value used into deletion
+    print("score_fn(input_img) iniziale:", float(score_fn(input_img)))
+
 

@@ -419,6 +419,7 @@ def deletion_curve_for_faithfulness_2( score_fn,
                         align_corners=False,
                     )[0, 0]
 
+    # the highest importance values ​​represent the pixels to be removed first.
     order = imp.flatten().argsort(descending=True)
     baseline = baseline.to(device=input_img.device, dtype=input_img.dtype)
 
@@ -426,15 +427,6 @@ def deletion_curve_for_faithfulness_2( score_fn,
     for frac in fractions:
         if not 0 <= frac <= 1:
             raise ValueError(f"Frazione di deletion non valida: {frac}")
-
-        x = input_img.clone()
-        k = int(round(frac * order.numel()))
-
-        # if k > 0:
-        #    x_flat = x.reshape(1, x.shape[1], -1)
-        #    baseline_flat = baseline.reshape(1, baseline.shape[1], -1)
-        #    selected = order[:k]
-        #    x_flat[:, :, selected] = baseline_flat[:, :, selected]
 
         # x that has a shape [1, C, H, W], not x_flat.
         #probs.append(float(score_fn(x)))
@@ -445,6 +437,11 @@ def deletion_curve_for_faithfulness_2( score_fn,
 
         k = int(round(frac * order.numel()))
         if k > 0:
+            # the k most important pixels 
+            # are replaced with the baseline. 
+            # Interpolation performed prior to ranking brings the map 
+            # to the image's resolution; the ranking is therefore based on 
+            # the pixels actually provided to the model.
             selected = order[:k]
             x_flat[:, :, selected] = baseline_flat[:, :, selected]
 
@@ -496,7 +493,24 @@ def deletion_metrics_from_maps(score_fn,
             signed = True
 
         # order select evidece for target.
-        # Ig there isn't, use the maps magnitudine .
+        # If there isn't signed , use the maps magnitudine .
+        
+        # All techniques have signed=True, except for Grad-CAM, which has signed=False.
+        
+        # Given this convention, the ranking process works as follows:
+        # For techniques with signed=True: pixels with positive contributions—those 
+        # interpreted as evidence in favor of the target class—are removed first 
+        # (np.maximum(m, 0)). 
+        # If no such pixels exist, the absolute values ​​(abs(m)) are used instead.
+        
+        # For Grad-CAM with signed=False: the map values ​​are sorted directly 
+        # in descending order. Since Grad-CAM is non-negative—as per our implementation
+        # the highest activations are removed first.
+        # The code is therefore consistent with the objective of evaluating how much 
+        # the removal of evidence supporting the target class reduces the class probability. 
+        # For signed maps, the resulting curve does not measure the effect of removing 
+        # negative contributions; this is a deliberate choice in how the test is interpreted, 
+        # not an error.
         importance = np.maximum(m, 0) if signed else m
         if not np.any(importance > 0):
             importance = np.abs(m)

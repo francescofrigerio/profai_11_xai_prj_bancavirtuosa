@@ -4,6 +4,9 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
 from matplotlib.figure import Figure
 from IPython.display import Image, display
 from utility import img28 , digit_mask
@@ -288,4 +291,74 @@ def inspect_digit_masks(positions, X_data, cfg):
 
     plt.tight_layout()
     plt.show()
+
+
+def plot_metrics_all(filename="xai_metrics_all.csv"):
+    """
+        plot metrics for final report 
+    """
+    # load CSV
+    df = pd.read_csv(filename)
+
+    # filter valid row on deletion (exclude lr_local_map with NaN)
+    # for CNN model
+    valid = df.dropna(subset=["del_auc", "del_gain", "del_auc_random"]).copy()
+    cnn_df = valid[valid["model"] == "cnn"].copy()
+
+    # Create figure with 2 panel
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
+    group_order = ["both_ok", "lr_ko_cnn_ok", "lr_ok_cnn_ko", "both_ko"]
+    tech_order = ["gradcam", "integrated_gradients", "occlusion", "lime", "shap"]
+
+    # panel left : Deletion AUC
+    sns.barplot( data=cnn_df,
+                x="group",
+                y="del_auc",
+                hue="technique",
+                order=group_order,
+                hue_order=tech_order,
+                errorbar="sd",
+                ax=axes[0],
+            )
+            
+    axes[0].set_title("CNN Deletion AUC (del_auc) per Gruppo e Tecnica")
+    axes[0].set_xlabel("Gruppo")
+    axes[0].set_ylabel("del_auc (media ± dev. std)")
+    axes[0].tick_params(axis="x", rotation=15)
+    axes[0].legend(title="Tecnica", loc="upper right")
+
+    # panel right : Deletion Gain
+    sns.barplot( data=cnn_df,
+                x="group",
+                y="del_gain",
+                hue="technique",
+                order=group_order,
+                hue_order=tech_order,
+                errorbar="sd",
+                ax=axes[1],
+            )
+    axes[1].axhline(0, color="black", linestyle="--", linewidth=0.8)
+    axes[1].set_title("CNN Deletion Gain (del_gain) per Gruppo e Tecnica")
+    axes[1].set_xlabel("Gruppo")
+    axes[1].set_ylabel("del_gain (media ± dev. std)")
+    axes[1].tick_params(axis="x", rotation=15)
+    axes[1].legend(title="Tecnica", loc="upper right")
+
+    plt.tight_layout()
+    plt.savefig("xai_cnn_deletion_summary.png", dpi=150)
+    plt.show()
+    
+    summary = ( df.dropna(subset=["del_auc", "del_gain"])
+                .groupby( ["group", "model", "target_name", "technique"])
+                        [
+                            ["mask_share", "focus_ratio", "del_auc", "del_gain", "agreement_spearman_mean"]
+                        ].agg(["count", "mean", "std", "median"])
+            )
+    print(summary.to_string())
+
+
+
+
+
+
 
