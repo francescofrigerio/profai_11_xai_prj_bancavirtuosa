@@ -194,6 +194,7 @@ def compare_2_xai( cfg,
         elif ( flag_inspect_2):
             pre_compare_group_xai_2( cfg, ctx_param_dict )                       
         else:
+            logger.info("START run_compare_group_xai_1 3 return params")
             results_1, records_1 , source_row_1 = run_compare_group_xai_1( cfg, 
                                                             logger, 
                                                             model, 

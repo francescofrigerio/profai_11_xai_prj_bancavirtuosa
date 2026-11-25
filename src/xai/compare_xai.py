@@ -795,7 +795,8 @@ def run_compare_group_xai_1(cfg,
                                                                                    default=str),
                                                                         encoding="utf-8"
                                                                         )
-                                                                
+    
+    logger.info("END run_compare_group_xai_1 return 3 params ")                                                            
     return results, records , rows
 
 """
