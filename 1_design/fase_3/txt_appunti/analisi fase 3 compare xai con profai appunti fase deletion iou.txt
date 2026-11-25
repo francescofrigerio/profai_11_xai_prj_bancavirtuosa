@@ -1,0 +1,166 @@
+Modifica run_main dopo compare_1 chiama compare_2 passando records.
+
+Itero su records
+
+for image_list ciclo uguale
+
+    for r in records_phase_1:
+    target_name = r["target_name"]
+    # CNN: dict {name_tech: res}
+    maps_cnn_for_target = row["maps_cnn"][target_name]
+
+    # LR: maps is ndarray; wrapper it to maintain the same struct
+   maps_lr_for_target = {"lr_local_map": row["maps_lr"][target_name]}
+   
+   # maps = { name: technique.explain(input_img, target)
+   #         for name, technique in techniques.items()
+   #       }
+   maps = {}
+
+  for name, item in maps_for_target.items():
+      if hasattr(item, "map"):  # risultato di un explainer CNN
+          maps[name] = { "map": np.asarray(item.map),
+                        "signed": bool(item.signed),
+                        }
+      else:  # map LR:  coef × feature
+          maps[name] = { "map": np.asarray(item),
+                        "signed": True,
+                        }
+                        
+  for name, item in maps.items():
+    m = item["map"]
+    signed = item["signed"]
+
+    imp = np.maximum(m, 0) if signed else m
+    if imp.max() <= 0:
+        imp = np.abs(m)
+        
+    explain_target_2()
+    
+    
+    
+Modifica a deletion_curve_for_faithfulness
+x.view(1, 3, -1)[:, :, order[:k]] = baseline
+Per una baseline immagine con la stessa forma di input_img, usa invece:
+
+x_flat = x.reshape(1, 3, -1)
+baseline_flat = baseline.to(input_img.device).reshape(1, 3, -1)
+x_flat[:, :, order[:k]] = baseline_flat[:, :, order[:k]]
+In questo modo ogni pixel selezionato viene sostituito con il pixel corrispondente della baseline sfocat
+
+La futura baseline sfocata dovrà avere una size parametrica in modo da tenerlo minimo, 
+rimuovere progressivamente i pixel più importanti secondo una tecnica, 
+misurare quanto cala la probabilità della classe predetta e confrontare l'area sotto la curva fra le tecniche
+La baseline “sfocata” deve avere la stessa forma dell’immagine di input (1, 3, H, W): 
+è il livello di sfocatura a essere parametrico, 
+non la dimensione della baseline. 
+Per esempio, puoi controllare la sfocatura con un kernel 
+gaussiano configurabile; per ogni immagine 
+generi una baseline sfocata e, a ogni frazione della deletion, s
+ostituisci i pixel più importanti con i valori corrispondenti della baseline. 
+Così la matrice di valori assegnati ai pixel selezionati 
+ha sempre forma e coordinate compatibili con l’immagine.
+
+La sequenza concettuale della fase 2 sarà:
+
+selezionare un target fisso per l’immagine;
+ordinare i pixel secondo l’importanza della mappa di ciascuna tecnica;
+sostituire progressivamente le regioni selezionate con la baseline sfocata, per esempio al 0%, 5%, 10%, …, 100%;
+misurare a ogni passaggio la probabilità del target;
+calcolare l’area sotto la curva usando le stesse frazioni per tutte le tecniche.
+Una curva che scende più rapidamente indica che, rispetto a quella baseline e a quel criterio di ordinamento, i pixel rimossi erano importanti per il target. Usare una baseline sfocata invece del nero è ragionevole per MNIST, ma i risultati dipenderanno dal livello di sfocatura: va quindi scelto e mantenuto identico per tutti i metodi e le immagini confrontate.
+
+C’è una distinzione importante per il confronto: le mappe CNN vanno valutate interrogando la CNN,
+ mentre la mappa LR va valutata interrogando il modello LR. Le aree sotto curve di modelli diversi non 
+ sono direttamente equivalenti; per questo confronterei prima le tecniche CNN fra loro e terrei il risultato LR separato, 
+ oppure riporterei anche un confronto relativo alla rispettiva curva casuale.
+
+Inoltre, per mappe firmate, ordinare per abs(m) non misura solo l’evidenza a favore della classe: 
+include anche quella contraria. Per una deletion che misura la rimozione di evidenza a favore del target, 
+va definito un ordinamento coerente con il segno, gestendo esplicitamente il caso in 
+cui la mappa non abbia contributi positivi.
+
+Per il primo passo scegliamo il parametro della sfocatura: vuoi controllarlo tramite dimensione del kernel gaussiano oppure tramite sigma?
+
+parametro sigma
+Controlla la forma della curva gaussiana all'interno di quella griglia:
+sigma piccolo (es. 1.0): 
+il peso resta concentrato quasi tutto sul pixel centrale; 
+la sfocatura è lieve e i dettagli fini (come i tratti di una cifra MNIST) 
+restano ancora riconoscibili dal modello.
+
+sigma grande (es. 5.0 o 10.0): 
+i pesi si distribuiscono in modo quasi uniforme su tutto il kernel; 
+il tratto viene completamente "spalmato" sullo sfondo, distruggendo l'informazione 
+strutturale.
+
+in utility insieme a black_baseline
+
+from torchvision.transforms import GaussianBlur
+
+
+def make_blurred_baseline(input_img, sigma):
+    """
+        Create a blurred baseline with the same shape as input_img.
+        input_img: tensor [1, C, H, W], already in the space used by the model.
+        
+        Sigma does not act on the importance map, but rather on the image used as a baseline. 
+        With a small sigma, the image remains close to the original; 
+        as sigma increases, details are attenuated and the image becomes more uniform. 
+        During deletion, the selected pixels are replaced by the values ??from the blurred 
+        baseline at the same coordinates.
+        
+    """
+    if sigma <= 0:
+        raise ValueError("sigma deve essere maggiore di 0")
+
+    h, w = input_img.shape[-2:]
+
+    # Kernel even, near=6*sigma, limit to image size 
+    max_kernel = min(h, w)
+    if max_kernel % 2 == 0:
+        max_kernel -= 1
+
+    kernel_size = min(2 * math.ceil(3 * sigma) + 1, max_kernel)
+
+    blur = GaussianBlur( kernel_size=kernel_size,
+                        sigma=[sigma, sigma],
+                        )
+
+    return blur(input_img)
+  
+cfg.DELETION_SIGMA=1 # 1,2,3  
+baseline = make_blurred_baseline(input_img, sigma=cfg.DELETION_SIGMA)
+
+FINE DELETION CURVE APPUNTI
+Due punti adesso
+1) Controlla il codice della nuova versione di fase 2 
+2) Controllare il codice di Spearman di fase 1 che non abbiamo
+ancora verificato.
+
+Vorrei ottenere una matrice 5x5 di Spearman medio (secondo te va bene ? )
+magari parametrizzando la dimensione della matrice di output
+Quindi mi sembra che il codice non vada bene è  in output ho 
+tutta l'immagine 28x28
+def mean_spearman_agreement(maps,cfg=CONFIG):
+    
+    # Calling twice np.argsort 
+    # we gets the ranking position of the item that we have in this cell?"
+    ranks = [np.argsort(np.argsort( 
+                         # flat numpy array return from to_grid28
+                         # abs to avoid sign impact on this metrics
+                         to_grid28(np.abs(r.map), cfg.DENSENET_SIZE).ravel())).astype(float)
+                         for r in maps.values()]
+    
+
+    if len(ranks) < 2:
+        return None
+    # correlation matrix between the ranks.
+    c = np.corrcoef(ranks)
+
+    # Spearman	Interpretation
+    # +1	    Perfect agreement
+    # 0	        No rank correlation
+    # -1	    Perfect inverse agreement
+    return to_valid_float(np.nanmean(c[np.triu_indices(len(ranks), 1)]))
+    

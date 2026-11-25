@@ -1,0 +1,60 @@
+Tappa 3 consegnata: progetto_tappa3.zip
+
+Lo zip contiene l’intero progetto (38 file, senza checkpoint), quindi non può mancare niente. Sostituisce quello della tappa 2. L’errata ha le nuove precisazioni (E38–E44).
+
+Cosa contiene la tappa 3
+File	Cosa fa
+sampling.py	Campione quantitativo (100 immagini, 10 per classe predetta) e galleria da 24: 10 corrette (una per classe, a caso con seed), 
+i 6 errori più sicuri della DenseNet e 2 immagini per ciascun quadrante, senza ripetizioni. 
+Per un errore si spiegano sia la classe predetta sia quella vera. 
+Se i dati non bastano è un errore, non una galleria ridotta.
+
+comparison.py	La regola di ricampionamento a 28×28 (in numpy), la maschera della cifra, Spearman con ranghi medi e IoU del 20% 
+di pixel più importanti (con segnalazione dei pari merito), matrici 7×7 con media e deviazione standard, riferimento casuale, 
+tabella dell’attribuzione fuori dalla cifra.
+
+faithfulness.py	Le curve di deletion, dietro COMPUTE_FAITHFULNESS (spento di default).
+run_stage3.py	Il driver temporaneo per Colab: campione, sei tecniche + LR locale, matrici, diagnosi di Occlusion, galleria.
+Cosa ho verificato e cosa no
+
+In locale i test che non richiedono torch passano: 69 casi, di cui 15 nuovi. Sono quelli che hanno più valore perché controllano le formule su casi calcolati a mano:
+
+il riferimento casuale deve dare Spearman ˜ 0 e IoU ˜ 0,11. La formula teorica è verificata a mano su un caso enumerabile (4 pixel, 2 scelti);
+una mappa riconosce se stessa (diagonale = 1), la modalità di segno cambia davvero il confronto, un ordine di cancellazione corretto batte quello casuale e quello casuale batte quello sbagliato.
+
+Ho introdotto cinque errori di proposito (soglia top-k per difetto invece che per eccesso, griglia bilineare spostata di mezzo pixel, galleria con gli errori meno sicuri, deletion con l’ordine invertito, finestra dell’area troncata) e i test li scoprono tutti. La griglia spostata inizialmente non era scoperta: i test che la smascheravano erano quello contro torch (saltato qui) e uno sull’allineamento troppo grossolano. Ho aggiunto un test numerico indipendente (una rampa lineare deve essere riprodotta esattamente) e ora la mutazione fallisce anche senza torch.
+
+Non ho potuto eseguire il driver run_stage3.py (richiede torch, GPU e MNIST) né il test che confronta il ricampionamento in numpy con quello di torch. Per quel driver è solo statico (sintassi, nomi, import): aspettati che il primo run su Colab riveli qualche difetto, come nelle tappe precedenti.
+
+Come eseguire su Colab
+
+Il checkpoint committato va copiato in fase_3/checkpoints/ (altrimenti il driver riaddestra, ~6 minuti in più):
+
+%cd /content
+!git clone https://github.com/francescofrigerio/profai_11_xai_prj_bancavirtuosa
+%cd profai_11_xai_prj_bancavirtuosa/1_design/fase_3
+!pip -q install captum==0.9.0 lime==0.2.0.1 shap==0.54.1 scikit-image
+!mkdir -p checkpoints && cp ../fase_1/checkpoints/densenet121_mnist.pt checkpoints/
+!sha256sum checkpoints/densenet121_mnist.pt
+!python -m pytest tests -q
+%run run_stage3.py --n-quant 20 --no-gallery
+%run run_stage3.py
+
+pytest: atteso 96 passati (gli 80 di prima + i 16 nuovi).
+Il primo run_stage3.py è un fumo da pochi minuti con 20 immagini e senza galleria: serve a scovare errori dello script prima del run completo.
+Il secondo è il run vero: circa 20 minuti (134 spiegazioni a 7,4 s, più la LR e il caricamento).
+
+Cosa guardare nei risultati
+Verifiche del confronto: il riferimento casuale (Spearman ˜ 0, IoU ˜ 0,11) è la prova che le misure non barano. 
+Se non esce, c’è un bug da cercare prima di leggere qualunque matrice.
+La diagnosi di Occlusion: perché sul 5 è negativa. Per classe 5, 7 e 0 il driver riporta quante finestre alzano il logit, 
+il margine sul secondo classificato e il logit dell’immagine nera. 
+Mi dirà se è un comportamento del modello (certe zone della cifra lo rendono meno simile a un 5) o qualcosa da correggere.
+LIME e IG fuori dalla cifra: il primo alto, il secondo a 0 per costruzione. Va letto con le cautele già in errata.
+Mi servono
+
+L’output di pytest, quello dei due run_stage3.py (anche il fumo, se dà errori), e dalla cartella outputs/stage3/: verifications.md, 
+stage3_results.json, agreement_matrices.png, outside_digit.csv, agreement_spearman.csv, agreement_iou.csv e le tre gallerie 
+(gallery_correct.png, gallery_errors.png, gallery_quadrants.png).
+
+Quando la tappa 3 sarà chiusa passiamo alla tappa 4, il notebook finale per i non tecnici, che raccoglie tutto con la narrazione in italiano.

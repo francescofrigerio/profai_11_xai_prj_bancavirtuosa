@@ -1,0 +1,370 @@
+
+1) 
+Spearman e IoU non si confrontano direttamente tra loro. Misurano aspetti diversi delle mappe:
+
+Spearman tra due tecniche misura quanto è simile l’ordinamento dei pixel per importanza, anche 
+se le intensità assolute differiscono.
+
+IoU tra due tecniche misura quanto si sovrappongono le regioni che ciascuna considera più importanti, 
+dopo averle trasformate in maschere binarie. 
+Per esempio, puoi selezionare per ogni mappa il 10% dei pixel più importanti e calcolare l’intersezione divisa per l’unione. 
+Ripetere il test al 5% e al 20% serve a controllare quanto il risultato dipenda da questa scelta.
+
+Attenzione a distinguere due usi diversi dell’IoU:
+
+IoU di localizzazione: confronta la regione importante di una mappa con la maschera della cifra (digit_mask). 
+Risponde a quanto si sovrappongono.
+IoU tra tecniche: confronta le regioni importanti di due mappe XAI, dopo aver selezionato, 
+per esempio, il 5%, 10% o 20% dei pixel più importanti di ciascuna. Risponde a quanto le due tecniche evidenziano le stesse zone.
+
+Non confronterei direttamente i valori di IoU e Spearman come se misurassero la stessa cosa: 
+Spearman considera l’ordinamento delle importanze su tutti i pixel,
+ mentre IoU considera la sovrapposizione delle regioni selezionate.
+  Puoi riportarli entrambi come misure complementari.
+
+
+Esempio: due mappe possono avere Spearman alto perché danno posizioni simili ai pixel, ma IoU più basso se, 
+usando una soglia, selezionano regioni leggermente diverse. Non significa che una metrica 
+sia in disaccordo con l’altra: stanno rispondendo a domande differenti. 
+Le riporterei quindi come risultati separati, senza cercare di combinarle 
+in un unico punteggio
+
+2) CONFRONTO TRA LE TECNICHE XAI
+
+Per confrontare le tecniche, è più informativo costruire una matrice di confronti a coppie, 
+calcolando Spearman e IoU tra ogni coppia di mappe sulla stessa immagine 
+e per la stessa classe target. Con cinque tecniche XAI più una mappa LR confrontabile, 
+avresti 15 coppie. IG–SHAP, Occlusion–LIME e Grad-CAM–altre possono essere confronti interessanti 
+da commentare, ma non sono sufficienti a rappresentare da soli l’accordo complessivo. 
+LR–CNN risponde a una domanda distinta: se le due rappresentazioni attribuiscono importanza 
+alle stesse zone dell’immagine.
+
+
+3) INCLUSIONE DI LR NEL CONFRONTO E CONMFRONTO LR E CNN
+
+Per includere LR nel confronto, non la tratterei semplicemente come un’altra tecnica XAI: 
+la userei come riferimento lineare, a condizione che la sua mappa e quelle della CNN siano 
+riportate sulla stessa griglia e riferite alla stessa classe. La convenzione sui segni è un passaggio successivo importante: 
+non applicherei automaticamente abs a tutte le mappe, perché così si confondono evidenza a favore e contro la classe.
+
+
+mantengo la logica di run_compare_group_xai
+per ogni immagine spieghi la classe predetta dalla CNN e, se la CNN sbaglia, 
+anche la classe vera. 
+Così le mappe CNN e LR vengono confrontate, per quanto possibile, rispetto allo stesso target. 
+È un confronto coerente delle evidenze che i due modelli associano a una classe, 
+ma non sempre spiega la decisione effettiva di entrambi.
+
+Per esempio, nel gruppo lr_ok_cnn_ko, LR è corretto e CNN sbaglia:
+
+per il target "pred", tgt è la classe predetta erroneamente dalla CNN;
+per il target "true", tgt è la classe vera;
+dato che lr.local_map(X_data[position], tgt) riceve lo stesso tgt, la mappa LR spiega la classe richiesta, non necessariamente 
+la classe che LR ha predetto.
+Quindi, in questo quadrante, la mappa LR del target "pred" non spiega perché LR ha fatto la sua previsione corretta: 
+mostra quali pixel il modello lineare associa alla classe sbagliata predetta dalla CNN. 
+È comunque utile per il confronto a target comune, ma va interpretata con questa etichetta. 
+Se invece vuoi confrontare le ragioni delle decisioni effettive dei due modelli, 
+nei casi di disaccordo servirebbe anche la mappa LR per la sua classe predetta. 
+Sono due domande diverse; non le mescolerei sotto un’unica etichetta "pred". rinomiunare pred come pred_cnn
+
+Per la fase 1 terrei quindi distinti i target, per esempio cnn_pred, true e, solo se vuoi analizzare le decisioni proprie 
+dei due modelli, lr_pred. Per la fedeltà, invece, la deletion curve deve essere calcolata sul modello 
+a cui appartiene la mappa: CNN per le spiegazioni CNN e LR per quelle LR. 
+Al momento il tuo codice valuta la CNN anche quando usa la mappa LR. Modificare deletion curve con pred_lr
+
+La scelta che hai descritto è dunque adatta a un confronto a classe target comune; 
+il passo successivo è rendere esplicito nei risultati che "pred" significa “predizione CNN”, 
+non “predizione del modello spiegato”.
+
+e' meglio includere anche il target predetto da LR nei quadranti in cui i due modelli non concordano
+
+
+
+Ho rivisto il codice aggiungendo il tutto per lr 
+due domande :
+
+2) La modifica per togliere la deletion_curve è nel senso
+di semplificare il codice e rendelo + leggibile perchè a me appare
+abbastanaza complesso invece due funzioni più semplici
+mi pare aiutino a capire il codice e anche i risultati e le spiegazioni.
+Dimmmi cosa ne pensi però se non condividi dimmi pure perchè adesso 
+il codice è più chiaro.
+La soluzione a cui pensavo è di lasciare la plot_deletion_curve solo nella versione di fase 2
+e farei due versioni di explain_target . explain_target_1 senza deletion_curve
+ed explain_target_2 con deletion_curve.
+la parte di storicizzazione delle metriche e meta deve rimanere perchè
+
+per metrics
+"mask_share" "mask_frac": "focus_ratio": sarebbero in fase 1 
+"del_auc": "del_gain": "del_curve": sarebbero in fase 2 
+   
+ per meta 
+"agreement_spearman": sarebbero in fase1
+"del_auc_random" "del_curve_random": sarebbero in fase2
+    
+Il principio architetturale, quindi, è: 
+target CNN ? tecniche XAI sulla CNN; 
+target LR ? lr.local_map su LR; 
+target vero ? mappe di entrambi, se vuoi il confronto a target comune. 
+
+La fase 2 dovrà conservare questa associazione quando calcola la fedeltà.
+
+Per stabilire quali metriche di localizzazione applicare alla mappa LR, 
+mi serve un dettaglio: lr.local_map restituisce per ciascun pixel un contributo firmato specifico 
+per immagine e classe, oppure una mappa ricavata dai soli coefficienti del modello ?
+Dal codice direi che non c'è alcuna evidenza della classe ma solo x e coefficienti ?
+
+1) Mi sembra che local_map resituisca un contributo firmato specifico 
+per immagine e classe come dalla return del codice della classe wrapper
+che ho implentato per incapsulare la LR.
+
+distinguere dove si concentra l’importanza da quale segno hanno i contributi. 
+Per farlo bene, però, occorre tenere separati questi due usi della mappa.
+
+
+
+2) Per la gestione dell'abs vedo adesso il calcolo
+nel codice in emntrambe le versioni usa la seguente regola
+dove res.signed vale False per GradCam e True per IntegratedGrad Occlusion Lime e Shap.
+Ti chiedo di analizzare insieme questo punto cruciale
+imp = np.maximum(m, 0) if res.signed else m   # evidence FOR the class
+if imp.max() <= 0:
+    imp = np.abs(m)
+    
+mask_share e l’accordo spaziale basato 
+sui ranghi possono confrontare le zone influenti 
+senza cancellare una regione solo perché il contributo è negativo.
+ Il risultato, però, va descritto come concentrazione dell’importanza 
+ in valore assoluto, non come evidenza a favore della classe.
+
+Per Integrated Gradients , SHAP , LIME , Occlusion , Logistic Regression
+devo determinare che significato ha un valore positivo o negativo
+
+
+
+Per SHAP, il segno va interpretato rispetto al valore atteso usato come riferimento: 
+positivo significa 
+contributo ad aumentare l’output rispetto a quel riferimento.
+Per shap nella formula della sommatoria
+abbiamo (x) - (x')
+(x) è l'immagine da spiegare (x') è un'immagine di background;
+
+Positivo	La componente contribuisce ad aumentare l'output della classe spiegata rispetto al riferimento
+Negativo	La componente contribuisce a diminuire l'output della classe spiegata rispetto al riferimento
+Vicino a zero	Contributo stimato piccolo
+positivo non significa necessariamente che il pixel appartenga alla cifra, e negativo non significa necessariamente che appartenga allo sfondo.
+Significa solamente che quella componente contribuisce rispettivamente ad aumentare o diminuire l'output considerato
+
+
+
+Per LIME, il segno dei coefficienti riguarda il modello surrogato e la codifica delle feature. 
+Va verificato come i coefficienti vengono trasformati nella mappa pixel: non assumere che il segno abbia automaticamente
+la convenzione desiderata.
+in lime abbiamo la sommatoria di z_j x beta_j
+Dove:
+- (z_j=1): il segmento è presente;
+- (z_j=0): il segmento è nascosto;
+- (beta_j): peso assegnato al segmento.
+Nel tuo codice il peso viene copiato su tutti i pixel appartenenti al segmento.
+Peso LIME	Significato
+Positivo	La presenza del segmento favorisce l'output della classe spiegata
+Negativo	La presenza del segmento sfavorisce l'output della classe spiegata
+Vicino a zero	Il segmento ha un'influenza locale stimata piccola
+
+ 
+Per Integrated Gradients, un contributo positivo dovrebbe indicare che, 
+rispetto al baseline scelto, quella caratteristica contribuisce ad aumentare l’output del target.
+Distingue il contributo a favore della classe target da quello contro la classe target
+
+Indichiamo con:
+- (F(x)): output del modello per la classe target (ad esempio il logit della classe).
+- (x): immagine originale.
+- (x'): baseline, ad esempio un'immagine nera.
+- (i): pixel o componente dell'immagine.
+
+Integrated Gradients calcola il contributo di ogni componente dell'input lungo il percorso dalla baseline all'immagine originale.
+
+In pratica, l'integrale viene approssimato con una somma di gradienti calcolati in più punti del percorso.
+
+Interpretazione del segno:
+- (IG_i > 0): il pixel contribuisce ad aumentare l'output della classe target rispetto alla baseline.
+- (IG_i < 0): il pixel contribuisce a diminuire l'output della classe target rispetto alla baseline.
+- (IG_i \approx 0\): contributo limitato.
+
+OK per IG valori di  default e faccio la sottrazione
+standard  per cui
+valori positivi per sostegno dei pixels alla classe predetta rispetto alla baselinme
+e valori negativi contribuiscono a diminuiore l'output della classe target rispetto alla baseline.
+
+
+Per Occlusion, controlla l’ordine della sottrazione 
+tra output originale e output con la regione oscurata. 
+La formula determina direttamente la convenzione.
+
+Distinguere il contributo a favore della classe target da quello contro la classe target.
+
+Indichiamo con:
+- (F(x)): output del modello per la classe target (ad esempio il logit della classe).
+- (x): immagine originale.
+- (x'): baseline, ad esempio un'immagine nera.
+- (i): pixel o componente dell'immagine.
+
+Occlusion misura quanto cambia l'output quando una regione dell'immagine viene sostituita con una baseline.
+per una regione r
+O = F(s) - F(Fx/r)
+dove \(x_{R}\) è l'immagine con la regione (R) oscurata.
+
+Interpretazione del segno:
+- (O_R > 0): oscurando la regione, l'output diminuisce. Quindi la regione contribuiva a sostenere la classe target.
+- (O_R < 0): oscurando la regione, l'output aumenta. Quindi la regione ostacolava la classe target.
+- (O_R \approx 0\): la regione ha un effetto limitato sull'output.
+
+OK per IG valori di  default e faccio la sottrazione
+standard  per cui
+valori positivi per sostegno dei pixels alla classe predetta rispetto alla baselinme
+e valori negativi contribuiscono a diminuiore l'output della classe target rispetto alla baseline.
+
+OK per Occlsion valori di  defaulr e faccio la sottrazione
+standard tra output originale e output con la regione oscurata.
+Quindi valori positivi per sostegno alla classe predetta valori negativi sono un ostacolo
+
+OK Per LR, controllata la formula di local_map: self.model.coef_[class_idx] * x
+se restituisce  prodotto tra feature e coefficiente, 
+il segno quindi descrive il contributo alla classe secondo la codifica delle feature 
+e la definizione dell’output.
+
+OK SHAP
+Nel codice attributo eseguo pick_shap_target che fa una sum degli shap values
+Non mi è tanto chiaro 
+    
+dei pixel
+set_seed(self.cfg.SEED)                     
+values = shap.GradientExplainer(self.model, 
+                                self.background).shap_values(input_img, nsamples=self.cfg.SHAP_NUM_SAMPL
+return pick_shap_target(values, input_label, self.cfg.NUM_CLASSES) # return arr[0].sum(axis=0)  
+
+il segno va interpretato rispetto al valore atteso usato come riferimento: 
+positivo significa 
+contributo ad aumentare l’output rispetto a quel riferimento.
+Per shap nella formula della sommatoria
+abbiamo (x) - (x')
+(x) è l'immagine da spiegare (x') è un'immagine di background;
+
+Positivo	La componente contribuisce ad aumentare l'output della classe spiegata rispetto al riferimento
+Negativo	La componente contribuisce a diminuire l'output della classe spiegata rispetto al riferimento
+Vicino a zero	Contributo stimato piccolo
+positivo non significa necessariamente che il pixel appartenga alla cifra, e negativo non significa necessariamente che appartenga allo sfondo.
+Significa solamente che quella componente contribuisce rispettivamente ad aumentare o diminuire l'output considerato
+
+
+
+OK Per LIME, il segno dei coefficienti riguarda il modello surrogato e la codifica delle feature. 
+Va verificato come i coefficienti vengono trasformati nella mappa pixel: non assumere che il segno abbia automaticamente
+la convenzione desiderata.
+in lime abbiamo la sommatoria di z_j x beta_j
+Dove:
+- (z_j=1): il segmento è presente;
+- (z_j=0): il segmento è nascosto;
+- (beta_j): peso assegnato al segmento.
+Nel tuo codice il peso viene copiato su tutti i pixel appartenenti al segmento.
+Peso LIME	Significato
+Positivo	La presenza del segmento favorisce l'output della classe spiegata
+Negativo	La presenza del segmento sfavorisce l'output della classe spiegata
+Vicino a zero	Il segmento ha un'influenza locale stimata piccola
+
+   
+Nel codice bisogna distinguere      
+positive = np.maximum(map, 0)
+negative = np.minimum(map, 0)
+absolute = np.abs(map)
+
+Sono tre informazioni diverse. Non da confondere.
+
+Salverei anche questa informazioni cosa ne dici ?
+def signed_diagnostics(m):
+    m = np.asarray(m, dtype=float)
+
+    pos = np.maximum(m, 0)
+    neg = np.minimum(m, 0)
+
+
+    return {
+        "positive_fraction": float(np.mean(m > 0)),
+        "negative_fraction": float(np.mean(m < 0)),
+        "positive_sum": float(pos.sum()),  # somma dei contributi positivi
+        "negative_sum": float(neg.sum()),  # somma con segno, quindi <= 0
+        "negative_abs_sum": float(np.abs(neg).sum()),  # magnitudine dei contributi negativi
+        "net_sum": float(m.sum()),
+        "absolute_sum": float(np.abs(m).sum()),
+    }
+Ti metto sotto il codice della versione 1 senza deletion curve poi passiamo alla 2
+    
+         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+row = {
+    "maps_cnn": {
+        "pred_cnn": {"gradcam": ..., "integrated_gradients": ...},
+        "true":     {"gradcam": ..., "integrated_gradients": ...},
+    },
+    "maps_lr": {
+        "pred_lr": ...,
+        "true": ...,
+    },
+    "signed_diagnostics": {
+        "cnn": {
+            "pred_cnn": {"gradcam": ..., "integrated_gradients": ...},
+            "true":     {"gradcam": ..., "integrated_gradients": ...},
+        },
+        "lr": {
+            "pred_lr": ...,
+            "true": ...,
+        },
+    },
+}
+
+
+Le chiavi "true" vanno aggiunte solo quando almeno uno dei modelli sbaglia. 
+Per la CNN, ogni voce corrisponde a una tecnica XAI applicata alla CNN; 
+per LR, invece, la mappa va ottenuta con lr.local_map(...). 
+Non chiamare explain_target_1 per creare maps_lr: quella funzione genera mappe degli explainer applicati alla CNN, 
+anche se le passi la classe predetta da LR.
+
+Per i record tabellari userei poi campi espliciti come model ("cnn" o "lr"), target_name, 
+target_class e technique (per LR, per esempio, "lr_local_map"). In questo modo una mappa CNN 
+per il target predetto da CNN non può essere confusa con una mappa LR per il target predetto da LR. 
+Le diagnostiche del segno si calcolano sulla mappa corrispondente: res.map per ciascuna tecnica CNN e l’array 
+restituito da lr.local_map per LR.
+
+Un dettaglio importante per gli Integrated Gradients: conviene conservare il risultato completo dell’explainer, 
+non solo res.map, perché completeness_error si trova in res.meta. Per il salvataggio JSON, i
+nvece, dovrai estrarre mappe e metadati in valori serializzabili.
+
+Il passo successivo è tradurre questa struttura in un ciclo senza sovrascrivere name e tgt tra i 
+target CNN e LR. Vuoi conservare negli oggetti maps_cnn l’intero risultato res di ciascun explainer, 
+così da mantenere anche metadati come completeness_error
+
+
