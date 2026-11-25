@@ -41,7 +41,7 @@ def to_json_value(obj):
     )
 
 
-def format_json_xai_rows(rows):
+def format_json_xai_rows(rows,include_maps=False):
     """
         Converts XAI rows into a JSON-serializable structure.
 
@@ -51,26 +51,14 @@ def format_json_xai_rows(rows):
         LR maps for each target;
         analysis metrics and metadata;
         sign diagnostics.
+
+        include_maps=True to include maps
     """
 
     formatted_images = []
 
     for row in rows:
-        maps_cnn_json = {}
-
-        for target_name, techniques_results in row.get("maps_cnn", {}).items():
-            maps_cnn_json[target_name] = {}
-
-            for technique_name, res in techniques_results.items():
-                maps_cnn_json[target_name][technique_name] = { "map": to_json_value(res.map),
-                                                            "signed": bool(res.signed),
-                                                            "meta": to_json_value(getattr(res, "meta", {})),
-                                                        }
-
-        maps_lr_json = { target_name: to_json_value(lr_map)
-                        for target_name, lr_map in row.get("maps_lr", {}).items()
-                        }
-
+        
         img_entry = { "index": to_json_value(row["index"]),
                     "pos": to_json_value(row["pos"]),
                     "true": to_json_value(row["true"]),
@@ -81,8 +69,8 @@ def format_json_xai_rows(rows):
                     "targets_cnn": to_json_value(row.get("targets_cnn", {})),
                     "targets_lr": to_json_value(row.get("targets_lr", {})),
 
-                    "maps_cnn": maps_cnn_json,
-                    "maps_lr": maps_lr_json,
+                    # "maps_cnn": maps_cnn_json,
+                    # "maps_lr": maps_lr_json,
 
                     "metrics_cnn": to_json_value(row.get("metrics_cnn", {})),
                     "meta_cnn": to_json_value(row.get("meta_cnn", {})),
@@ -109,6 +97,25 @@ def format_json_xai_rows(rows):
                     # "agreement_matrix": row["meta_cnn"][target_name]["agreement_spearman_matrix"]["matrix"],
                     # "agreement_spearman": row["meta_cnn"][target_name]["agreement_spearman_matrix"]["agreement_spearman"],
         }
+
+        if include_maps:
+            maps_cnn_json = {}
+            
+            for target_name, techniques_results in row.get("maps_cnn", {}).items():
+                maps_cnn_json[target_name] = {}
+            
+                for technique_name, res in techniques_results.items():
+                            maps_cnn_json[target_name][technique_name] = { "map": to_json_value(res.map),
+                                                                        "signed": bool(res.signed),
+                                                                        "meta": to_json_value(getattr(res, "meta", {})),
+                                                                    }
+            
+            maps_lr_json = { target_name: to_json_value(lr_map)
+                                for target_name, lr_map in row.get("maps_lr", {}).items()
+                            }
+
+            img_entry["maps_cnn"] = maps_cnn_json
+            img_entry["maps_lr"] = maps_lr_json
 
         formatted_images.append(img_entry)
 

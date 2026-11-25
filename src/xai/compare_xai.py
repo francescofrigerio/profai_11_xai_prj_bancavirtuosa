@@ -796,9 +796,9 @@ def run_compare_group_xai_1(cfg,
                                                                         encoding="utf-8"
                                                                         )
     
-    logger.info("END run_compare_group_xai_1 return 3 params ") 
-    logger.info(f"sizes -> results_keys={len(results)} records={len(records)} rows={len(rows)}") 
-    logger.info(f"types -> results_keys={type(results)} records={type(records)} rows={type(rows)}")                                                         
+    
+    logger.debug(f"sizes -> results_keys={len(results)} records={len(records)} rows={len(rows)}") 
+    logger.debug(f"types -> results_keys={type(results)} records={type(records)} rows={type(rows)}")                                                         
     return results, records , rows
 
 """
