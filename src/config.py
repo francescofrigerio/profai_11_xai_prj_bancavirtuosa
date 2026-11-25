@@ -38,6 +38,7 @@ class ConfigConstantsDefault:
     RUN_PHASE_3: int = 3                                    
     LR_EXPECTED_VAL_ACC = (0.90, 0.94)    # design: about 0.92 (phase 0: 0.9222)
     GAP_EXPECTED = (0.03, 0.07)           # design: 4-6 points (phase 0: 4.78 on validation)
+    SECTION_DISPLAY_ON: bool = False      # True -> head only, display help online
     
     # Reproducibility and environment
     SEED: int = 42

@@ -796,7 +796,7 @@ def run_compare_group_xai_1(cfg,
                                                                         encoding="utf-8"
                                                                         )
                                                                 
-    return results, records
+    return results, records , rows
 
 """
         The general objective of the code is to compare XAI explanations produced 
@@ -820,6 +820,7 @@ def run_compare_group_xai_2(cfg,
                             logger,
                             source_results,
                             source_records,
+                            source_rows,
                             model,
                             device,
                             techniques, 
@@ -844,8 +845,8 @@ def run_compare_group_xai_2(cfg,
     model.eval()
 
     rows = []
-    for source_record in source_records:
-        org_idx = source_record["index"]
+    for source_row in source_rows:
+        org_idx = source_row["index"]
 
         if org_idx not in idx_to_pos:
             raise KeyError(f"id_dataset {org_idx} not in this split")
@@ -858,9 +859,9 @@ def run_compare_group_xai_2(cfg,
         if int(idx) != int(org_idx):
             raise ValueError(f"Indice non corrispondente: record={org_idx}, dataset={idx}")
 
-        if int(input_label) != int(source_record["true"]):
+        if int(input_label) != int(source_row["true"]):
              raise ValueError(f"Etichetta non corrispondente per index={org_idx}: "
-                              f"record={source_record['true']}, dataset={input_label}")
+                              f"record={source_row['true']}, dataset={input_label}")
         # add the batch dimension to the image
         # from (3,H,W) to (1,3,H,W)
         input_img = input_image.unsqueeze(0).to(device)
@@ -869,15 +870,15 @@ def run_compare_group_xai_2(cfg,
         baseline = make_blurred_baseline(input_img, sigma=cfg.DELETION_SIGMA)
 
         # not modify source record 
-        result_row = dict(source_record)
+        result_row = dict(source_row)
         result_row["metrics_cnn_del"] = {}
         result_row["meta_cnn_del"] = {}
 
         # for each target in cnn_targets, 
         # it recovery maps from XAI techniques 
         # applied to the CNN;
-        for target_name, target_class in source_record["targets_cnn"].items():
-            maps_for_target = source_record["maps_cnn"].get(target_name)
+        for target_name, target_class in source_row["targets_cnn"].items():
+            maps_for_target = source_row["maps_cnn"].get(target_name)
 
             if not maps_for_target:
                 raise KeyError( f"Nessuna mappa CNN per target={target_name}, "
@@ -919,9 +920,9 @@ def run_compare_group_xai_2(cfg,
     for r in rows:
         for target_name, target_class in r["targets_cnn"].items():
             for tech_name in names_tech:
-                 metric = result_row["metrics_cnn"][target_name][tech_name]
-                 deletion_metric = result_row["metrics_cnn_del"][target_name][tech_name]
-                 deletion_meta = result_row["meta_cnn_del"][target_name]
+                 metric = r["metrics_cnn"][target_name][tech_name]
+                 deletion_metric = r["metrics_cnn_del"][target_name][tech_name]
+                 deletion_meta = r["meta_cnn_del"][target_name]
 
                  records_dest.append(
                  {
@@ -961,7 +962,7 @@ def run_compare_group_xai_2(cfg,
             records_dest.append({ "group": group, 
                             "index": r["index"], 
                             "true": r["true"],
-                            "pred": r["pred_cnn"], 
+                            "pred_cnn": r["pred_cnn"], 
                             "pred_lr": r["pred_lr"],
                             "model": "lr",
                             "target_name": target_name, 
