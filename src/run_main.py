@@ -14,6 +14,12 @@ import warnings
 # import torch
 import numpy as np
 
+# Conflict between colab and last numy version
+# where could ben substitide from np.trapezoid
+# AttributeError: module 'numpy' has no attribute 'trapz'
+if not hasattr(np, "trapz"):
+    np.trapz = np.trapezoid
+
 from baseline import fit_baseline
 from config import CONFIG 
 from constants import GROUPS_RESULT_OK_KO
@@ -205,7 +211,7 @@ def compare_2_xai( cfg,
                                                             group,
                                                             list_images ) 
 
-        
+            logger.info("START run_compare_group_xai_2 3 return params")
             results_2, records_2 = run_compare_group_xai_2( cfg, 
                                                         logger, 
                                                         results_1,
