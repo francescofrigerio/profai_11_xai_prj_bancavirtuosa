@@ -699,24 +699,24 @@ def explain_target_2( score_fn,
                                     )
 
 
-def explain_shap_vs_ig( model,background, input_img, target_class, score_fn ,cfg,logger):
-
+def explain_shap_vs_ig( org_idx,model,background, input_img, target_class, score_fn ,cfg,logger ):
+    """
+         compare shap and ig for debug
+    """
     shap_explainer = ShapExplainer(model, cfg, background)
     ig_explainer = IntegratedGradientsCaptum(model, cfg)
 
     # Inspect raw output of GradientExplainer before pick_shap_target
     set_seed(shap_explainer.cfg.SEED)
-    raw_values = shap.GradientExplainer(shap_explainer.model, shap_explainer.background
-    ).shap_values(input_img, nsamples=shap_explainer.cfg.SHAP_NUM_SAMPLES)
+    raw_values = shap.GradientExplainer(shap_explainer.model, shap_explainer.background).shap_values(input_img, 
+                                                                                                    nsamples=shap_explainer.cfg.SHAP_NUM_SAMPLES)
 
-    print("target_class:", target_class)
-    print("type(raw_values):", type(raw_values))
+    logger.info(f"target_class:{target_class} org_idx {org_idx}" )
+    logger.info(f"type(raw_values): {type(raw_values)}")
     if isinstance(raw_values, list):
-        print("len(raw_values):",len(raw_values),
-                                "| shapes:",[np.asarray(v).shape for v in raw_values],
-                    )
+        logger.info(f"len(raw_values):{len(raw_values)} | shapes: {[np.asarray(v).shape for v in raw_values]}")
     else:
-        print("np.asarray(raw_values).shape:", np.asarray(raw_values).shape)
+        logger.info(f"np.asarray(raw_values).shape:{np.asarray(raw_values).shape}")
 
     # Compare 2D maps build by SHAP and IG
     m_shap = shap_explainer.attribute(input_img, target_class)
@@ -726,11 +726,11 @@ def explain_shap_vs_ig( model,background, input_img, target_class, score_fn ,cfg
         m = np.asarray(m)
         pos_frac = float((m > 0).mean())
         neg_frac = float((m < 0).mean())
-        print(f"[{name}] shape={m.shape} min={m.min():.6f} max={m.max():.6f} "
-              f"mean={m.mean():.6f} pos%={pos_frac*100:.1f}% neg%={neg_frac*100:.1f}%"
-            )
+        logger.info(f"[{name}] shape={m.shape} min={m.min():.6f} max={m.max():.6f} "
+                   f"mean={m.mean():.6f} pos%={pos_frac*100:.1f}% neg%={neg_frac*100:.1f}%"
+                    )
 
     # 3. Check initial score and importance value used into deletion
-    print("score_fn(input_img) iniziale:", float(score_fn(input_img)))
+    logger.info(f"score_fn(input_img) iniziale: {float(score_fn(input_img))}")
 
 

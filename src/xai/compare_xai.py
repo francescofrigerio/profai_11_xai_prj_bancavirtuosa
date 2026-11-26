@@ -276,7 +276,7 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
                 records.append({"group": group, 
                                 "index": r["index"], 
                                 "true": r["true"],
-                                "pred": r["pred_cnn"], 
+                                "pred_cnn": r["pred_cnn"], 
                                 "pred_lr": r["pred_lr"],
                                 "mask_mean": r["mask_mean"],
                                 "target": name_pred_true, 
@@ -295,7 +295,7 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
                 records.append({"group": group, 
                                 "index": r["index"], 
                                 "true": r["true"],
-                                "pred": r["pred_cnn"], 
+                                "pred_cnn": r["pred_cnn"], 
                                 "pred_lr": r["pred_lr"],
                                 "mask_mean": r["mask_mean"],
                                 "target": name_pred_true, 
@@ -732,7 +732,7 @@ def run_compare_group_xai_1(cfg,
                 records.append({"group": group, 
                                 "index": r["index"], 
                                 "true": r["true"],
-                                "pred": r["pred_cnn"], 
+                                "pred_cnn": r["pred_cnn"], 
                                 "pred_lr": r["pred_lr"],
                                 "mask_mean": r["mask_mean"],
                                 "mask_dilation": r["mask_dilation"],
@@ -756,7 +756,7 @@ def run_compare_group_xai_1(cfg,
             records.append({ "group": group, 
                             "index": r["index"], 
                             "true": r["true"],
-                            "pred": r["pred_cnn"], 
+                            "pred_cnn": r["pred_cnn"], 
                             "pred_lr": r["pred_lr"],
                             "mask_mean": r["mask_mean"],
                             "mask_dilation": r["mask_dilation"],
@@ -837,7 +837,7 @@ def run_compare_group_xai_2(cfg,
     idx_to_pos = dataset.idx_dataset_position()
     # X_data, y_data, y_pred_lr = ctx["X_data"], ctx["y_data"], ctx["y_pred_lr"]
     names_tech = list(techniques)
-    org_idx_cmp_shap_ig = ctx["org_idx_cmp_shap_ig"]
+    # org_idx_cmp_shap_ig = ctx["org_idx_cmp_shap_ig"]
     background = ctx["background"]
 
     # fractions: percentages of pixels to be removed during the deletion test.
@@ -849,6 +849,7 @@ def run_compare_group_xai_2(cfg,
     model.eval()
 
     rows = []
+    already_log = False
     for source_row in source_rows:
         org_idx = source_row["index"]
 
@@ -901,8 +902,12 @@ def run_compare_group_xai_2(cfg,
                                                     rng=rng,
                                                 )
 
-            if ( org_idx == org_idx_cmp_shap_ig ):
-                explain_shap_vs_ig(model,background,input_img, target_class, score_fn ,cfg,logger)
+            cnn_true_target = source_row["targets_cnn"].get("true")
+            lr_true_target = source_row["targets_lr"].get("true")
+            
+            if ( already_log and cnn_true_target is None and lr_true_target is None ):
+                explain_shap_vs_ig(org_idx,model,background,input_img, target_class, score_fn ,cfg,logger)
+                already_log = True
 
             result_row["metrics_cnn_del"][target_name] = metrics_del
             result_row["meta_cnn_del"][target_name] = meta_del
