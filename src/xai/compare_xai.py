@@ -849,7 +849,7 @@ def run_compare_group_xai_2(cfg,
     model.eval()
 
     rows = []
-    already_log = False
+    not_already_log = True
     for source_row in source_rows:
         org_idx = source_row["index"]
 
@@ -905,9 +905,9 @@ def run_compare_group_xai_2(cfg,
             cnn_true_target = source_row["targets_cnn"].get("true")
             lr_true_target = source_row["targets_lr"].get("true")
             
-            if ( already_log and cnn_true_target is None and lr_true_target is None ):
+            if ( not_already_log and cnn_true_target is None and lr_true_target is None ):
                 explain_shap_vs_ig(org_idx,model,background,input_img, target_class, score_fn ,cfg,logger)
-                already_log = True
+                not_already_log = False
 
             result_row["metrics_cnn_del"][target_name] = metrics_del
             result_row["meta_cnn_del"][target_name] = meta_del
