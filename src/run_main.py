@@ -307,10 +307,7 @@ def explore_2_xai( cfg,
                                                CONFIG.IMAGE_SIZE, 
                                                CONFIG.IMAGE_SIZE)
 
-    # X_test_lr , y_test_lr , idx_test = data_to_input_lr(test_loader_lr,1, 
-    #                                             CONFIG.IMAGE_SIZE, 
-    #                                             CONFIG.IMAGE_SIZE)
-          
+       
     logger.debug("Test di riproducibilità superato con successo!")
     # Logistic regression (train indices only)
     lr = fit_baseline(X_train_lr, y_train_lr, X_val_lr, y_val_lr,cfg,logger)
@@ -674,21 +671,26 @@ def main(cfg=CONFIG, logger=LOGGER):
 
  
 
+    logger.debug("Start Check Fase 1")
     # Esecuzione condizionale o sequenziale basata sulla fase
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_1 ):
         if (cfg.SECTION_DISPLAY_ON):
             section_display_title( "Fase2:Training CNN - Eseguire solo con GPU", 
                                    "Debug GradCam , Metriche , Matrice di Confusione , Grafico a Barre F1_SCORE per Classi"
-                                )
+        logger.debug("Before Run Fase 1")                       )
         phase_1_train(cfg, logger, out, flag_pretrained)
-        
+        logger.debug("After Run Fase 1")   
+      
+    logger.debug("Start Check Fase 2")  
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_2 ):
         phase_2_xai(cfg, logger, inp, out)
 
+    logger.debug("Start Check Fase 3")
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_3 ):
+        logger.debug("Before Run Fase 3") 
         phase_3_xai(cfg, logger, out)
+        logger.debug("Before Run Fase 3") 
         
-
     logger.debug("Programma Terminato")
 
 if __name__ == "__main__":
