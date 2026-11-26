@@ -676,7 +676,8 @@ def main(cfg=CONFIG, logger=LOGGER):
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_1 ):
         if (cfg.SECTION_DISPLAY_ON):
             section_display_title( "Fase2:Training CNN - Eseguire solo con GPU", 
-                                   "Debug GradCam , Metriche , Matrice di Confusione , Grafico a Barre F1_SCORE per Classi"
+                                   "Debug GradCam , Metriche , Matrice di Confusione , Grafico a Barre F1_SCORE per Classi")
+                                   
         logger.debug("Before Run Fase 1")                       )
         phase_1_train(cfg, logger, out, flag_pretrained)
         logger.debug("After Run Fase 1")   
