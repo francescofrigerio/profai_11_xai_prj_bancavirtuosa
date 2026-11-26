@@ -6,7 +6,7 @@ import torch
 import numpy as np
 import shap
 
-from training import set_seed
+from utility import set_seed
 from xai.explainer import Explainer
 
 def make_background(transform_train, cfg,logger, device):
