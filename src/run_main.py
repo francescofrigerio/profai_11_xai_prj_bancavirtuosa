@@ -411,21 +411,28 @@ def phase_3_xai(cfg,
 
     print(summary_df.to_string(index=False))
     
+    GROUP_SETS_BY_MODE = {  # "all": GROUPS_RESULT_OK_KO,
+                            "both_ok": GROUPS_RESULT_BOTH_OK,
+                            "both_ko": GROUPS_RESULT_BOTH_KO,
+                            "lr_ok_cnn_ko": GROUPS_RESULT_LR_OK_CNN_KO,
+                            "lr_ko_cnn_ok": GROUPS_RESULT_LR_KO_CNN_OK,
+                        }
+                        
     selected_mode = getattr(cfg, "SAMPLE_GROUP_SELECTION", "all")
     if selected_mode not in GROUP_SETS_BY_MODE:
         raise ValueError(f"Valore non valido per cfg.SAMPLE_GROUP_SELECTION: {selected_mode!r}. "
                         f"Valori ammessi: {list(GROUP_SETS_BY_MODE.keys())}"
                         )
 
-    active_groups = GROUP_SETS_BY_MODE[selected_mode]
-    logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(active_groups.keys()))
+    group = GROUP_SETS_BY_MODE[selected_mode]
+    logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(group.keys()))
 
     # for group in GROUPS_RESULT_OK_KO:
     # for group in GROUPS_RESULT_BOTH_OK:
-    for group in active_groups:
+    # for group in active_groups:
     
-        # Sostituisci 57588 con un index presente nel JSON
-        plot_masks_for_image(json_path=out_path / f"stage2_maps_{group}.json",
+    # Sostituisci 57588 con un index presente nel JSON
+    plot_masks_for_image(json_path=out_path / f"stage2_maps_{group}.json",
                         image_index=57588,
                         X_data=X_data,
                         cfg=cfg,
