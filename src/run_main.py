@@ -249,7 +249,7 @@ def compare_2_xai( cfg,
             all_results_2[group] = results_2
             all_records_2 += records_2
     
-     if all_records_1:
+    if all_records_1:
         with open(out_path / "xai_metrics_all_1.csv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(all_records_2[0]))
             w.writeheader()
