@@ -22,7 +22,8 @@ if not hasattr(np, "trapz"):
 
 from baseline import fit_baseline
 from config import CONFIG 
-from constants import GROUPS_RESULT_OK_KO , GROUPS_RESULT_BOTH_OK
+from constants import GROUPS_RESULT_OK_KO , GROUPS_RESULT_BOTH_OK , GROUPS_RESULT_BOTH_KO
+from constants import GROUPS_RESULT_LR_OK_CNN_KO , GROUPS_RESULT_LR_KO_CNN_OK 
 
 from data import data_to_input_lr, load_datasets
 from utility import  load_images_by_class , read_text_for_html
@@ -181,7 +182,7 @@ def compare_2_xai( cfg,
                         "background" : background
                         }
     
-    # all_records_1, all_results_1 = [], {}
+    all_records_1, all_results_1 = [], {}
     all_records_2, all_results_2 = [], {}
 
     flag_inspect_1 = False
@@ -189,8 +190,25 @@ def compare_2_xai( cfg,
     # add assert not possible both True
     assert not (flag_inspect_1 and flag_inspect_2), "possibile una sola funzione di inspect "
 
+    GROUP_SETS_BY_MODE = { "all": GROUPS_RESULT_OK_KO,
+                            "both_ok": GROUPS_RESULT_BOTH_OK,
+                            "both_ko": GROUPS_RESULT_BOTH_KO,
+                            "lr_ok_cnn_ko": GROUPS_RESULT_LR_OK_CNN_KO,
+                            "lr_ko_cnn_ok": GROUPS_RESULT_LR_KO_CNN_OK,
+                        }
+
+    selected_mode = getattr(cfg, "SAMPLE_GROUP_SELECTION", "all")
+    if selected_mode not in GROUP_SETS_BY_MODE:
+        raise ValueError(f"Valore non valido per cfg.SAMPLE_GROUP_SELECTION: {selected_mode!r}. "
+                        f"Valori ammessi: {list(GROUP_SETS_BY_MODE.keys())}"
+                        )
+
+    active_groups = GROUP_SETS_BY_MODE[selected_mode]
+    logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(active_groups.keys()))
+
     # for group in GROUPS_RESULT_OK_KO:
-    for group in GROUPS_RESULT_BOTH_OK:
+    # for group in GROUPS_RESULT_BOTH_OK:
+    for group in active_groups:
         list_images = load_images_by_class(logger, 
                                            out_path / f"images_{group}.json",
                                            n_images_for_class=cfg.XAI_IMAGES_FOR_CLASS)
@@ -203,7 +221,7 @@ def compare_2_xai( cfg,
         elif ( flag_inspect_2):
             pre_compare_group_xai_2( cfg, ctx_param_dict )                       
         else:
-            logger.info("START run_compare_group_xai_1 3 return params")
+            # logger.info("START run_compare_group_xai_1 3 return params")
             results_1, source_row_1 = run_compare_group_xai_1( cfg, 
                                                             logger, 
                                                             model, 
@@ -213,8 +231,11 @@ def compare_2_xai( cfg,
                                                             ctx_param_dict,
                                                             group,
                                                             list_images ) 
+                                                            
+            all_results_1[group] = results_1
+            all_records_1 += records_1
 
-            logger.info("START run_compare_group_xai_2 3 return params")
+            # logger.info("START run_compare_group_xai_2 3 return params")
             results_2, records_2 = run_compare_group_xai_2( cfg, 
                                                         logger, 
                                                         results_1,
@@ -228,13 +249,19 @@ def compare_2_xai( cfg,
             all_results_2[group] = results_2
             all_records_2 += records_2
     
+     if all_records_1:
+        with open(out_path / "xai_metrics_all_1.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(all_records_2[0]))
+            w.writeheader()
+            w.writerows(all_records_2)
+            
     if all_records_2:
-        with open(out_path / "xai_metrics_all.csv", "w", newline="", encoding="utf-8") as f:
+        with open(out_path / "xai_metrics_all_2.csv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(all_records_2[0]))
             w.writeheader()
             w.writerows(all_records_2)
 
-    return all_results_2
+    return all_records_1 , all_results_2
 
 
 def explore_2_xai( cfg,
@@ -366,8 +393,19 @@ def phase_3_xai(cfg,
     if (cfg.SECTION_DISPLAY_ON):
             section_display_title( "Fase3:Report Finale XAI -", 
                                     "Comparazione tra Grad-CAM, Integrated Gradients , Occlusion Map Lime Shap sulla griglia 28x28."
-                                    )
-    plot_metrics_all(filename="xai_metrics_all.csv")
+                                   )
+                                   
+    for csv_name in ("xai_metrics_all_1.csv", "xai_metrics_all_2.csv"):
+        csv_path = out_path / csv_name
+        if not csv_path.is_file():
+            logger.warning("File metriche non trovato: %s", csv_path)
+            continue
+
+        try:
+            plot_metrics_all(filename=csv_path)
+        except Exception as exc:
+            logger.warning("Errore durante plot_metrics_all su %s (non bloccante): %s",csv_path,exc,)
+    
 
 def phase_2_xai( cfg,
                  logger,

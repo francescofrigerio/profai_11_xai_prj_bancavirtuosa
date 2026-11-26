@@ -648,8 +648,7 @@ def run_compare_group_xai_1(cfg,
                         row["ig_unreliable_true"] = bool(err > ig_max)
 
             rows.append(row)
-            logger.info("[%s] idx %d pos %d true %d CNN %d LR %d",
-                        group, org_idx, position, true, pred_cnn,pred_lr)
+            logger.debug("[%s] idx %d pos %d true %d CNN %d LR %d",group, org_idx, position, true, pred_cnn,pred_lr)
 
     # Lime Shap stability of Explanation
     # stochastic techniques: same image explained twice
@@ -939,10 +938,10 @@ def run_compare_group_xai_2(cfg,
                  records_dest.append(
                  {
                         "group": group,
-                        "index": result_row["index"],
-                        "true": result_row["true"],
-                        "pred_cnn": result_row["pred_cnn"],
-                        "pred_lr": result_row["pred_lr"],
+                        "index": r["index"],
+                        "true": r["true"],
+                        "pred_cnn": r["pred_cnn"],
+                        "pred_lr": r["pred_lr"],
                         "model": "cnn",
                         "target_name": target_name,
                         "target_class": target_class,

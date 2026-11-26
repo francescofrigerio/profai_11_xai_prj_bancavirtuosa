@@ -115,7 +115,11 @@ class ConfigConstantsDefault:
 
     # Sampling
     GALLERY_SIZE: int = 24
-    N_QUANT: int = 100                   # quantitative sample; fixed after timing in phase zero
+    N_QUANT: int = 100    
+    # SAMPLE_GROUP_SELECTION = "all" (default)  
+    # options both_ko lr_ok_cnn_ko lr_ko_cnn_ok   
+    SAMPLE_GROUP_SELECTION = "both_ok"          
+    # quantitative sample;
 
     # Comparison
     # IG_COMPLETENESS_MAX = 0.05

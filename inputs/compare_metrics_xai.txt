@@ -1,0 +1,19 @@
+Verifiche Confronti a Coppia	        Ipotesi da verificare
+IG–SHAP	                                Affinità tra SHAP e Integrated Gradients
+                                        perché entrambi si basano sui gradienti 
+                                        L'accordo dovrebbe essere alto.
+
+Occlusion–LIME	                        Affinità metodi basati su perturbazione.
+                                        L'accordo dovrebbe essere moderato 
+                                        Un disaccordo non implica automaticamente un errore
+                                        a causa del fatto che LIME produce intrinsicamente rumore.
+
+Grad-CAM–altre	                        utile per studiare l’effetto della risoluzione: 
+                                        l’accordo, che sale con risoluzione grossolana, 
+                                        può dipendere da quanto sono estese le regioni selezionate 
+                                        e dal ridimensionamento, non solo dalla tecnica.
+
+LR–CNN	                                utile per capire se la CNN guarda gli stessi tratti della LR
+                                        Per confrontare le rappresentazioni spaziali, 
+                                        bisogna usare le mappe LR e CNN dello stesso target, 
+                                        per esempio "true" quando disponibile.
