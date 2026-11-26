@@ -1,7 +1,7 @@
 """
     Commont utility for Normalization , Model Cnn and Logistic Regression
 """
-
+import random
 import math
 import html
 import json
