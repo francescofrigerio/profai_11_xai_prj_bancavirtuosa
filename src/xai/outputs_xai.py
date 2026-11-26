@@ -125,6 +125,58 @@ def format_json_xai_rows(rows,include_maps=False):
     return formatted_images
 
 
+def format_json_xai_maps_rows( rows,
+                              group=None,
+                              label=None,
+                              mask_threshold=0.1,
+                              mask_dilation=0,
+                          ):
+    """
+         Create payload JSON light with maps and metadata 
+         This is file will be used to recovery images and compare target.
+    """
+
+    formatted_images = []
+
+    for row in rows:
+        maps_cnn_json = {}
+
+        for target_name, techniques_results in row.get("maps_cnn", {}).items():
+            maps_cnn_json[target_name] = {}
+
+            for technique_name, res in techniques_results.items():
+                maps_cnn_json[target_name][technique_name] = {
+                    "map": to_json_value(res.map),
+                    "signed": bool(res.signed),
+                }
+
+        maps_lr_json = {
+            target_name: to_json_value(lr_map)
+            for target_name, lr_map in row.get("maps_lr", {}).items()
+        }
+
+        img_entry = { "index": to_json_value(row["index"]),
+                      "pos": to_json_value(row["pos"]),
+                      "true": to_json_value(row["true"]),
+                      "pred_cnn": to_json_value(row["pred_cnn"]),
+                      "pred_lr": to_json_value(row["pred_lr"]),
+                      "targets_cnn": to_json_value(row.get("targets_cnn", {})),
+                      "targets_lr": to_json_value(row.get("targets_lr", {})),
+                      "maps_cnn": maps_cnn_json,
+                      "maps_lr": maps_lr_json,
+                      "input_image": to_json_value(row.get("input_image")),
+                  }
+
+        formatted_images.append(img_entry)
+
+    return { "group": group,
+              "label": label,
+              "mask_threshold": mask_threshold,
+              "mask_dilation": mask_dilation,
+              "n_images": len(formatted_images),
+              "images": formatted_images,
+          }
+    
 def plot_maps_grid_dinamic(rows, target_key, maps_key, names, cfg, X_data, title, path, logger, max_rows=10):
     sel = [r for r in rows if target_key in r[maps_key]][:max_rows]
     if not sel:
@@ -293,7 +345,7 @@ def inspect_digit_masks(positions, X_data, cfg):
     plt.show()
 
 
-def plot_metrics_all(filename="xai_metrics_all.csv"):
+def plot_metrics_all(filename):
     """
         plot metrics for final report 
     """
@@ -345,9 +397,10 @@ def plot_metrics_all(filename="xai_metrics_all.csv"):
     axes[1].legend(title="Tecnica", loc="upper right")
 
     plt.tight_layout()
-    plt.savefig("xai_cnn_deletion_summary.png", dpi=150)
+    fig.savefig("xai_cnn_deletion_summary.png", dpi=150, bbox_inches="tight")
     plt.show()
-    
+    plt.close(fig)
+
     summary = ( df.dropna(subset=["del_auc", "del_gain"])
                 .groupby( ["group", "model", "target_name", "technique"])
                         [
@@ -355,6 +408,175 @@ def plot_metrics_all(filename="xai_metrics_all.csv"):
                         ].agg(["count", "mean", "std", "median"])
             )
     print(summary.to_string())
+    
+    
+    
+    
+    def plot_mask_sensitivity( json_path,
+                              X_data,
+                              cfg,
+                              thresholds=(0.1, 0.2),
+                              dilations=(0, 1),
+                              save_path=None,
+                          ):
+    """
+        This function Detects the masks for all json images and compare
+        the mean fraction of selected pixels for threshold e dilation.
+
+        Restituisce:
+            summary_df: statistiche aggregate per configurazione
+            masks: maschere indicizzate per (index, threshold, dilation)
+            fig: figura matplotlib
+    """
+    data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    images = data.get("images", [])
+
+    if not images:
+        raise ValueError(f"Nessuna immagine trovata in {json_path}")
+
+    rows = []
+    masks = {}
+
+    for item in images:
+        image_index = int(item["index"])
+        position = int(item["pos"])
+
+        # Sane recovery images used by phase 1 and 2 xai
+        image = img28(position, X_data, size=cfg.IMAGE_SIZE)
+
+        for threshold in thresholds:
+            for dilation in dilations:
+                mask = digit_mask(image, threshold, dilation)
+
+                # Manages both array NumPy and tensors PyTorch
+                if hasattr(mask, "detach"):
+                    mask = mask.detach().cpu().numpy()
+
+                mask = np.asarray(mask).squeeze().astype(bool)
+
+                masks[(image_index, threshold, dilation)] = mask
+
+                rows.append({ "index": image_index,
+                            "threshold": threshold,
+                            "dilation": dilation,
+                            "mask_fraction": float(mask.mean()),
+                        })
+
+    for_image_df = pd.DataFrame(rows)
+
+    summary_df = ( for_image_df.groupby(["threshold", "dilation"])["mask_fraction"]
+                                .agg(["mean", "std", "count"])
+                                .reset_index()
+              )
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+
+    for dilation in dilations:
+        subset = summary_df[summary_df["dilation"] == dilation]
+        ax.errorbar( subset["threshold"],
+                      subset["mean"],
+                      yerr=subset["std"].fillna(0),
+                      marker="o",
+                      capsize=4,
+                      label=f"dilation={dilation}",
+                  )
+
+    ax.set_title("Sensibilità della frazione di maschera")
+    ax.set_xlabel("Threshold")
+    ax.set_ylabel("Frazione media di pixel selezionati")
+    ax.set_xticks(list(thresholds))
+    ax.grid(True, alpha=0.3)
+    ax.legend(title="Dilation")
+
+    fig.tight_layout()
+
+    if save_path is not None:
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+
+    plt.show()
+
+    return summary_df, masks, fig
+    
+    
+    
+def plot_masks_for_image( json_path,
+                        image_index,
+                        X_data,
+                        cfg,
+                        masks,
+                        thresholds=(0.1, 0.2),
+                        dilations=(0, 1),
+                        save_path=None,
+                    ):
+    """
+        This function views the original image with mask overlaps
+        for every pair of threshold and dilation.
+    """
+
+    data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    images = data.get("images", [])
+
+    item = next( (row for row in images 
+                            if int(row["index"]) == int(image_index)),
+                                None,
+                )
+                
+    if item is None:
+        raise KeyError(f"Indice immagine {image_index} non trovato in {json_path}")
+
+    position = int(item["pos"])
+    image = img28(position, X_data, size=cfg.IMAGE_SIZE)
+
+    if hasattr(image, "detach"):
+        image = image.detach().cpu().numpy()
+
+    image = np.asarray(image).squeeze()
+
+    configurations = [ (threshold, dilation)
+                        for threshold in thresholds
+                        for dilation in dilations
+                    ]
+
+    fig, axes = plt.subplots( 1,len(configurations),figsize=(4 * len(configurations), 4),squeeze=False,)
+    axes = axes.ravel()
+
+    for ax, (threshold, dilation) in zip(axes, configurations):
+        key = (int(image_index), threshold, dilation)
+
+        if key not in masks:
+            raise KeyError(
+                f"Maschera non trovata per index={image_index}, "
+                f"threshold={threshold}, dilation={dilation}. "
+                "Verifica che thresholds e dilations siano gli stessi "
+                "usati in plot_mask_sensitivity."
+            )
+
+        mask = np.asarray(masks[key]).squeeze().astype(bool)
+
+        if mask.shape != image.shape:
+            raise ValueError(f"Shape immagine {image.shape} diversa da quella della "
+                             f"maschera {mask.shape} per {key}"
+                            )
+
+        ax.imshow(image, cmap="gray")
+        overlay = np.ma.masked_where(~mask, mask)
+        ax.imshow(overlay, cmap="Reds", alpha=0.45, vmin=0, vmax=1)
+
+        ax.set_title(f"threshold={threshold}, dilation={dilation}\n"
+                    f"mask.mean()={mask.mean():.3f}"
+                    )
+        ax.axis("off")
+
+    fig.suptitle(f"Maschere per immagine index={image_index}",
+                    fontsize=14,
+                )
+    fig.tight_layout()
+
+    if save_path is not None:
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+
+    plt.show()
+    return fig
 
 
 

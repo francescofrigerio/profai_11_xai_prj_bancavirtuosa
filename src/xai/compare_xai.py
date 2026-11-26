@@ -13,7 +13,7 @@ import numpy as np
 from matplotlib.figure import Figure
 from IPython.display import Image, display
 from xai.outputs_xai import plot_maps_grid , plot_deletion_curves ,plot_maps_grid_dinamic
-from xai.outputs_xai import format_json_xai_rows , inspect_digit_masks
+from xai.outputs_xai import format_json_xai_rows , inspect_digit_masks , format_json_xai_maps_rows
 
 from config import CONFIG
 # from constants import IMAGENET_MEAN_TRANSFORM , IMAGENET_STD_TRANSFORM
@@ -795,11 +795,11 @@ def run_compare_group_xai_1(cfg,
                                                                                    default=str),
                                                                         encoding="utf-8"
                                                                         )
-    
-    
+                                                                        
+     
     logger.debug(f"sizes -> results_keys={len(results)} records={len(records)} rows={len(rows)}") 
     logger.debug(f"types -> results_keys={type(results)} records={type(records)} rows={type(rows)}")                                                         
-    return results, rows
+    return results, records , rows
 
 
 def run_compare_group_xai_2(cfg, 
@@ -875,6 +875,7 @@ def run_compare_group_xai_2(cfg,
 
         # not modify source record 
         result_row = dict(source_row)
+        result_row["input_image"] = input_image.detach().cpu().squeeze().numpy()
         result_row["metrics_cnn_del"] = {}
         result_row["meta_cnn_del"] = {}
 
@@ -1021,12 +1022,24 @@ def run_compare_group_xai_2(cfg,
                 "images": format_json_xai_rows(rows),
                 "total_seconds": time.time() - t0
             }
-                                                                                     
+        
+    maps_payload = format_json_xai_maps_rows( rows,
+                                              group=group,
+                                              label=label,
+                                              mask_threshold=cfg.MASK_THRESHOLD,
+                                              mask_dilation=cfg.MASK_DILATION,
+                                          )
+                                                                                                                       
     (out_path / f"stage2_compare2_results_{group}.json").write_text(json.dumps(results_dest,
                                                                                        indent=2, 
                                                                                        default=str),
                                                                             encoding="utf-8"
                                                                             )
+                                                                            
+    
+    Path(f"stage2_maps_{group}.json").write_text(json.dumps(maps_payload, ensure_ascii=False),
+                                                            encoding="utf-8",
+                                                )
     
     return results_dest , records_dest 
 

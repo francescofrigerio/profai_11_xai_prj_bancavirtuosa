@@ -38,7 +38,7 @@ from utility import create_and_save_images_lists , require , save_quadrant_balan
 from xai.explore_xai import run_exp , make_gradcam_callback
 from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai_1 , pre_compare_group_xai_2
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
-from xai.outputs_xai import plot_metrics_all
+from xai.outputs_xai import plot_metrics_all , plot_mask_sensitivity , plot_masks_for_image
 
 from xai import build_techniques
 from xai.shap_explainer import make_background
@@ -222,15 +222,15 @@ def compare_2_xai( cfg,
             pre_compare_group_xai_2( cfg, ctx_param_dict )                       
         else:
             # logger.info("START run_compare_group_xai_1 3 return params")
-            results_1, source_row_1 = run_compare_group_xai_1( cfg, 
-                                                            logger, 
-                                                            model, 
-                                                            device,
-                                                            techniques,
-                                                            lr, 
-                                                            ctx_param_dict,
-                                                            group,
-                                                            list_images ) 
+            results_1, records_1 , source_row_1 = run_compare_group_xai_1( cfg, 
+                                                                          logger, 
+                                                                          model, 
+                                                                          device,
+                                                                          techniques,
+                                                                          lr, 
+                                                                          ctx_param_dict,
+                                                                          group,
+                                                                          list_images ) 
                                                             
             all_results_1[group] = results_1
             all_records_1 += records_1
@@ -402,6 +402,41 @@ def phase_3_xai(cfg,
             plot_metrics_all(filename=csv_path)
         except Exception as exc:
             logger.warning("Errore durante plot_metrics_all su %s (non bloccante): %s",csv_path,exc,)
+            
+    summary_df, masks, fig = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{group}.json",
+                                                    X_data=X_data,
+                                                    cfg=cfg,
+                                                    save_path=out_path / f"mask_sensitivity_{group}.png",
+                                                )
+
+    print(summary_df.to_string(index=False))
+    
+    selected_mode = getattr(cfg, "SAMPLE_GROUP_SELECTION", "all")
+    if selected_mode not in GROUP_SETS_BY_MODE:
+        raise ValueError(f"Valore non valido per cfg.SAMPLE_GROUP_SELECTION: {selected_mode!r}. "
+                        f"Valori ammessi: {list(GROUP_SETS_BY_MODE.keys())}"
+                        )
+
+    active_groups = GROUP_SETS_BY_MODE[selected_mode]
+    logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(active_groups.keys()))
+
+    # for group in GROUPS_RESULT_OK_KO:
+    # for group in GROUPS_RESULT_BOTH_OK:
+    for group in active_groups:
+    
+        # Sostituisci 57588 con un index presente nel JSON
+        plot_masks_for_image(json_path=out_path / f"stage2_maps_{group}.json",
+                        image_index=57588,
+                        X_data=X_data,
+                        cfg=cfg,
+                        masks=masks,
+                        thresholds=(0.1, 0.2),
+                        dilations=(0, 1),
+                        save_path=out_path / f"mask_examples_{group}_57588.png",
+                    )
+
+                                   
+    
     
 
 def phase_2_xai( cfg,
@@ -426,6 +461,8 @@ def phase_2_xai( cfg,
         section_display_content("Fase2:Metriche Xai", content_html=content_txt)
    
     compare_2_xai(cfg,logger,out_path,flag_pretrained)
+    
+    
 
 def phase_1_train(cfg,
                 logger,
