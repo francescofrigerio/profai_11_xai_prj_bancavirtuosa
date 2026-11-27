@@ -382,10 +382,14 @@ def explore_2_xai( cfg,
 
     return result_ok , result_ko
 
-def phase_3_xai(cfg,
+def analysis_2_xai(cfg,
                  logger,
-                 inp_path,
                  out_path):
+    """
+          X_data = X_val_lr must be the same value of the function compare 2 xai
+          In the next version we can modify both to pass argument instead of
+          read again the dataset
+    """
 
     
     t_start = time.time()
@@ -421,10 +425,10 @@ def phase_3_xai(cfg,
                                    )
 
     GROUP_SETS_BY_MODE = {  # "all": GROUPS_RESULT_OK_KO,
-                                "both_ok": GROUPS_RESULT_BOTH_OK,
-                                "both_ko": GROUPS_RESULT_BOTH_KO,
-                                "lr_ok_cnn_ko": GROUPS_RESULT_LR_OK_CNN_KO,
-                                "lr_ko_cnn_ok": GROUPS_RESULT_LR_KO_CNN_OK,
+                            "both_ok": GROUPS_RESULT_BOTH_OK,
+                            "both_ko": GROUPS_RESULT_BOTH_KO,
+                            "lr_ok_cnn_ko": GROUPS_RESULT_LR_OK_CNN_KO,
+                            "lr_ko_cnn_ok": GROUPS_RESULT_LR_KO_CNN_OK,
                             }
                             
     selected_mode = getattr(cfg, "SAMPLE_GROUP_SELECTION", "all")
@@ -463,9 +467,10 @@ def phase_3_xai(cfg,
     
     print(summary_df.to_string(index=False))
     
-    # Substitude 57588 with a index presente into the JSON
+    # Substitude image_index with a index presente into the JSON and csv
+    # both_ko 56664 
     plot_masks_for_image(json_path=out_path / f"stage2_maps_{group}.json",
-                        image_index=57588,
+                        image_index=56664,
                         X_data=X_val_lr,
                         cfg=cfg,
                         masks=masks,
@@ -475,9 +480,25 @@ def phase_3_xai(cfg,
                     )
 
                                    
-    
-    
-
+def phase_3_xai(cfg,
+                 logger,
+                 inp_path,
+                 out_path):
+                 
+    if (cfg.SECTION_DISPLAY_ON):
+        section_display_title( "Fase3:Processo Finale XAI - Modello da Training LR", 
+                     "Confronto tra metriche Xai / LR."
+                        )
+        section_display_title( "Fase3:Comparazione Metriche - Immagini da Quadrante", 
+                     "Confronto metriche Xai"
+                        )
+        results_txt = read_text_for_html(inp_path / cfg.FILE_TXT_RESULTS_XAI)
+        section_display_content("Fase3:Confronto Metriche Xai", content_html=results_txt)
+        
+        compare_txt = read_text_for_html(inp_path / cfg.FILE_TXT_COMPARE_XAI)
+        section_display_content("Fase3:Confronto Metriche Xai", content_html=compare_txt)
+        
+                 
 def phase_2_xai( cfg,
                  logger,
                  inp_path,
@@ -499,7 +520,8 @@ def phase_2_xai( cfg,
         content_txt = read_text_for_html(inp_path / cfg.FILE_TXT_CONTENTS_XAI)
         section_display_content("Fase2:Metriche Xai", content_html=content_txt)
    
-    compare_2_xai(cfg,logger,out_path,flag_pretrained)
+    # compare_2_xai(cfg,logger,out_path,flag_pretrained)
+    analysis_2_xai(cfg,logger,out_path)
     
     
 

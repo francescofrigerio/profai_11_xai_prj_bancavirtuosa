@@ -117,9 +117,10 @@ class ConfigConstantsDefault:
     GALLERY_SIZE: int = 24
     N_QUANT: int = 100    
     # (default)  
-    SAMPLE_GROUP_SELECTION = "all" 
+    # SAMPLE_GROUP_SELECTION = "all" 
     # options both_ko lr_ok_cnn_ko lr_ko_cnn_ok   
-    # SAMPLE_GROUP_SELECTION = "both_ok"          
+    # SAMPLE_GROUP_SELECTION = "both_ok" 
+    SAMPLE_GROUP_SELECTION = "both_ko"          
     # quantitative sample;
 
     # Comparison
@@ -146,6 +147,8 @@ class ConfigConstantsDefault:
     INPUT_DIR: str = ROOT_DIR / "inputs"
 
     FILE_TXT_CONTENTS_XAI: str = "contents_metrics_xai.txt" 
+    FILE_TXT_RESULTS_XAI: str = "results_metrics_xai.txt" 
+    FILE_TXT_COMPARE_XAI: str = "compare_metrics_xai.txt" 
 
     # found and confirmed by visual control
     CHECK_CLASSES: tuple[int, ...] = (2, 3, 5, 8)

@@ -1,19 +1,21 @@
-Verifiche Confronti a Coppia	        Ipotesi da verificare
-IG vs SHAP	                        Affinità tra SHAP e Integrated Gradients
-                                        perché entrambi si basano sui gradienti 
-                                        L'accordo dovrebbe essere alto.
+Verifiche Confronti a Coppia            Ipotesi
+-----------------------------------------------------------------------------------------------
+IG vs SHAP                              Affinità tra SHAP e Integrated Gradients
+                                        perché entrambi si basano sui gradienti
+                                        L'accordo potrebbe essere alto.(da verificare)
 
-Occlusion LIME	                        Affinità metodi basati su perturbazione.
-                                        L'accordo dovrebbe essere moderato 
+Occlusion LIME                          Affinità metodi basati su perturbazione.
+                                        L'accordo potrebbe essere moderato.(da verificare)
                                         Un disaccordo non implica automaticamente un errore
                                         a causa del fatto che LIME produce intrinsicamente rumore.
 
-Grad-CAM altre	                        utile per studiare l’effetto della risoluzione: 
-                                        l’accordo, che sale con risoluzione grossolana, 
-                                        può dipendere da quanto sono estese le regioni selezionate 
+Grad-CAM altre                          utile per studiare l'effetto della risoluzione:
+                                        l'accordo, che sale con risoluzione grossolana,
+                                        può dipendere da quanto sono estese le regioni selezionate
                                         e dal ridimensionamento, non solo dalla tecnica.
 
-LR CNN	                                utile per capire se la CNN guarda gli stessi tratti della LR
-                                        Per confrontare le rappresentazioni spaziali, 
-                                        bisogna usare le mappe LR e CNN dello stesso target, 
+LR CNN                                  utile per capire se la CNN guarda gli stessi tratti della LR
+                                        Per confrontare le rappresentazioni spaziali,
+                                        bisogna usare le mappe LR e CNN dello stesso target,
                                         per esempio "true" quando disponibile.
+                                        
