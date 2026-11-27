@@ -343,7 +343,7 @@ def run_compare_group_xai(cfg, logger, model, device, techniques, lr, ctx, group
     return results, records
 
 
-def pre_compare_group_xai_1 (cfg, ctx ):
+def pre_compare_group_xai_rand (cfg, ctx ):
     """
         analysis before run_compare_xai
     """
@@ -418,15 +418,16 @@ def select_thin_thick_examples(X_data, y_data, cfg, quantiles=(0.2, 0.8)):
     return selected
 
 
-def pre_compare_group_xai_2(cfg,ctx, quantiles=(0.2, 0.8)):
+def run_inspect_group_xai(cfg,X_data, y_data, quantiles=(0.2, 0.8)):
     
     """
         analysis pre compare group to choice Treshold mask
         The final print score is a useful estimate for selecting examples, 
         not a perfect measure of significance: it depends on the threshold.
+        This function start selecting thin and thick examples.
     """
     
-    X_data, y_data, = ctx["X_data"], ctx["y_data"]
+    # X_data, y_data, = ctx["X_data"], ctx["y_data"]
 
     selected = select_thin_thick_examples(X_data, y_data, cfg)
 
@@ -437,6 +438,7 @@ def pre_compare_group_xai_2(cfg,ctx, quantiles=(0.2, 0.8)):
                 ]
     inspect_digit_masks(positions, X_data, cfg)
     print(selected)
+    return selected
 
 
 def run_compare_group_xai_1(cfg, 

@@ -36,7 +36,7 @@ from training import get_device, get_trained_model , evaluate_model
 
 from utility import create_and_save_images_lists , require , save_quadrant_balance_to_json
 from xai.explore_xai import run_exp , make_gradcam_callback
-from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai_1 , pre_compare_group_xai_2
+from xai.compare_xai import run_compare_group_xai ,select_thin_thick_examples
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
 from xai.outputs_xai import plot_mask_sensitivity , plot_masks_for_image
 from xai.outputs_xai import plot_metrics_all , plot_spearman_vs_iou
@@ -186,11 +186,8 @@ def compare_2_xai( cfg,
     all_records_1, all_results_1 = [], {}
     all_records_2, all_results_2 = [], {}
 
-    flag_inspect_1 = False
-    flag_inspect_2 = False
-    # add assert not possible both True
-    assert not (flag_inspect_1 and flag_inspect_2), "possibile una sola funzione di inspect "
-
+    
+    
     GROUP_SETS_BY_MODE = { "all": GROUPS_RESULT_OK_KO,
                             "both_ok": GROUPS_RESULT_BOTH_OK,
                             "both_ko": GROUPS_RESULT_BOTH_KO,
@@ -206,7 +203,6 @@ def compare_2_xai( cfg,
 
     active_groups = GROUP_SETS_BY_MODE[selected_mode]
     logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(active_groups.keys()))
-
     for group in active_groups:
         list_images = load_images_by_class(logger, 
                                            out_path / f"images_{group}.json",
@@ -215,13 +211,8 @@ def compare_2_xai( cfg,
             logger.warning("Gruppo %s vuoto: salto", group)
             continue
 
-        if (flag_inspect_1):
-            pre_compare_group_xai_1( cfg, ctx_param_dict )
-        elif ( flag_inspect_2):
-            pre_compare_group_xai_2( cfg, ctx_param_dict )                       
-        else:
-            # logger.info("START run_compare_group_xai_1 3 return params")
-            results_1, records_1 , source_row_1 = run_compare_group_xai_1( cfg, 
+        # logger.info("START run_compare_group_xai_1 3 return params")
+        results_1, records_1 , source_row_1 = run_compare_group_xai_1( cfg, 
                                                                           logger, 
                                                                           model, 
                                                                           device,
@@ -260,7 +251,7 @@ def compare_2_xai( cfg,
             w.writeheader()
             w.writerows(all_records_2)
 
-    return X_val_lr
+    return X_val_lr , y_val_lr ,idx_val_lr
 
 
 def explore_2_xai( cfg,
@@ -320,7 +311,7 @@ def explore_2_xai( cfg,
     y_pred_val_lr = lr.predict(X_val_lr)
     
     # from here is different compare to phase 1
-    list_img = []
+    ÿ st 훱翴  = []
     list_img = load_images_by_class(logger,out_path / cfg.FILE_IMG_CNN_KO, n_images_for_class = cfg.NUM_IMAGES_LOAD_FOR_CLASS)
 
     if len(list_img) == 0 :
@@ -381,10 +372,46 @@ def explore_2_xai( cfg,
 
     return result_ok , result_ko
 
+def inspect_2_xai(cfg, X_data = None , y_data = None , idx_val = None , quantiles=(0.2, 0.8)):
+    
+    """
+        analysis pre compare group to choice Treshold mask
+        The final print score is a useful estimate for selecting examples, 
+        not a perfect measure of significance: it depends on the threshold.
+        This function start selecting thin and thick examples.
+    """
+    
+    # X_data, y_data, = ctx["X_data"], ctx["y_data"]
+    X_val_lr = x_data
+    y_val_lr = y_data
+    idx_val_lr = idx_val
+    if X_val_lr is None and :
+        _ , loaders_dict , _ = load_datasets()
+        
+        # Load tensor for train and test baseline
+        val_loader_lr = loaders_dict["lr"]["val"]
+        
+        # Load tensor 
+        X_val_lr , y_val_lr , idx_val_lr = data_to_input_lr(val_loader_lr,1, 
+                                                CONFIG.IMAGE_SIZE, 
+                                                 CONFIG.IMAGE_SIZE)
+
+    selected = select_thin_thick_examples(X_val_lr, y_val_lr, cfg)
+
+    # positions to pass at view function 
+    positions = [ position
+                    for examples in selected.values()
+                        for position in (examples["thin"], examples["thick"])
+                ]
+    inspect_digit_masks(positions, X_val_lr, cfg)
+    print(selected)
+    return selected
+    
 def analysis_2_xai(cfg,
                  logger,
                  out_path,
-                 x_data=None):
+                 x_data=None,
+                 selected_img ):
     """
           X_data = X_val_lr must be the same value of the function compare 2 xai
           In the next version we can modify both to pass argument instead of
@@ -398,7 +425,7 @@ def analysis_2_xai(cfg,
     #     logger.debug(f"WARNING: {warning}")
     X_val_lr = x_data
     if X_val_lr is None:
-        _ , loaders_dict , transform_cnn_dict = load_datasets()
+        _ , loaders_dict , _ = load_datasets()
         
         # Load tensor for train and test baseline
         val_loader_lr = loaders_dict["lr"]["val"]
@@ -496,11 +523,28 @@ def phase_2_xai( cfg,
         content_txt = read_text_for_html(inp_path / cfg.FILE_TXT_CONTENTS_XAI)
         section_display_content("Fase2:Metriche Xai", content_html=content_txt)
    
-    x_data = None
+    x_data , y_data = None , None
     flag_compare = False
+    flag_inspect = True
+    flag_analysis = True
+                       
     if flag_compare:
-        x_data = compare_2_xai(cfg,logger,out_path,flag_pretrained)
-    analysis_2_xai(cfg,logger,out_path,x_data)
+        x_data,y_data,idx_val = compare_2_xai(cfg,logger,out_path,flag_pretrained)
+    
+    if ( flag_inspect):
+        selected_img = inspect_2_xai( cfg, x_data,y_data,idx_val)    
+       
+    print(f"selected_img {type(selected_img)}") 
+    print(f"selected_img {len(selected_img)}") 
+    print(f"selected_img {selected_img}") 
+    
+    print(f"selected_img {type(idx_val)}") 
+    print(f"selected_img {len(idx_val)}") 
+    # print(f"selected_img {idx_val}")
+    raise ValueError("Mi fermo per debug")
+    
+    if ( flag_analysis):
+        analysis_2_xai(cfg,logger,out_path,x_data,selected_img)
     
     
 
