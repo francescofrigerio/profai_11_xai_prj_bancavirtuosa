@@ -401,13 +401,13 @@ def analysis_2_xai(cfg,
     # if warning:
     #     logger.debug(f"WARNING: {warning}")
     
-    # _ , loaders_dict , transform_cnn_dict = load_datasets()
-    # transform_val_cnn = transform_cnn_dict["val"]
-    
-    # Load tensor for train and test baseline
-    # train_loader_lr = loaders_dict["lr"]["train"]
-    
     if x_data is None:
+        _ , loaders_dict , transform_cnn_dict = load_datasets()
+        # transform_val_cnn = transform_cnn_dict["val"]
+     
+        # Load tensor for train and test baseline
+        # train_loader_lr = loaders_dict["lr"]["train"]
+    
         val_loader_lr = loaders_dict["lr"]["val"]
         # test_loader_lr = loaders_dict["lr"]["test"]
     
