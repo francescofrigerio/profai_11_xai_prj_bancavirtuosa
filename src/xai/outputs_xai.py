@@ -2,6 +2,8 @@
      Plot Graph for Xai
 """
 import math
+import json
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -310,7 +312,7 @@ def plot_deletion_curves(metrics, meta, fractions, path,logger):
 
 def inspect_digit_masks(positions, X_data, cfg):
     """
-        plot image to inspect_digit_masks and choice treshold param
+        plot image to inspect_digit_masks and choice threshold param
     """
     fig, axes = plt.subplots(
         len(positions),
@@ -329,7 +331,7 @@ def inspect_digit_masks(positions, X_data, cfg):
 
         for col_idx, threshold in enumerate(MASK_THRESHOLD_LIST, start=1):
             mask = digit_mask(image, threshold, dilation=0)
-            #  print for each treshold the pixel fraction selected by the mask
+            #  print for each threshold the pixel fraction selected by the mask
             print("threshold and mask.mean ",threshold, mask.mean())
             if row_idx == 0:
                 axes[row_idx, col_idx].set_title(f"Soglia {threshold:.2f}")
@@ -410,23 +412,21 @@ def plot_metrics_all(filename):
     print(summary.to_string())
     
     
-    
-    
-    def plot_mask_sensitivity( json_path,
-                              X_data,
-                              cfg,
-                              thresholds=(0.1, 0.2),
-                              dilations=(0, 1),
-                              save_path=None,
-                          ):
+def plot_mask_sensitivity( json_path,
+                            X_data,
+                            cfg,
+                            thresholds=(0.1, 0.2),
+                            dilations=(0, 1),
+                            save_path=None,
+                        ):
     """
-        This function Detects the masks for all json images and compare
-        the mean fraction of selected pixels for threshold e dilation.
+        Detect masks for all JSON images and compare mean selected pixel fractions
+        across threshold and dilation values.
 
-        Restituisce:
-            summary_df: statistiche aggregate per configurazione
-            masks: maschere indicizzate per (index, threshold, dilation)
-            fig: figura matplotlib
+        Return Value:
+        summary_df: summary statistics for config.
+        masks: indexed masks (index, threshold, dilation)
+        fig: matplotlib Figure
     """
     data = json.loads(Path(json_path).read_text(encoding="utf-8"))
     images = data.get("images", [])
@@ -441,45 +441,44 @@ def plot_metrics_all(filename):
         image_index = int(item["index"])
         position = int(item["pos"])
 
-        # Sane recovery images used by phase 1 and 2 xai
+        # Same image recovery used by XAI phases 1 and 2
         image = img28(position, X_data, size=cfg.IMAGE_SIZE)
 
         for threshold in thresholds:
             for dilation in dilations:
                 mask = digit_mask(image, threshold, dilation)
 
-                # Manages both array NumPy and tensors PyTorch
+                # Handle both NumPy arrays and PyTorch tensors
                 if hasattr(mask, "detach"):
                     mask = mask.detach().cpu().numpy()
-
                 mask = np.asarray(mask).squeeze().astype(bool)
 
                 masks[(image_index, threshold, dilation)] = mask
 
-                rows.append({ "index": image_index,
-                            "threshold": threshold,
-                            "dilation": dilation,
-                            "mask_fraction": float(mask.mean()),
-                        })
+                rows.append({"index": image_index,
+                                    "threshold": threshold,
+                                    "dilation": dilation,
+                                    "mask_fraction": float(mask.mean()),
+                                })
 
     for_image_df = pd.DataFrame(rows)
 
     summary_df = ( for_image_df.groupby(["threshold", "dilation"])["mask_fraction"]
-                                .agg(["mean", "std", "count"])
-                                .reset_index()
-              )
+                    .agg(["mean", "std", "count"])
+                    .reset_index()
+                 )
 
     fig, ax = plt.subplots(figsize=(7, 5))
 
     for dilation in dilations:
         subset = summary_df[summary_df["dilation"] == dilation]
         ax.errorbar( subset["threshold"],
-                      subset["mean"],
-                      yerr=subset["std"].fillna(0),
-                      marker="o",
-                      capsize=4,
-                      label=f"dilation={dilation}",
-                  )
+                    subset["mean"],
+                    yerr=subset["std"].fillna(0),
+                    marker="o",
+                    capsize=4,
+                    label=f"dilation={dilation}",
+                )
 
     ax.set_title("Sensibilità della frazione di maschera")
     ax.set_xlabel("Threshold")
@@ -495,8 +494,7 @@ def plot_metrics_all(filename):
 
     plt.show()
 
-    return summary_df, masks, fig
-    
+    return summary_df, masks, fig    
     
     
 def plot_masks_for_image( json_path,

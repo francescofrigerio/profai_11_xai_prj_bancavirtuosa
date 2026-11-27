@@ -31,7 +31,7 @@ from utility import  load_images_by_class , read_text_for_html
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants 
 from outputs import plot_predict_info , plot_quadrants_balance_info
-from outputs import section_display_title , section_display_content
+from outputs import section_display_title , section_display_content 
 from training import get_device, get_trained_model , evaluate_model
 
 from utility import create_and_save_images_lists , require , save_quadrant_balance_to_json
@@ -251,9 +251,9 @@ def compare_2_xai( cfg,
     
     if all_records_1:
         with open(out_path / "xai_metrics_all_1.csv", "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=list(all_records_2[0]))
+            w = csv.DictWriter(f, fieldnames=list(all_records_1[0]))
             w.writeheader()
-            w.writerows(all_records_2)
+            w.writerows(all_records_1)
             
     if all_records_2:
         with open(out_path / "xai_metrics_all_2.csv", "w", newline="", encoding="utf-8") as f:
@@ -387,11 +387,55 @@ def phase_3_xai(cfg,
                  inp_path,
                  out_path):
 
+    
+    t_start = time.time()
+    
+    device, warning = get_device(cfg)
+    if warning:
+        logger.debug(f"WARNING: {warning}")
+    
+    _ , loaders_dict , transform_cnn_dict = load_datasets()
+    # transform_val_cnn = transform_cnn_dict["val"]
+    
+    # Load tensor for train and test baseline
+    # train_loader_lr = loaders_dict["lr"]["train"]
+    val_loader_lr = loaders_dict["lr"]["val"]
+    # test_loader_lr = loaders_dict["lr"]["test"]
+    
+    # Load tensor for train and test cnn
+    # train_loader_cnn = loaders_dict["cnn"]["train"]
+    # val_loader_cnn = loaders_dict["cnn"]["val"]
+    # test_loader_cnn = loaders_dict["cnn"]["test"]
+
+    # X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, 
+    #                                                CONFIG.IMAGE_SIZE, 
+    #                                                CONFIG.IMAGE_SIZE)
+    
+    X_val_lr , _ , _ = data_to_input_lr(val_loader_lr,1, 
+                                               CONFIG.IMAGE_SIZE, 
+                                               CONFIG.IMAGE_SIZE)
+    
     if (cfg.SECTION_DISPLAY_ON):
             section_display_title( "Fase3:Report Finale XAI -", 
                                     "Comparazione tra Grad-CAM, Integrated Gradients , Occlusion Map Lime Shap sulla griglia 28x28."
                                    )
-                                   
+
+    GROUP_SETS_BY_MODE = {  # "all": GROUPS_RESULT_OK_KO,
+                                "both_ok": GROUPS_RESULT_BOTH_OK,
+                                "both_ko": GROUPS_RESULT_BOTH_KO,
+                                "lr_ok_cnn_ko": GROUPS_RESULT_LR_OK_CNN_KO,
+                                "lr_ko_cnn_ok": GROUPS_RESULT_LR_KO_CNN_OK,
+                            }
+                            
+    selected_mode = getattr(cfg, "SAMPLE_GROUP_SELECTION", "all")
+    if selected_mode not in GROUP_SETS_BY_MODE:
+        raise ValueError(f"Valore non valido per cfg.SAMPLE_GROUP_SELECTION: {selected_mode!r}. "
+                            f"Valori ammessi: {list(GROUP_SETS_BY_MODE.keys())}"
+                            )
+    
+    group = GROUP_SETS_BY_MODE[selected_mode]
+    logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(group.keys()))
+                            
     for csv_name in ("xai_metrics_all_1.csv", "xai_metrics_all_2.csv"):
         csv_path = out_path / csv_name
         if not csv_path.is_file():
@@ -403,38 +447,26 @@ def phase_3_xai(cfg,
         except Exception as exc:
             logger.warning("Errore durante plot_metrics_all su %s (non bloccante): %s",csv_path,exc,)
             
-    summary_df, masks, fig = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{group}.json",
-                                                    X_data=X_data,
-                                                    cfg=cfg,
-                                                    save_path=out_path / f"mask_sensitivity_{group}.png",
-                                                )
-
-    print(summary_df.to_string(index=False))
     
-    GROUP_SETS_BY_MODE = {  # "all": GROUPS_RESULT_OK_KO,
-                            "both_ok": GROUPS_RESULT_BOTH_OK,
-                            "both_ko": GROUPS_RESULT_BOTH_KO,
-                            "lr_ok_cnn_ko": GROUPS_RESULT_LR_OK_CNN_KO,
-                            "lr_ko_cnn_ok": GROUPS_RESULT_LR_KO_CNN_OK,
-                        }
-                        
-    selected_mode = getattr(cfg, "SAMPLE_GROUP_SELECTION", "all")
-    if selected_mode not in GROUP_SETS_BY_MODE:
-        raise ValueError(f"Valore non valido per cfg.SAMPLE_GROUP_SELECTION: {selected_mode!r}. "
-                        f"Valori ammessi: {list(GROUP_SETS_BY_MODE.keys())}"
-                        )
-
-    group = GROUP_SETS_BY_MODE[selected_mode]
-    logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(group.keys()))
+    
+    
 
     # for group in GROUPS_RESULT_OK_KO:
     # for group in GROUPS_RESULT_BOTH_OK:
     # for group in active_groups:
+
+    summary_df, masks, fig = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{group}.json",
+                                                            X_data=X_val_lr,
+                                                            cfg=cfg,
+                                                            save_path=out_path / f"mask_sensitivity_{group}.png",
+                                                        )
     
-    # Sostituisci 57588 con un index presente nel JSON
+    print(summary_df.to_string(index=False))
+    
+    # Substitude 57588 with a index presente into the JSON
     plot_masks_for_image(json_path=out_path / f"stage2_maps_{group}.json",
                         image_index=57588,
-                        X_data=X_data,
+                        X_data=X_val_lr,
                         cfg=cfg,
                         masks=masks,
                         thresholds=(0.1, 0.2),
@@ -733,7 +765,7 @@ def main(cfg=CONFIG, logger=LOGGER):
     logger.debug("Start Check Fase 3")
     if flag_phase_to_run in ( cfg.RUN_PHASE , cfg.RUN_PHASE_3 ):
         logger.debug("Before Run Fase 3") 
-        phase_3_xai(cfg, logger, out)
+        phase_3_xai(cfg, logger, inp , out)
         logger.debug("Before Run Fase 3") 
         
     logger.debug("Programma Terminato")

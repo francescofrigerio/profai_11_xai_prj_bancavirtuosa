@@ -1,7 +1,7 @@
 """
      This module implement run function with Xai code
 """
-# import os
+from pathlib import Path
 import json
 import time
 import copy
@@ -550,7 +550,7 @@ def run_compare_group_xai_1(cfg,
                     "targets_lr": targets_lr, 
                     "mask_mean": mask.mean(), 
                     "mask_dilation": cfg.MASK_DILATION, 
-                    "mask_treshold": cfg.MASK_THRESHOLD, 
+                    "mask_threshold": cfg.MASK_THRESHOLD, 
                     "maps_cnn": {}, 
                     "metrics_cnn": {}, 
                     "meta_cnn": {}, 
@@ -735,7 +735,7 @@ def run_compare_group_xai_1(cfg,
                                 "pred_lr": r["pred_lr"],
                                 "mask_mean": r["mask_mean"],
                                 "mask_dilation": r["mask_dilation"],
-                                "mask_treshold": r["mask_treshold"],
+                                "mask_threshold": r["mask_threshold"],
                                 "model": "cnn",
                                 "target_name": target_name, 
                                 "target_class": target_class , 
@@ -759,7 +759,7 @@ def run_compare_group_xai_1(cfg,
                             "pred_lr": r["pred_lr"],
                             "mask_mean": r["mask_mean"],
                             "mask_dilation": r["mask_dilation"],
-                            "mask_treshold": r["mask_treshold"],
+                            "mask_threshold": r["mask_threshold"],
                             "model": "lr",
                             "target_name": target_name, 
                             "target_class": target_class, 
@@ -778,7 +778,7 @@ def run_compare_group_xai_1(cfg,
                 "label": label,
                 "mask_mean": mask.mean(),
                 "mask_dilation": cfg.MASK_DILATION,
-                "mask_treshold": cfg.MASK_THRESHOLD,
+                "mask_threshold": cfg.MASK_THRESHOLD,
                 "model": {k: ctx["info"].get(k) for k in ("action", "reason", "device")},
                 "n_images": len(rows),
                 "n_cnn_wrong": sum(r["pred_cnn"] != r["true"] for r in rows),
@@ -848,7 +848,8 @@ def run_compare_group_xai_2(cfg,
     model.eval()
 
     rows = []
-    not_already_log = True
+    # true for run other debug 
+    not_already_log = False
     for source_row in source_rows:
         org_idx = source_row["index"]
 

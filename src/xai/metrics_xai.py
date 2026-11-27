@@ -418,8 +418,8 @@ def deletion_curve_for_faithfulness_2( score_fn,
                         mode="bilinear",
                         align_corners=False,
                     )[0, 0]
-
-    # the highest importance values ​​represent the pixels to be removed first.
+    
+    # the highest importabce values represent teh pixel to be removed first.
     order = imp.flatten().argsort(descending=True)
     baseline = baseline.to(device=input_img.device, dtype=input_img.dtype)
 
@@ -501,9 +501,9 @@ def deletion_metrics_from_maps(score_fn,
         # For techniques with signed=True: pixels with positive contributions—those 
         # interpreted as evidence in favor of the target class—are removed first 
         # (np.maximum(m, 0)). 
-        # If no such pixels exist, the absolute values ​​(abs(m)) are used instead.
-        
-        # For Grad-CAM with signed=False: the map values ​​are sorted directly 
+        # if no such pixels exist the absolute values (abs(m)) are used instead.
+        #  
+        # Fir Grad-Cam width-signed=False: the map values are sorted directly
         # in descending order. Since Grad-CAM is non-negative—as per our implementation
         # the highest activations are removed first.
         # The code is therefore consistent with the objective of evaluating how much 
