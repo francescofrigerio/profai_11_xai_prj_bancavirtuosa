@@ -351,7 +351,8 @@ def inspect_digit_masks(positions, X_data, cfg):
     plt.close(fig) 
 
 
-def plot_metrics_all(filename):
+def plot_metrics_all(filename=None,
+                     save_path=None):
     """
         plot metrics for final report 
     """
@@ -403,7 +404,11 @@ def plot_metrics_all(filename):
     axes[1].legend(title="Tecnica", loc="upper right")
 
     plt.tight_layout()
-    fig.savefig("xai_cnn_deletion_summary.png", dpi=150, bbox_inches="tight")
+    
+    if save_path is not None:
+        # fig.savefig("xai_cnn_deletion_summary.png", dpi=150, bbox_inches="tight")
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        
     plt.show()
     plt.close(fig)
 
