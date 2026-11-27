@@ -39,7 +39,8 @@ from xai.explore_xai import run_exp , make_gradcam_callback
 from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai_1 , pre_compare_group_xai_2
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
 from xai.outputs_xai import plot_mask_sensitivity , plot_masks_for_image
-from xai.outputs_xai import plot_metrics_all , plot_spearman_vs_iou
+# from xai.outputs_xai import plot_metrics_all , plot_spearman_vs_iou
+from xai.outputs_xai import plot_metrics_all 
 
 from xai import build_techniques
 from xai.shap_explainer import make_background
