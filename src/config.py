@@ -117,10 +117,12 @@ class ConfigConstantsDefault:
     GALLERY_SIZE: int = 24
     N_QUANT: int = 100    
     # (default)  
-    # SAMPLE_GROUP_SELECTION = "all" 
+    SAMPLE_GROUP_SELECTION = "all" 
     # options both_ko lr_ok_cnn_ko lr_ko_cnn_ok   
     # SAMPLE_GROUP_SELECTION = "both_ok" 
-    SAMPLE_GROUP_SELECTION = "both_ko"          
+    # SAMPLE_GROUP_SELECTION = "both_ko"    
+    
+    ANALYSIS_GROUP_SELECTION = "both_ko"      
     # quantitative sample;
 
     # Comparison

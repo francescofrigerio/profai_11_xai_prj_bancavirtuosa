@@ -432,9 +432,9 @@ def analysis_2_xai(cfg,
                             "lr_ko_cnn_ok": GROUPS_RESULT_LR_KO_CNN_OK,
                             }
                             
-    selected_mode = getattr(cfg, "SAMPLE_GROUP_SELECTION", "all")
+    selected_mode = getattr(cfg, "ANALYSIS_GROUP_SELECTION", "all")
     if selected_mode not in GROUP_SETS_BY_MODE:
-        raise ValueError(f"Valore non valido per cfg.SAMPLE_GROUP_SELECTION: {selected_mode!r}. "
+        raise ValueError(f"Valore non valido per cfg.ANALYSIS_GROUP_SELECTION: {selected_mode!r}. "
                             f"Valori ammessi: {list(GROUP_SETS_BY_MODE.keys())}"
                             )
     
