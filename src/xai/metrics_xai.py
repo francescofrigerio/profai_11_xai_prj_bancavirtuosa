@@ -543,6 +543,8 @@ def deletion_metrics_from_maps(score_fn,
 
 def compare_spatial_maps(map_a, map_b, top_fraction=0.10):
     """
+        This function accepts xai map and compare what i wish
+        for example spearman vs iou. 
     """
     a = np.asarray(map_a, dtype=float).squeeze()
     b = np.asarray(map_b, dtype=float).squeeze()

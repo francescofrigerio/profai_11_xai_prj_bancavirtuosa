@@ -39,8 +39,7 @@ from xai.explore_xai import run_exp , make_gradcam_callback
 from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai_1 , pre_compare_group_xai_2
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
 from xai.outputs_xai import plot_mask_sensitivity , plot_masks_for_image
-# from xai.outputs_xai import plot_metrics_all , plot_spearman_vs_iou
-from xai.outputs_xai import plot_metrics_all 
+from xai.outputs_xai import plot_metrics_all , plot_spearman_vs_iou
 
 from xai import build_techniques
 from xai.shap_explainer import make_background
@@ -208,8 +207,6 @@ def compare_2_xai( cfg,
     active_groups = GROUP_SETS_BY_MODE[selected_mode]
     logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(active_groups.keys()))
 
-    # for group in GROUPS_RESULT_OK_KO:
-    # for group in GROUPS_RESULT_BOTH_OK:
     for group in active_groups:
         list_images = load_images_by_class(logger, 
                                            out_path / f"images_{group}.json",
@@ -395,8 +392,7 @@ def analysis_2_xai(cfg,
     """
 
     
-    t_start = time.time()
-    
+    # t_start = time.time()
     # device, warning = get_device(cfg)
     # if warning:
     #     logger.debug(f"WARNING: {warning}")
@@ -408,70 +404,55 @@ def analysis_2_xai(cfg,
         val_loader_lr = loaders_dict["lr"]["val"]
         
         # Load tensor 
-        # val_loader_cnn = loaders_dict["cnn"]["val"]
-        
         X_val_lr , _ , _ = data_to_input_lr(val_loader_lr,1, 
                                                 CONFIG.IMAGE_SIZE, 
                                                  CONFIG.IMAGE_SIZE)
     
     if (cfg.SECTION_DISPLAY_ON):
-            section_display_title( "Fase3:Report Finale XAI -", 
+            section_display_title( "Fase2:Analisi XAI -", 
                                     "Comparazione tra Grad-CAM, Integrated Gradients , Occlusion Map Lime Shap sulla griglia 28x28."
                                    )
 
-    GROUP_SETS_BY_MODE = {  # "all": GROUPS_RESULT_OK_KO,
+    GROUP_SETS_BY_MODE = { "all": GROUPS_RESULT_OK_KO,
                             "both_ok": GROUPS_RESULT_BOTH_OK,
                             "both_ko": GROUPS_RESULT_BOTH_KO,
                             "lr_ok_cnn_ko": GROUPS_RESULT_LR_OK_CNN_KO,
                             "lr_ko_cnn_ok": GROUPS_RESULT_LR_KO_CNN_OK,
-                            }
-                            
+                         }
+    
     selected_mode = getattr(cfg, "ANALYSIS_GROUP_SELECTION", "all")
     if selected_mode not in GROUP_SETS_BY_MODE:
-        raise ValueError(f"Valore non valido per cfg.ANALYSIS_GROUP_SELECTION: {selected_mode!r}. "
+        raise ValueError(f"Valore non valido per cfg.SAMPLE_GROUP_SELECTION: {selected_mode!r}. "
                             f"Valori ammessi: {list(GROUP_SETS_BY_MODE.keys())}"
-                            )
+                        )
     
-    group = GROUP_SETS_BY_MODE[selected_mode]
-    logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(group.keys()))
-                            
-    # for i,csv_name in enumerate(("xai_metrics_all_1.csv", "xai_metrics_all_2.csv")):
-    #     csv_path = out_path / csv_name
-    #     if not csv_path.is_file():
-    #         logger.warning("File metriche non trovato: %s", csv_path)
-    #         continue
-    # 
-    #     try:
-    #         plot_metrics_all(filename=csv_path,
-    #                          save_path=out_path / f"xai_cnn_deletion_summary_{i}.png")
-    #         
-    #     
-    #     except Exception as exc:
-    #         logger.warning("Errore durante plot_metrics_all su %s (non bloccante): %s",csv_path,exc,)
-    #         
-    # 
-    plot_metrics_all(filename=out_path / "xai_metrics_all_2.csv",
-                    save_path=out_path / f"xai_cnn_deletion_summary.png")
+    active_groups = GROUP_SETS_BY_MODE[selected_mode]
+    logger.debug("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(active_groups.keys()))
+    
+    for group in active_groups:
+        logger.info(f"start {group}")              
+        plot_metrics_all(filename=out_path / "xai_metrics_all_2.csv",
+                    save_path=out_path / f"xai_cnn_deletion_summary_{group}.png")
                              
-    summary_df, masks = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{selected_mode}.json",
+        summary_df, masks = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{group}.json",
                                                             X_data=X_val_lr,
                                                             cfg=cfg,
-                                                            save_path=out_path / f"mask_sensitivity_{selected_mode}.png",
+                                                            save_path=out_path / f"mask_sensitivity_{group}.png",
                                                         )
     
-    print(summary_df.to_string(index=False))
+        print(summary_df.to_string(index=False))
     
-    # Substitude image_index with a index presente into the JSON and csv
-    # both_ko 56664 
-    img_idx=56664
-    plot_masks_for_image(json_path=out_path / f"stage2_maps_{selected_mode}.json",
+        # Substitude image_index with a index presente into the JSON and csv
+        # both_ko 56664 
+        img_idx=56664
+        plot_masks_for_image(json_path=out_path / f"stage2_maps_{group}.json",
                         image_index=img_idx,
                         X_data=X_val_lr,
                         cfg=cfg,
                         masks=masks,
                         thresholds=(0.1, 0.2),
                         dilations=(0, 1),
-                        save_path=out_path / f"mask_examples_{selected_mode}_{img_idx}.png",
+                        save_path=out_path / f"mask_examples_{group}_{img_idx}.png",
                     )
 
                                    

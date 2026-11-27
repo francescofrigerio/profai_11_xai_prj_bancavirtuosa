@@ -361,19 +361,20 @@ def plot_metrics_all(filename=None,
 
     # filter valid row on deletion (exclude lr_local_map with NaN)
     # for CNN model
-    print(f"Start {filename}")
+    # print(f"Start {filename}")
     print(df.head())
-    print(f"End {filename}")
+    # print(f"End {filename}")
     valid = df.dropna(subset=["del_auc", "del_gain", "del_auc_random"]).copy()
     cnn_df = valid[valid["model"] == "cnn"].copy()
 
-    # Create figure with 2 panel
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
-    group_order = ["both_ok", "lr_ko_cnn_ok", "lr_ok_cnn_ko", "both_ko"]
-    tech_order = ["gradcam", "integrated_gradients", "occlusion", "lime", "shap"]
+    try:
+        # Create figure with 2 panel
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
+        group_order = ["both_ok", "lr_ko_cnn_ok", "lr_ok_cnn_ko", "both_ko"]
+        tech_order = ["gradcam", "integrated_gradients", "occlusion", "lime", "shap"]
 
-    # panel left : Deletion AUC
-    sns.barplot( data=cnn_df,
+        # panel left : Deletion AUC
+        sns.barplot( data=cnn_df,
                 x="group",
                 y="del_auc",
                 hue="technique",
@@ -383,14 +384,14 @@ def plot_metrics_all(filename=None,
                 ax=axes[0],
             )
             
-    axes[0].set_title("CNN Deletion AUC (del_auc) per Gruppo e Tecnica")
-    axes[0].set_xlabel("Gruppo")
-    axes[0].set_ylabel("del_auc (media ± dev. std)")
-    axes[0].tick_params(axis="x", rotation=15)
-    axes[0].legend(title="Tecnica", loc="upper right")
+        axes[0].set_title("CNN Deletion AUC (del_auc) per Gruppo e Tecnica")
+        axes[0].set_xlabel("Gruppo")
+        axes[0].set_ylabel("del_auc (media ± dev. std)")
+        axes[0].tick_params(axis="x", rotation=15)
+        axes[0].legend(title="Tecnica", loc="upper right")
 
-    # panel right : Deletion Gain
-    sns.barplot( data=cnn_df,
+        # panel right : Deletion Gain
+        sns.barplot( data=cnn_df,
                 x="group",
                 y="del_gain",
                 hue="technique",
@@ -399,22 +400,24 @@ def plot_metrics_all(filename=None,
                 errorbar="sd",
                 ax=axes[1],
             )
-    axes[1].axhline(0, color="black", linestyle="--", linewidth=0.8)
-    axes[1].set_title("CNN Deletion Gain (del_gain) per Gruppo e Tecnica")
-    axes[1].set_xlabel("Gruppo")
-    axes[1].set_ylabel("del_gain (media ± dev. std)")
-    axes[1].tick_params(axis="x", rotation=15)
-    axes[1].legend(title="Tecnica", loc="upper right")
+        axes[1].axhline(0, color="black", linestyle="--", linewidth=0.8)
+        axes[1].set_title("CNN Deletion Gain (del_gain) per Gruppo e Tecnica")
+        axes[1].set_xlabel("Gruppo")
+        axes[1].set_ylabel("del_gain (media ± dev. std)")
+        axes[1].tick_params(axis="x", rotation=15)
+        axes[1].legend(title="Tecnica", loc="upper right")
 
-    plt.tight_layout()
+        plt.tight_layout()
     
-    if save_path is not None:
-        # fig.savefig("xai_cnn_deletion_summary.png", dpi=150, bbox_inches="tight")
-        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        if save_path is not None:
+            # fig.savefig("xai_cnn_deletion_summary.png", dpi=150, bbox_inches="tight")
+            fig.savefig(save_path, dpi=150, bbox_inches="tight")
         
-    plt.show()
-    plt.close(fig)
-
+        plt.show()
+    
+    finally:
+        plt.close(fig)
+    
     summary = ( df.dropna(subset=["del_auc", "del_gain"])
                 .groupby( ["group", "model", "target_name", "technique"])
                         [
@@ -480,11 +483,12 @@ def plot_mask_sensitivity( json_path,
                     .reset_index()
                  )
 
-    fig, ax = plt.subplots(figsize=(7, 5))
+    try:
+        fig, ax = plt.subplots(figsize=(7, 5))
 
-    for dilation in dilations:
-        subset = summary_df[summary_df["dilation"] == dilation]
-        ax.errorbar( subset["threshold"],
+        for dilation in dilations:
+            subset = summary_df[summary_df["dilation"] == dilation]
+            ax.errorbar( subset["threshold"],
                     subset["mean"],
                     yerr=subset["std"].fillna(0),
                     marker="o",
@@ -492,24 +496,25 @@ def plot_mask_sensitivity( json_path,
                     label=f"dilation={dilation}",
                 )
 
-    ax.set_title("Sensibilità della frazione di maschera")
-    ax.set_xlabel("Threshold")
-    ax.set_ylabel("Frazione media di pixel selezionati")
-    ax.set_xticks(list(thresholds))
-    ax.grid(True, alpha=0.3)
-    ax.legend(title="Dilation")
+        ax.set_title("Sensibilità della frazione di maschera")
+        ax.set_xlabel("Threshold")
+        ax.set_ylabel("Frazione media di pixel selezionati")
+        ax.set_xticks(list(thresholds))
+        ax.grid(True, alpha=0.3)
+        ax.legend(title="Dilation")
 
-    fig.tight_layout()
+        fig.tight_layout()
 
-    if save_path is not None:
-        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        if save_path is not None:
+            fig.savefig(save_path, dpi=150, bbox_inches="tight")
 
-    plt.show()
+        plt.show()
 
     # return summary_df, masks, fig  
-    plt.close(fig) 
-    return summary_df, masks
+    finally:
+        plt.close(fig) 
     
+    return summary_df, masks
     
 def plot_masks_for_image( json_path,
                         image_index,
@@ -591,6 +596,62 @@ def plot_masks_for_image( json_path,
     # return fig
     finally:
         plt.close(fig) 
+
+
+def plot_spearman_vs_iou(comparisons, save_path=None):
+    """
+        The graph relates two different aspects of the agreement between maps. 
+        Spearman measures the similarity in the ranking of importance across the entire map; 
+        top-k IoU measures the degree of overlap among the most important pixels. 
+        Each point represents a pair of maps compared for the same image and the same target.
+
+        comparisons: list of dict, one for comparison.
+        Every dict have to keep:
+        index, pair, spearman_abs, iou_top
+    """
+    df = pd.DataFrame(comparisons)
+
+    required = {"index", "pair", "spearman_abs", "iou_top"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Campi mancanti in comparisons: {sorted(missing)}")
+
+    df = df.dropna(subset=["spearman_abs", "iou_top"])
+
+    if df.empty:
+        raise ValueError("Nessun confronto valido da visualizzare")
+
+    try:
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+        sns.scatterplot( data=df,
+                    x="spearman_abs",
+                    y="iou_top",
+                    hue="pair",
+                    alpha=0.8,
+                    s=70,
+                    ax=ax,
+                )
+
+        ax.set_title("Accordo tra mappe: Spearman e IoU top-k")
+        ax.set_xlabel("Spearman tra magnitudini delle mappe")
+        ax.set_ylabel("IoU tra pixel top-k")
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(0, 1)
+        ax.grid(True, alpha=0.3)
+        ax.legend(title="Coppia di tecniche", bbox_to_anchor=(1.02, 1), loc="upper left")
+
+        fig.tight_layout()
+
+        if save_path is not None:
+            fig.savefig(save_path, dpi=150, bbox_inches="tight")
+
+        plt.show()
+        print(df)
+    finally:
+        plt.close(fig) 
+    # return df
     
     
 
