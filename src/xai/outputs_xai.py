@@ -575,6 +575,62 @@ def plot_masks_for_image( json_path,
 
     plt.show()
     return fig
+    
+    
+def plot_spearman_vs_iou(comparisons, save_path=None):
+    """
+        The graph relates two different aspects of the agreement between maps. 
+        Spearman measures the similarity in the ranking of importance across the entire map; 
+        top-k IoU measures the degree of overlap among the most important pixels. 
+        Each point represents a pair of maps compared for the same image and the same target.
+
+        comparisons: list of dict, one for comparison.
+        Every dict have to keep:
+        index, pair, spearman_abs, iou_top
+    """
+    df = pd.DataFrame(comparisons)
+
+    required = {"index", "pair", "spearman_abs", "iou_top"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Campi mancanti in comparisons: {sorted(missing)}")
+
+    df = df.dropna(subset=["spearman_abs", "iou_top"])
+
+    if df.empty:
+        raise ValueError("Nessun confronto valido da visualizzare")
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    sns.scatterplot( data=df,
+                    x="spearman_abs",
+                    y="iou_top",
+                    hue="pair",
+                    alpha=0.8,
+                    s=70,
+                    ax=ax,
+                )
+
+    ax.set_title("Accordo tra mappe: Spearman e IoU top-k")
+    ax.set_xlabel("Spearman tra magnitudini delle mappe")
+    ax.set_ylabel("IoU tra pixel top-k")
+    ax.set_xlim(-1, 1)
+    ax.set_ylim(0, 1)
+    ax.grid(True, alpha=0.3)
+    ax.legend(title="Coppia di tecniche", bbox_to_anchor=(1.02, 1), loc="upper left")
+
+    fig.tight_layout()
+
+    if save_path is not None:
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+
+    plt.show()
+    return df, fig
+       
+
+    
+
+
 
 
 

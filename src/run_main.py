@@ -38,7 +38,8 @@ from utility import create_and_save_images_lists , require , save_quadrant_balan
 from xai.explore_xai import run_exp , make_gradcam_callback
 from xai.compare_xai import run_compare_group_xai , pre_compare_group_xai_1 , pre_compare_group_xai_2
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
-from xai.outputs_xai import plot_metrics_all , plot_mask_sensitivity , plot_masks_for_image
+from xai.outputs_xai import plot_mask_sensitivity , plot_masks_for_image
+from xai.outputs_xai import plot_metrics_all , plot_spearman_vs_iou
 
 from xai import build_techniques
 from xai.shap_explainer import make_background
@@ -385,7 +386,7 @@ def explore_2_xai( cfg,
 def analysis_2_xai(cfg,
                  logger,
                  out_path,
-                 x_data):
+                 x_data=None):
     """
           X_data = X_val_lr must be the same value of the function compare 2 xai
           In the next version we can modify both to pass argument instead of
@@ -404,21 +405,23 @@ def analysis_2_xai(cfg,
     
     # Load tensor for train and test baseline
     # train_loader_lr = loaders_dict["lr"]["train"]
-    # val_loader_lr = loaders_dict["lr"]["val"]
-    # test_loader_lr = loaders_dict["lr"]["test"]
     
-    # Load tensor for train and test cnn
-    # train_loader_cnn = loaders_dict["cnn"]["train"]
-    # val_loader_cnn = loaders_dict["cnn"]["val"]
-    # test_loader_cnn = loaders_dict["cnn"]["test"]
+    if x_data is None:
+        val_loader_lr = loaders_dict["lr"]["val"]
+        # test_loader_lr = loaders_dict["lr"]["test"]
+    
+        # Load tensor for train and test cnn
+        # train_loader_cnn = loaders_dict["cnn"]["train"]
+        val_loader_cnn = loaders_dict["cnn"]["val"]
+        # test_loader_cnn = loaders_dict["cnn"]["test"]
 
-    # X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, 
-    #                                                CONFIG.IMAGE_SIZE, 
-    #                                                CONFIG.IMAGE_SIZE)
+        # X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, 
+        #                                                CONFIG.IMAGE_SIZE, 
+        #                                                CONFIG.IMAGE_SIZE)
     
-    # X_val_lr , _ , _ = data_to_input_lr(val_loader_lr,1, 
-    #                                            CONFIG.IMAGE_SIZE, 
-    #                                            CONFIG.IMAGE_SIZE)
+        X_val_lr , _ , _ = data_to_input_lr(val_loader_lr,1, 
+                                                CONFIG.IMAGE_SIZE, 
+                                                 CONFIG.IMAGE_SIZE)
     
     if (cfg.SECTION_DISPLAY_ON):
             section_display_title( "Fase3:Report Finale XAI -", 
@@ -521,7 +524,10 @@ def phase_2_xai( cfg,
         content_txt = read_text_for_html(inp_path / cfg.FILE_TXT_CONTENTS_XAI)
         section_display_content("Fase2:Metriche Xai", content_html=content_txt)
    
-    x_data = compare_2_xai(cfg,logger,out_path,flag_pretrained)
+    x_data = None
+    flag_compare = False
+    if flag_compare:
+        x_data = compare_2_xai(cfg,logger,out_path,flag_pretrained)
     analysis_2_xai(cfg,logger,out_path,x_data)
     
     

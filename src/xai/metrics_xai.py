@@ -6,6 +6,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from scipy.stats import rankdata
+from scipy.stats import spearmanr
+import math
+
 
 from utility import to_grid28
 from config import CONFIG
@@ -533,6 +536,41 @@ def deletion_metrics_from_maps(score_fn,
                 "fractions": fractions.tolist(),
             }
     return metrics, meta
+    
+    
+
+
+
+def compare_spatial_maps(map_a, map_b, top_fraction=0.10):
+    """
+    """
+    a = np.asarray(map_a, dtype=float).squeeze()
+    b = np.asarray(map_b, dtype=float).squeeze()
+
+    if a.shape != b.shape:
+        raise ValueError(f"Mappe con shape diverse: {a.shape} != {b.shape}")
+    if a.ndim != 2:
+        raise ValueError(f"Le mappe devono essere 2D, ricevuta shape {a.shape}")
+    if not 0 < top_fraction <= 1:
+        raise ValueError("top_fraction deve essere nell'intervallo (0, 1]")
+
+    # Check the deal on importance localization by ignoring sign
+    a_abs = np.abs(a).ravel()
+    b_abs = np.abs(b).ravel()
+
+    rho = float(spearmanr(a_abs, b_abs)[0])
+
+    k = max(1, math.ceil(top_fraction * a_abs.size))
+    top_a = set(np.argpartition(a_abs, -k)[-k:])
+    top_b = set(np.argpartition(b_abs, -k)[-k:])
+
+    union = top_a | top_b
+    iou_top = len(top_a & top_b) / len(union) if union else 0.0
+
+    return {"spearman_abs": rho,
+            "iou_top": float(iou_top),
+            "top_fraction": top_fraction,
+        }
 
 
 
