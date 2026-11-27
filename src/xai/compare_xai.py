@@ -926,7 +926,7 @@ def run_compare_group_xai_2(cfg,
                                  )
 
         rows.append(result_row)
-        logger.info("[%s] idx %d pos %d: deletion CNN completata",group,org_idx,position)
+        logger.debug("[%s] idx %d pos %d: deletion CNN completata",group,org_idx,position)
         
     # creates records for the CSV;
     records_dest = []

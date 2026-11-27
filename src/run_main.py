@@ -459,7 +459,7 @@ def analysis_2_xai(cfg,
     # for group in GROUPS_RESULT_BOTH_OK:
     # for group in active_groups:
 
-    summary_df, masks, fig = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{group}.json",
+    summary_df, masks, fig = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{selected_mode}.json",
                                                             X_data=X_val_lr,
                                                             cfg=cfg,
                                                             save_path=out_path / f"mask_sensitivity_{group}.png",
@@ -469,7 +469,7 @@ def analysis_2_xai(cfg,
     
     # Substitude image_index with a index presente into the JSON and csv
     # both_ko 56664 
-    plot_masks_for_image(json_path=out_path / f"stage2_maps_{group}.json",
+    plot_masks_for_image(json_path=out_path / f"stage2_maps_{selected_mode}.json",
                         image_index=56664,
                         X_data=X_val_lr,
                         cfg=cfg,
