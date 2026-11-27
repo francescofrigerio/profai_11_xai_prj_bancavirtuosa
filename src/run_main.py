@@ -400,8 +400,8 @@ def analysis_2_xai(cfg,
     # device, warning = get_device(cfg)
     # if warning:
     #     logger.debug(f"WARNING: {warning}")
-    
-    if x_data is None:
+    X_val_lr = x_data
+    if X_val_lr is None:
         _ , loaders_dict , transform_cnn_dict = load_datasets()
         # transform_val_cnn = transform_cnn_dict["val"]
      
@@ -465,7 +465,7 @@ def analysis_2_xai(cfg,
     # for group in active_groups:
 
     summary_df, masks, fig = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{selected_mode}.json",
-                                                            X_data=x_data,
+                                                            X_data=X_val_lr,
                                                             cfg=cfg,
                                                             save_path=out_path / f"mask_sensitivity_{group}.png",
                                                         )
@@ -476,7 +476,7 @@ def analysis_2_xai(cfg,
     # both_ko 56664 
     plot_masks_for_image(json_path=out_path / f"stage2_maps_{selected_mode}.json",
                         image_index=56664,
-                        X_data=x_data,
+                        X_data=X_val_lr,
                         cfg=cfg,
                         masks=masks,
                         thresholds=(0.1, 0.2),
