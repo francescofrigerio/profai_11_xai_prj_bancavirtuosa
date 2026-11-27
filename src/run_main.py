@@ -457,31 +457,25 @@ def analysis_2_xai(cfg,
             logger.warning("Errore durante plot_metrics_all su %s (non bloccante): %s",csv_path,exc,)
             
     
-    
-    
-
-    # for group in GROUPS_RESULT_OK_KO:
-    # for group in GROUPS_RESULT_BOTH_OK:
-    # for group in active_groups:
-
     summary_df, masks, fig = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{selected_mode}.json",
                                                             X_data=X_val_lr,
                                                             cfg=cfg,
-                                                            save_path=out_path / f"mask_sensitivity_{group}.png",
+                                                            save_path=out_path / f"mask_sensitivity_{selected_mode}.png",
                                                         )
     
     print(summary_df.to_string(index=False))
     
     # Substitude image_index with a index presente into the JSON and csv
     # both_ko 56664 
+    img_idx=56664
     plot_masks_for_image(json_path=out_path / f"stage2_maps_{selected_mode}.json",
-                        image_index=56664,
+                        image_index=img_idx,
                         X_data=X_val_lr,
                         cfg=cfg,
                         masks=masks,
                         thresholds=(0.1, 0.2),
                         dilations=(0, 1),
-                        save_path=out_path / f"mask_examples_{group}_57588.png",
+                        save_path=out_path / f"mask_examples_{selected_mode}_{img_idx}.png",
                     )
 
                                    

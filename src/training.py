@@ -1,4 +1,3 @@
-
 import random
 import time
 import torch
@@ -12,6 +11,9 @@ from model import enter_train_mode ,  freeze_backbone, make_optimizer , define_l
 
 from metrics import accuracy
 from utility import sync , set_seed
+
+import os
+os.environ["TQDM_DISABLE"] = "1"
 
 def timed(fn, device):
     """

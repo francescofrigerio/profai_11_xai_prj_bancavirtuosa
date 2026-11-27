@@ -233,7 +233,8 @@ def plot_maps_grid_dinamic(rows, target_key, maps_key, names, cfg, X_data, title
         except Exception:
             logger.exception("Impossibile mostrare %s", path)
     finally:
-        fig.clear()
+        #fig.clear()
+        plt.close(fig)
 
 def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, max_rows=10):
 
@@ -268,7 +269,8 @@ def plot_maps_grid(rows, target_key, names, cfg, X_data, title, path, logger, ma
         except Exception:
             logger.exception("Impossibile mostrare %s", path)
     finally:
-        fig.clear()
+        # fig.clear()
+        plt.close(fig)
 
 
 def plot_deletion_curves(metrics, meta, fractions, path,logger):
@@ -307,7 +309,8 @@ def plot_deletion_curves(metrics, meta, fractions, path,logger):
         except Exception:
             logger.exception("Impossibile mostrare %s", path)
     finally:
-            fig.clear()
+        # fig.clear()
+        plt.close(fig)
 
 
 def inspect_digit_masks(positions, X_data, cfg):
@@ -345,6 +348,7 @@ def inspect_digit_masks(positions, X_data, cfg):
 
     plt.tight_layout()
     plt.show()
+    plt.close(fig) 
 
 
 def plot_metrics_all(filename):
@@ -494,7 +498,9 @@ def plot_mask_sensitivity( json_path,
 
     plt.show()
 
-    return summary_df, masks, fig    
+    # return summary_df, masks, fig  
+    plt.close(fig) 
+    return summary_df, masks
     
     
 def plot_masks_for_image( json_path,
@@ -574,7 +580,8 @@ def plot_masks_for_image( json_path,
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
 
     plt.show()
-    return fig
+    # return fig
+    plt.close(fig) 
     
     
 
