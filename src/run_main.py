@@ -445,7 +445,7 @@ def analysis_2_xai(cfg,
     group = GROUP_SETS_BY_MODE[selected_mode]
     logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(group.keys()))
                             
-    for i,csv_name in enumerate("xai_metrics_all_1.csv", "xai_metrics_all_2.csv"):
+    for i,csv_name in enumerate(("xai_metrics_all_1.csv", "xai_metrics_all_2.csv")):
         csv_path = out_path / csv_name
         if not csv_path.is_file():
             logger.warning("File metriche non trovato: %s", csv_path)
