@@ -417,8 +417,8 @@ def analysis_2_xai(cfg,
     #                                                CONFIG.IMAGE_SIZE)
     
     # X_val_lr , _ , _ = data_to_input_lr(val_loader_lr,1, 
-                                               CONFIG.IMAGE_SIZE, 
-                                               CONFIG.IMAGE_SIZE)
+    #                                            CONFIG.IMAGE_SIZE, 
+    #                                            CONFIG.IMAGE_SIZE)
     
     if (cfg.SECTION_DISPLAY_ON):
             section_display_title( "Fase3:Report Finale XAI -", 
