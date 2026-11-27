@@ -261,7 +261,7 @@ def compare_2_xai( cfg,
             w.writeheader()
             w.writerows(all_records_2)
 
-    return all_records_1 , all_results_2
+    return X_val_lr
 
 
 def explore_2_xai( cfg,
@@ -384,7 +384,8 @@ def explore_2_xai( cfg,
 
 def analysis_2_xai(cfg,
                  logger,
-                 out_path):
+                 out_path,
+                 x_data):
     """
           X_data = X_val_lr must be the same value of the function compare 2 xai
           In the next version we can modify both to pass argument instead of
@@ -394,16 +395,16 @@ def analysis_2_xai(cfg,
     
     t_start = time.time()
     
-    device, warning = get_device(cfg)
-    if warning:
-        logger.debug(f"WARNING: {warning}")
+    # device, warning = get_device(cfg)
+    # if warning:
+    #     logger.debug(f"WARNING: {warning}")
     
-    _ , loaders_dict , transform_cnn_dict = load_datasets()
+    # _ , loaders_dict , transform_cnn_dict = load_datasets()
     # transform_val_cnn = transform_cnn_dict["val"]
     
     # Load tensor for train and test baseline
     # train_loader_lr = loaders_dict["lr"]["train"]
-    val_loader_lr = loaders_dict["lr"]["val"]
+    # val_loader_lr = loaders_dict["lr"]["val"]
     # test_loader_lr = loaders_dict["lr"]["test"]
     
     # Load tensor for train and test cnn
@@ -415,7 +416,7 @@ def analysis_2_xai(cfg,
     #                                                CONFIG.IMAGE_SIZE, 
     #                                                CONFIG.IMAGE_SIZE)
     
-    X_val_lr , _ , _ = data_to_input_lr(val_loader_lr,1, 
+    # X_val_lr , _ , _ = data_to_input_lr(val_loader_lr,1, 
                                                CONFIG.IMAGE_SIZE, 
                                                CONFIG.IMAGE_SIZE)
     
@@ -460,7 +461,7 @@ def analysis_2_xai(cfg,
     # for group in active_groups:
 
     summary_df, masks, fig = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{selected_mode}.json",
-                                                            X_data=X_val_lr,
+                                                            X_data=x_data,
                                                             cfg=cfg,
                                                             save_path=out_path / f"mask_sensitivity_{group}.png",
                                                         )
@@ -471,7 +472,7 @@ def analysis_2_xai(cfg,
     # both_ko 56664 
     plot_masks_for_image(json_path=out_path / f"stage2_maps_{selected_mode}.json",
                         image_index=56664,
-                        X_data=X_val_lr,
+                        X_data=x_data,
                         cfg=cfg,
                         masks=masks,
                         thresholds=(0.1, 0.2),
@@ -520,8 +521,8 @@ def phase_2_xai( cfg,
         content_txt = read_text_for_html(inp_path / cfg.FILE_TXT_CONTENTS_XAI)
         section_display_content("Fase2:Metriche Xai", content_html=content_txt)
    
-    # compare_2_xai(cfg,logger,out_path,flag_pretrained)
-    analysis_2_xai(cfg,logger,out_path)
+    x_data = compare_2_xai(cfg,logger,out_path,flag_pretrained)
+    analysis_2_xai(cfg,logger,out_path,x_data)
     
     
 
