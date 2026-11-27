@@ -552,44 +552,45 @@ def plot_masks_for_image( json_path,
     fig, axes = plt.subplots( 1,len(configurations),figsize=(4 * len(configurations), 4),squeeze=False,)
     axes = axes.ravel()
 
-    for ax, (threshold, dilation) in zip(axes, configurations):
-        key = (int(image_index), threshold, dilation)
+    try:
+        for ax, (threshold, dilation) in zip(axes, configurations):
+            key = (int(image_index), threshold, dilation)
 
-        if key not in masks:
-            raise KeyError(
-                f"Maschera non trovata per index={image_index}, "
-                f"threshold={threshold}, dilation={dilation}. "
-                "Verifica che thresholds e dilations siano gli stessi "
-                "usati in plot_mask_sensitivity."
-            )
+            if key not in masks:
+                raise KeyError( f"Maschera non trovata per index={image_index}, "
+                              f"threshold={threshold}, dilation={dilation}. "
+                              "Verifica che thresholds e dilations siano gli stessi "
+                              "usati in plot_mask_sensitivity."
+                          )
 
-        mask = np.asarray(masks[key]).squeeze().astype(bool)
+            mask = np.asarray(masks[key]).squeeze().astype(bool)
 
-        if mask.shape != image.shape:
-            raise ValueError(f"Shape immagine {image.shape} diversa da quella della "
-                             f"maschera {mask.shape} per {key}"
-                            )
+            if mask.shape != image.shape:
+                raise ValueError(f"Shape immagine {image.shape} diversa da quella della "
+                                 f"maschera {mask.shape} per {key}"
+                                )
 
-        ax.imshow(image, cmap="gray")
-        overlay = np.ma.masked_where(~mask, mask)
-        ax.imshow(overlay, cmap="Reds", alpha=0.45, vmin=0, vmax=1)
+            ax.imshow(image, cmap="gray")
+            overlay = np.ma.masked_where(~mask, mask)
+            ax.imshow(overlay, cmap="Reds", alpha=0.45, vmin=0, vmax=1)
 
-        ax.set_title(f"threshold={threshold}, dilation={dilation}\n"
+            ax.set_title(f"threshold={threshold}, dilation={dilation}\n"
                     f"mask.mean()={mask.mean():.3f}"
                     )
-        ax.axis("off")
+            ax.axis("off")
 
-    fig.suptitle(f"Maschere per immagine index={image_index}",
+        fig.suptitle(f"Maschere per immagine index={image_index}",
                     fontsize=14,
-                )
-    fig.tight_layout()
+                    )
+        fig.tight_layout()
 
-    if save_path is not None:
-        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        if save_path is not None:
+            fig.savefig(save_path, dpi=150, bbox_inches="tight")
 
-    plt.show()
+        plt.show()
     # return fig
-    plt.close(fig) 
+    finally:
+        plt.close(fig) 
     
     
 

@@ -403,23 +403,13 @@ def analysis_2_xai(cfg,
     X_val_lr = x_data
     if X_val_lr is None:
         _ , loaders_dict , transform_cnn_dict = load_datasets()
-        # transform_val_cnn = transform_cnn_dict["val"]
-     
+        
         # Load tensor for train and test baseline
-        # train_loader_lr = loaders_dict["lr"]["train"]
-    
         val_loader_lr = loaders_dict["lr"]["val"]
-        # test_loader_lr = loaders_dict["lr"]["test"]
-    
-        # Load tensor for train and test cnn
-        # train_loader_cnn = loaders_dict["cnn"]["train"]
-        val_loader_cnn = loaders_dict["cnn"]["val"]
-        # test_loader_cnn = loaders_dict["cnn"]["test"]
-
-        # X_train_lr , y_train_lr , _  = data_to_input_lr(train_loader_lr,1, 
-        #                                                CONFIG.IMAGE_SIZE, 
-        #                                                CONFIG.IMAGE_SIZE)
-    
+        
+        # Load tensor 
+        # val_loader_cnn = loaders_dict["cnn"]["val"]
+        
         X_val_lr , _ , _ = data_to_input_lr(val_loader_lr,1, 
                                                 CONFIG.IMAGE_SIZE, 
                                                  CONFIG.IMAGE_SIZE)
@@ -445,21 +435,24 @@ def analysis_2_xai(cfg,
     group = GROUP_SETS_BY_MODE[selected_mode]
     logger.info("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(group.keys()))
                             
-    for i,csv_name in enumerate(("xai_metrics_all_1.csv", "xai_metrics_all_2.csv")):
-        csv_path = out_path / csv_name
-        if not csv_path.is_file():
-            logger.warning("File metriche non trovato: %s", csv_path)
-            continue
-
-        try:
-            plot_metrics_all(filename=csv_path,
-                             save_path=out_path / f"xai_cnn_deletion_summary_{i}.png")
-            
-        
-        except Exception as exc:
-            logger.warning("Errore durante plot_metrics_all su %s (non bloccante): %s",csv_path,exc,)
-            
-    
+    # for i,csv_name in enumerate(("xai_metrics_all_1.csv", "xai_metrics_all_2.csv")):
+    #     csv_path = out_path / csv_name
+    #     if not csv_path.is_file():
+    #         logger.warning("File metriche non trovato: %s", csv_path)
+    #         continue
+    # 
+    #     try:
+    #         plot_metrics_all(filename=csv_path,
+    #                          save_path=out_path / f"xai_cnn_deletion_summary_{i}.png")
+    #         
+    #     
+    #     except Exception as exc:
+    #         logger.warning("Errore durante plot_metrics_all su %s (non bloccante): %s",csv_path,exc,)
+    #         
+    # 
+    plot_metrics_all(filename=out_path / "xai_metrics_all_2.csv",
+                    save_path=out_path / f"xai_cnn_deletion_summary.png")
+                             
     summary_df, masks = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{selected_mode}.json",
                                                             X_data=X_val_lr,
                                                             cfg=cfg,
