@@ -361,6 +361,9 @@ def plot_metrics_all(filename=None,
 
     # filter valid row on deletion (exclude lr_local_map with NaN)
     # for CNN model
+    print(f"Start {filename}")
+    print(df.head())
+    print(f"End {filename}")
     valid = df.dropna(subset=["del_auc", "del_gain", "del_auc_random"]).copy()
     cnn_df = valid[valid["model"] == "cnn"].copy()
 

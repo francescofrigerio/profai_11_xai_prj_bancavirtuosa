@@ -460,7 +460,7 @@ def analysis_2_xai(cfg,
             logger.warning("Errore durante plot_metrics_all su %s (non bloccante): %s",csv_path,exc,)
             
     
-    summary_df, masks, fig = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{selected_mode}.json",
+    summary_df, masks = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{selected_mode}.json",
                                                             X_data=X_val_lr,
                                                             cfg=cfg,
                                                             save_path=out_path / f"mask_sensitivity_{selected_mode}.png",
