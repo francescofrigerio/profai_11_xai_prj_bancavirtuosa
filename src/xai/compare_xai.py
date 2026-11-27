@@ -1036,11 +1036,17 @@ def run_compare_group_xai_2(cfg,
                                                                                        default=str),
                                                                             encoding="utf-8"
                                                                             )
+    
+    (out_path / f"stage2_maps_{group}.json").write_text(json.dumps(results_dest,
+                                                                            indent=2, 
+                                                                            default=str),
+                                                                            encoding="utf-8"
+                                                                            )
                                                                             
     
-    Path(f"stage2_maps_{group}.json").write_text(json.dumps(maps_payload, ensure_ascii=False),
-                                                            encoding="utf-8",
-                                                )
+    # Path(f"stage2_maps_{group}.json").write_text(json.dumps(maps_payload, ensure_ascii=False),
+    #                                                        encoding="utf-8",
+    #                                            )
     
     return results_dest , records_dest 
 
