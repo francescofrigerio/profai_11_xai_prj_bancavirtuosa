@@ -768,16 +768,16 @@ def validate_maps_json_positions(json_path, dataset,idx_to_pos_lr=None):
         Check Alignment between dataset and json maps
     """
     data = json.loads(Path(json_path).read_text(encoding="utf-8"))
-    idx_to_pos = dataset.idx_dataset_position()
+    idx_to_pos_cnn = dataset.idx_dataset_position()
 
     for row in data.get("images", []):
         index = int(row["index"])
         pos_json = int(row["pos"])
 
-        if index not in idx_to_pos:
+        if index not in idx_to_pos_cnn:
             raise KeyError(f"index={index} del JSON non presente nel dataset")
 
-        pos_expected = int(idx_to_pos[index])
+        pos_expected = int(idx_to_pos_cnn[index])
         if pos_json != pos_expected:
             raise ValueError(f"Posizione non coerente per index={index}: "
                             f"JSON pos={pos_json}, dataset pos={pos_expected}"
@@ -789,9 +789,24 @@ def validate_maps_json_positions(json_path, dataset,idx_to_pos_lr=None):
                             f"index={dataset_index}, atteso {index}"
                             )
                           
-        if idx_to_pos_lr is None:
-            if pos_json not in idx_to_pos_lr:
-                raise KeyError(f"index={pos_json} non trovato nei dati LR")
+        # if idx_to_pos_lr is None:
+        #    if pos_json not in idx_to_pos_lr:
+        #        raise KeyError(f"index={pos_json} non trovato nei dati LR")
+        if idx_to_pos_lr is not None:
+            if index not in idx_to_pos_lr:
+                raise KeyError(f"index={index} del JSON non presente nei dati LR")
+
+            pos_lr = int(idx_to_pos_lr[index])
+            # The comparison pos_json / pos_lr is valid 
+            # because the CNN and LR datasets are constructed using the same val_idx, 
+            # and the validation loaders have `shuffle=False`. 
+            # It is a useful check nonetheless: should the split or ordering change in the future, 
+            # it will alert , rather than silently associating the wrong image.
+            if pos_json != pos_lr:
+                raise ValueError(f"Posizione non coerente per index={index}: "
+                                f"JSON/dataset CNN pos={pos_json}, dati LR pos={pos_lr}"
+                                )
+                
 
     return True
     

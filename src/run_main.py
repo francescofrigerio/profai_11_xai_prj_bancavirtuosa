@@ -415,7 +415,8 @@ def inspect_2_xai(cfg, X_data = None , y_data = None , idx_val = None , quantile
 def analysis_2_xai(cfg,
                  logger,
                  out_path,
-                 x_data=None ):
+                 x_data=None,
+                 idx_val_lr=None ):
     """
           X_data = X_val_lr must be the same value of the function compare 2 xai
           In the next version we can modify both to pass argument instead of
@@ -425,6 +426,7 @@ def analysis_2_xai(cfg,
     
     X_val_lr = x_data
     idx_to_pos = None
+    # idx_val_lr = None
     # This check is appropriate if the default value is None. 
     # It's important Don't use `if not X_val_lr with a NumPy array or a tensor, 
     # as it may lead to an ambiguity error.
@@ -482,7 +484,8 @@ def analysis_2_xai(cfg,
         print(summary_df.to_string(index=False))
     
         # check json map file 
-        validate_maps_json_positions(_json_path, dataset,idx_to_pos)
+        is_valid = validate_maps_json_positions(_json_path, dataset,idx_to_pos)
+        assert(is_valid == True,f"Attenzione!! json file {_json_path} non valido o non coerente")
         
         # Substitude image_index with a index presente into the JSON and csv
         # static selected img after reading json file
@@ -492,6 +495,7 @@ def analysis_2_xai(cfg,
     
             plot_masks_for_image(json_path=_json_path,
                             image_index=img_idx,
+                            idx_to_pos_lr=idx_to_pos,
                             X_data=X_val_lr,
                             cfg=cfg,
                             masks=masks,
@@ -568,7 +572,7 @@ def phase_2_xai( cfg,
         content_txt = read_text_for_html(inp_path / cfg.FILE_TXT_CONTENTS_XAI)
         section_display_content("Fase2:Metriche Xai", content_html=content_txt)
    
-    x_data , y_data = None , None
+    x_data , y_data , idx_val = None , None , None
                     
     if cfg.FLAG_FINAL_REPORT:
         x_data,y_data,idx_val = compare_2_xai(cfg,logger,out_path,flag_pretrained)
@@ -587,7 +591,7 @@ def phase_2_xai( cfg,
     # raise ValueError("Mi fermo per debug")
     
     if cfg.FLAG_ANALYSIS_REPORT:
-        analysis_2_xai(cfg,logger,out_path,x_data)
+        analysis_2_xai(cfg,logger,out_path,x_data,idx_val)
     
     
 

@@ -1,5 +1,29 @@
 """
      Here we load dataset and dataloader
+     
+     Here we define the main load function (load_dataset)
+     
+     This function return datataset_dict , loaders_dict transorm_dict 
+     for train val test data.
+     
+     So in the project we can access anywhere to train , val and test data
+     for both lr and cnn . The format of x_data is different between lr(1,28x28) and cnn (3,128,128)
+     so we need a different structiure as datataset , loaders transorm.
+     datataset_lr and datataset_cnn 
+     loaders_lr and loaders_cnn 
+     transorm_lr and transorm_cnv 
+     
+     The detail of the structure is as next:
+     1. For example val_lr is a TransformedDataset constructed using Subset(trainval_base, val_idx), 
+     with original_indices set to val_idx.
+     
+     2. The validation DataLoader has shuffle=False, so it returns samples in the order specified by val_idx.
+    
+     3. The function data_to_input_lr copies images and labels into X_input and y_input—maintaining 
+     the order of the batches—and concatenates the IDs (idx) in that same order.
+
+     Consequently, X_val_lr[i], y_val_lr[i], and idx_val_lr[i] all correspond 
+     to the same sample. train_idx is not involved in this loading process.
 """
 import json
 from pathlib import Path

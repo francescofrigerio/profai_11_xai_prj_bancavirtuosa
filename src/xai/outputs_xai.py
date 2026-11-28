@@ -519,6 +519,7 @@ def plot_mask_sensitivity( json_path,
     
 def plot_masks_for_image( json_path,
                         image_index,
+                        idx_to_pos_lr,
                         X_data,
                         cfg,
                         masks,
@@ -542,10 +543,15 @@ def plot_masks_for_image( json_path,
     if item is None:
         raise KeyError(f"Indice immagine {image_index} non trovato in {json_path}")
 
-    position = int(item["pos"])
+    # position = int(item["pos"])
+    # image = img28(position, X_data, size=cfg.IMAGE_SIZE)
+    # In this way, we don't depend on the assumption that the position 
+    # in the CNN dataset coincides with the position in the LR array. 
+    # The JSON position remains useful for verifying the CNN dataset; `
+    # idx_to_pos_lr provides the correct position for X_val_lr.
+    position_lr = idx_to_pos_lr[image_index]
+    image = img28(position_lr, X_data, size=cfg.IMAGE_SIZE)
     
-    image = img28(position, X_data, size=cfg.IMAGE_SIZE)
-
     if hasattr(image, "detach"):
         image = image.detach().cpu().numpy()
 
