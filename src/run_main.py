@@ -28,6 +28,7 @@ from constants import GROUPS_RESULT_LR_OK_CNN_KO , GROUPS_RESULT_LR_KO_CNN_OK
 from data import data_to_input_lr, load_datasets
 from utility import  load_images_by_class , read_text_for_html
 
+
 from logger import LOGGER
 from metrics import accuracy, confusion, macro_f1, quadrants 
 from outputs import plot_predict_info , plot_quadrants_balance_info
@@ -35,11 +36,13 @@ from outputs import section_display_title , section_display_content
 from training import get_device, get_trained_model , evaluate_model
 
 from utility import create_and_save_images_lists , require , save_quadrant_balance_to_json
+from utility select_thin_thick_examples ,select_thin_thick_from_maps_json , validate_maps_json_positions
+
 from xai.explore_xai import run_exp , make_gradcam_callback
-from xai.compare_xai import run_compare_group_xai ,select_thin_thick_examples
+from xai.compare_xai import run_compare_group_xai
 from xai.compare_xai import run_compare_group_xai_1 , run_compare_group_xai_2
 from xai.outputs_xai import plot_mask_sensitivity , plot_masks_for_image
-from xai.outputs_xai import plot_metrics_all , plot_spearman_vs_iou
+from xai.outputs_xai import plot_metrics_all , plot_spearman_vs_iou , inspect_digit_masks
 
 from xai import build_techniques
 from xai.shap_explainer import make_background
@@ -397,21 +400,22 @@ def inspect_2_xai(cfg, X_data = None , y_data = None , idx_val = None , quantile
                                                  CONFIG.IMAGE_SIZE)
 
     selected = select_thin_thick_examples(X_val_lr, y_val_lr, cfg)
-
+    
     # positions to pass at view function 
     positions = [ position
                     for examples in selected.values()
                         for position in (examples["thin"], examples["thick"])
                 ]
     inspect_digit_masks(positions, X_val_lr, cfg)
+    print("START SELECTED DIGIT MASK")
     print(selected)
-    return selected
+    print("END SELECTED DIGIT MASK")
+    return selected , positions
     
 def analysis_2_xai(cfg,
                  logger,
                  out_path,
-                 x_data=None,
-                 selected_img ):
+                 x_data=None ):
     """
           X_data = X_val_lr must be the same value of the function compare 2 xai
           In the next version we can modify both to pass argument instead of
@@ -419,21 +423,27 @@ def analysis_2_xai(cfg,
     """
 
     
-    # t_start = time.time()
-    # device, warning = get_device(cfg)
-    # if warning:
-    #     logger.debug(f"WARNING: {warning}")
     X_val_lr = x_data
+    idx_to_pos = None
+    # This check is appropriate if the default value is None. 
+    # It's important Don't use `if not X_val_lr with a NumPy array or a tensor, 
+    # as it may lead to an ambiguity error.
     if X_val_lr is None:
-        _ , loaders_dict , _ = load_datasets()
+        datasets_dict , loaders_dict , _ = load_datasets()
+        trainval_dataset = datasets_dict["trainval"]
         
         # Load tensor for train and test baseline
         val_loader_lr = loaders_dict["lr"]["val"]
         
         # Load tensor 
-        X_val_lr , _ , _ = data_to_input_lr(val_loader_lr,1, 
-                                                CONFIG.IMAGE_SIZE, 
-                                                 CONFIG.IMAGE_SIZE)
+        X_val_lr , y_val_lr , idx_val_lr = data_to_input_lr(val_loader_lr,1, 
+                                                            cfg.IMAGE_SIZE, 
+                                                            cfg.IMAGE_SIZE)
+                                                 
+        idx_to_pos = { int(sample_id): pos
+                        for pos, sample_id in enumerate(idx_val_lr)
+                     }
+
     
     if (cfg.SECTION_DISPLAY_ON):
             section_display_title( "Fase2:Analisi XAI -", 
@@ -457,11 +467,13 @@ def analysis_2_xai(cfg,
     logger.debug("Selezione gruppi XAI attiva: mode=%s -> %s", selected_mode, list(active_groups.keys()))
     
     for group in active_groups:
-        logger.info(f"start {group}")              
+        logger.info(f"start {group}")     
+        _json_path = out_path / f"stage2_maps_{group}.json"  
+               
         plot_metrics_all(filename=out_path / "xai_metrics_all_2.csv",
                     save_path=out_path / f"xai_cnn_deletion_summary_{group}.png")
                              
-        summary_df, masks = plot_mask_sensitivity( json_path=out_path / f"stage2_maps_{group}.json",
+        summary_df, masks = plot_mask_sensitivity( json_path=_json_path,
                                                             X_data=X_val_lr,
                                                             cfg=cfg,
                                                             save_path=out_path / f"mask_sensitivity_{group}.png",
@@ -469,18 +481,51 @@ def analysis_2_xai(cfg,
     
         print(summary_df.to_string(index=False))
     
+        # check json map file 
+        validate_maps_json_positions(_json_path, dataset,idx_to_pos)
+        
         # Substitude image_index with a index presente into the JSON and csv
-        # both_ko 56664 
+        # static selected img after reading json file
         img_idx=56664
-        plot_masks_for_image(json_path=out_path / f"stage2_maps_{group}.json",
-                        image_index=img_idx,
-                        X_data=X_val_lr,
-                        cfg=cfg,
-                        masks=masks,
-                        thresholds=(0.1, 0.2),
-                        dilations=(0, 1),
-                        save_path=out_path / f"mask_examples_{group}_{img_idx}.png",
-                    )
+        flag_single_img = False
+        if flag_single_img:
+    
+            plot_masks_for_image(json_path=_json_path,
+                            image_index=img_idx,
+                            X_data=X_val_lr,
+                            cfg=cfg,
+                            masks=masks,
+                            thresholds=(0.1, 0.2),
+                            dilations=(0, 1),
+                            save_path=out_path / f"mask_examples_{img_idx}.png",
+                        )
+                        
+        
+        
+        
+        # dinamic selected img from current group
+        selected = select_thin_thick_from_maps_json(json_path=_json_path,
+                                                    X_data=X_val_lr,
+                                                    cfg=cfg)
+                    
+    
+        # iterate a dict element
+        for digit , examples in (selected.items()):
+            # iterate a thickness element
+            for thickness in ("thin", "thick"):
+                example = examples[thickness]
+                # ID JSON record , not pos X_data
+                example_idx = example["index"]
+                
+                plot_masks_for_image(json_path=_json_path,
+                                image_index=example_idx,  
+                                X_data=X_val_lr,
+                                cfg=cfg,
+                                masks=masks,
+                                thresholds=(0.1, 0.2),
+                                dilations=(0, 1),
+                                save_path=out_path / f"mask_{group}_digit{digit}_{thickness}_{example_idx}.png"
+                            )
 
                                    
 def phase_3_xai(cfg,
@@ -524,27 +569,25 @@ def phase_2_xai( cfg,
         section_display_content("Fase2:Metriche Xai", content_html=content_txt)
    
     x_data , y_data = None , None
-    flag_compare = False
-    flag_inspect = True
-    flag_analysis = True
-                       
-    if flag_compare:
+                    
+    if cfg.FLAG_FINAL_REPORT:
         x_data,y_data,idx_val = compare_2_xai(cfg,logger,out_path,flag_pretrained)
     
-    if ( flag_inspect):
-        selected_img = inspect_2_xai( cfg, x_data,y_data,idx_val)    
+    if cfg.FLAG_INSPECT_REPORT:
+        selected_images , position_images = inspect_2_xai( cfg, x_data,y_data,idx_val)    
        
-    print(f"selected_img {type(selected_img)}") 
-    print(f"selected_img {len(selected_img)}") 
-    print(f"selected_img {selected_img}") 
+    print(f"selected_img {type(selected_images)}") 
+    print(f"selected_img {len(selected_images)}") 
+    print(f"selected_img {type(position_images)}") 
+    print(f"selected_img {len(position_images)}") 
     
     print(f"selected_img {type(idx_val)}") 
     print(f"selected_img {len(idx_val)}") 
     # print(f"selected_img {idx_val}")
-    raise ValueError("Mi fermo per debug")
+    # raise ValueError("Mi fermo per debug")
     
-    if ( flag_analysis):
-        analysis_2_xai(cfg,logger,out_path,x_data,selected_img)
+    if cfg.FLAG_ANALYSIS_REPORT:
+        analysis_2_xai(cfg,logger,out_path,x_data)
     
     
 

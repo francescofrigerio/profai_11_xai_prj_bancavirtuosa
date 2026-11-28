@@ -746,4 +746,152 @@ def print_inspect_function(logger,f_imported_defined):
     logger.info("Sorgente f_imported_defined:\n%s",inspect.getsource(f_imported_defined))
     
     
+def stroke_thickness_score(position, X_data, cfg):
+    """
+         detect stroke_thickness_score
+         for select thin thick images
+    """
+    image = img28(position, X_data, size=cfg.IMAGE_SIZE)
+    mask = digit_mask(image, cfg.MASK_THRESHOLD, dilation=0).astype(bool)
+
+    skeleton = skeletonize(mask)
+    if not mask.any() or not skeleton.any():
+        return None
+
+    distances = distance_transform_edt(mask)
+    # thickness estimate: twice mean distance
+    # of skeleton pixels from border of mask 
+    return float(2 * distances[skeleton].mean())
+
+def validate_maps_json_positions(json_path, dataset,idx_to_pos_lr=None):
+    """
+        Check Alignment between dataset and json maps
+    """
+    data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    idx_to_pos = dataset.idx_dataset_position()
+
+    for row in data.get("images", []):
+        index = int(row["index"])
+        pos_json = int(row["pos"])
+
+        if index not in idx_to_pos:
+            raise KeyError(f"index={index} del JSON non presente nel dataset")
+
+        pos_expected = int(idx_to_pos[index])
+        if pos_json != pos_expected:
+            raise ValueError(f"Posizione non coerente per index={index}: "
+                            f"JSON pos={pos_json}, dataset pos={pos_expected}"
+                            )
+
+        _, _, dataset_index = dataset[pos_expected]
+        if int(dataset_index) != index:
+            raise ValueError(f"Il dataset alla posizione {pos_expected} restituisce "
+                            f"index={dataset_index}, atteso {index}"
+                            )
+                          
+        if idx_to_pos_lr is None:
+            if pos_json not in idx_to_pos_lr:
+                raise KeyError(f"index={pos_json} non trovato nei dati LR")
+
+    return True
+    
+
+def select_thin_thick_from_maps_json( json_path,
+                                      X_data,
+                                      cfg,
+                                      quantiles=(0.2, 0.8)):
+   
+    """
+        select_thin_thick_examples from maps json file
+        select images in which the lines are particularly thin or thick.
+        
+    """
+    
+    data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    images = data.get("images", [])
+
+    if not images:
+        raise ValueError(f"Nessuna immagine trovata in {json_path}")
+
+    selected = {}
+
+    # group by record for true label, using only one from json
+    for digit in sorted({int(row["true"]) for row in images}):
+        candidates = [ row for row in images
+                            if int(row["true"]) == digit
+                    ]
+
+        scored = []
+        for row in candidates:
+            position = int(row["pos"])
+            score = stroke_thickness_score(position, X_data, cfg)
+
+            if score is not None:
+                scored.append((row, float(score)))
+
+        if len(scored) < 2:
+            continue
+
+        scores = np.array([score for _, score in scored])
+        thin_target, thick_target = np.quantile(scores, quantiles)
+
+        thin_i = int(np.argmin(np.abs(scores - thin_target)))
+        thick_i = int(np.argmin(np.abs(scores - thick_target)))
+
+        thin_row, thin_score = scored[thin_i]
+        thick_row, thick_score = scored[thick_i]
+
+        selected[digit] = { "thin": {
+                            "index": int(thin_row["index"]),
+                            "pos": int(thin_row["pos"]),
+                            "score": thin_score,
+                          },
+                          "thick": {
+                              "index": int(thick_row["index"]),
+                              "pos": int(thick_row["pos"]),
+                              "score": thick_score,
+                          },
+                        }
+
+    return selected
+
+
+def select_thin_thick_examples(X_data, y_data, cfg, quantiles=(0.2, 0.8)):
+    """
+        select_thin_thick_examples from X_Data
+        select images in which the lines are particularly thin or thick.
+        
+    """
+    labels = np.asarray(y_data).reshape(-1)
+    selected = {}
+    
+    for digit in np.unique(labels):
+        candidates = np.flatnonzero(labels == digit)
+        scored = []
+
+        for position in candidates:
+            score = stroke_thickness_score(position, X_data, cfg)
+            if score is not None:
+                scored.append((int(position), score))
+
+        if len(scored) < 2:
+            continue
+
+        positions = np.array([item[0] for item in scored])
+        scores = np.array([item[1] for item in scored])
+
+        thin_target, thick_target = np.quantile(scores, quantiles)
+
+        thin_idx = np.argmin(np.abs(scores - thin_target))
+        thick_idx = np.argmin(np.abs(scores - thick_target))
+
+        selected[int(digit)] = { "thin": int(positions[thin_idx]),
+                                "thick": int(positions[thick_idx]),
+                                "thin_score": float(scores[thin_idx]),
+                                "thick_score": float(scores[thick_idx]),
+                                }
+
+    return selected
+    
+    
 

@@ -20,8 +20,8 @@ from config import CONFIG
 from constants import TITLES, GROUPS_RESULT_OK_KO
 
 from utility import digit_mask , img28
-# from utility import black_normalized , black_baseline
 from utility import make_blurred_baseline , black_baseline
+
 
 from xai import GradCamCaptum , build_techniques
 from xai.shap_explainer import make_background
@@ -363,84 +363,6 @@ def pre_compare_group_xai_rand (cfg, ctx ):
     
     inspect_digit_masks(positions, X_data, cfg)
 
-def stroke_thickness_score(position, X_data, cfg):
-    """
-         detect stroke_thickness_score
-    """
-    image = img28(position, X_data, size=cfg.IMAGE_SIZE)
-    mask = digit_mask(image, cfg.MASK_THRESHOLD, dilation=0).astype(bool)
-
-    skeleton = skeletonize(mask)
-    if not mask.any() or not skeleton.any():
-        return None
-
-    distances = distance_transform_edt(mask)
-    # thickness estimate: twice mean distance
-    # of skeleton pixels from border of mask 
-    return float(2 * distances[skeleton].mean())
-
-
-def select_thin_thick_examples(X_data, y_data, cfg, quantiles=(0.2, 0.8)):
-    """
-        select_thin_thick_examples
-        select images in which the lines are particularly thin or thick.
-        
-    """
-    labels = np.asarray(y_data).reshape(-1)
-    selected = {}
-    
-    for digit in np.unique(labels):
-        candidates = np.flatnonzero(labels == digit)
-        scored = []
-
-        for position in candidates:
-            score = stroke_thickness_score(position, X_data, cfg)
-            if score is not None:
-                scored.append((int(position), score))
-
-        if len(scored) < 2:
-            continue
-
-        positions = np.array([item[0] for item in scored])
-        scores = np.array([item[1] for item in scored])
-
-        thin_target, thick_target = np.quantile(scores, quantiles)
-
-        thin_idx = np.argmin(np.abs(scores - thin_target))
-        thick_idx = np.argmin(np.abs(scores - thick_target))
-
-        selected[int(digit)] = { "thin": int(positions[thin_idx]),
-                                "thick": int(positions[thick_idx]),
-                                "thin_score": float(scores[thin_idx]),
-                                "thick_score": float(scores[thick_idx]),
-                                }
-
-    return selected
-
-
-def run_inspect_group_xai(cfg,X_data, y_data, quantiles=(0.2, 0.8)):
-    
-    """
-        analysis pre compare group to choice Treshold mask
-        The final print score is a useful estimate for selecting examples, 
-        not a perfect measure of significance: it depends on the threshold.
-        This function start selecting thin and thick examples.
-    """
-    
-    # X_data, y_data, = ctx["X_data"], ctx["y_data"]
-
-    selected = select_thin_thick_examples(X_data, y_data, cfg)
-
-    # positions to pass at view function 
-    positions = [ position
-                    for examples in selected.values()
-                        for position in (examples["thin"], examples["thick"])
-                ]
-    inspect_digit_masks(positions, X_data, cfg)
-    print(selected)
-    return selected
-
-
 def run_compare_group_xai_1(cfg, 
                             logger, 
                             model, 
@@ -486,11 +408,14 @@ def run_compare_group_xai_1(cfg,
     
     for id_class in sorted(list_images):
         for item in list_images[id_class]:
+            # This different values are really important and basic for all xai project
+            # org_idc is the sample ID 
+            # positionis its position in the dataset
             org_idx = item["id_dataset"]
             if org_idx not in idx_to_pos:
                 raise KeyError(f"id_dataset {org_idx} not in this split")
             position = idx_to_pos[org_idx]
-
+            
             # get X and y for the current image
             input_image, input_label, idx = dataset[position]
             assert idx == org_idx

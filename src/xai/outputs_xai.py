@@ -12,6 +12,7 @@ import pandas as pd
 from matplotlib.figure import Figure
 from IPython.display import Image, display
 from utility import img28 , digit_mask
+# from utility select_thin_thick_examples
 from constants import TITLES , MASK_THRESHOLD_LIST
 import torch
 
@@ -542,6 +543,7 @@ def plot_masks_for_image( json_path,
         raise KeyError(f"Indice immagine {image_index} non trovato in {json_path}")
 
     position = int(item["pos"])
+    
     image = img28(position, X_data, size=cfg.IMAGE_SIZE)
 
     if hasattr(image, "detach"):

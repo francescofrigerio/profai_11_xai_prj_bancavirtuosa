@@ -80,21 +80,6 @@ class TransformedDataset(Dataset):
                           }
         return dict_result
         
-def debug_iter_dataloader(dataloader_):
-    """
-        Number elements batch: 3
-        Type batch: <class 'list'>
-        Element 0: shape=torch.Size([64, 3, 128, 128]), dtype=torch.float32
-        Element 1: shape=torch.Size([64]), dtype=torch.int64
-        Element 2: shape=torch.Size([64]), dtype=torch.int64
-    """
-    batch = next(iter(dataloader_))
-            
-    print("Numero elementi nel batch:", len(batch))
-    print("Tipo batch:", type(batch))
-            
-    for i, item in enumerate(batch):
-        print(f"Elemento {i}: shape={item.shape}, dtype={item.dtype}")
 
 def load_datasets(cfg=CONFIG,logger=LOGGER):
     """
@@ -222,6 +207,7 @@ def load_datasets(cfg=CONFIG,logger=LOGGER):
 
     return datasets_dict , loaders_dict , transform_cnn_dict
 
+      
 def data_to_input_lr( dataloader_ , 
                       channels , 
                       w , 
@@ -271,6 +257,22 @@ def data_to_input_lr( dataloader_ ,
     
     return X_input , y_input , idx
 
+def debug_iter_dataloader(dataloader_):
+    """
+        Number elements batch: 3
+        Type batch: <class 'list'>
+        Element 0: shape=torch.Size([64, 3, 128, 128]), dtype=torch.float32
+        Element 1: shape=torch.Size([64]), dtype=torch.int64
+        Element 2: shape=torch.Size([64]), dtype=torch.int64
+    """
+    batch = next(iter(dataloader_))
+            
+    print("Numero elementi nel batch:", len(batch))
+    print("Tipo batch:", type(batch))
+            
+    for i, item in enumerate(batch):
+        print(f"Elemento {i}: shape={item.shape}, dtype={item.dtype}")
+        
 def get_images_labels(dataset_,flag_data_loader=True,idx_dataset=0,
                       cfg=CONFIG,logger=LOGGER):
     """

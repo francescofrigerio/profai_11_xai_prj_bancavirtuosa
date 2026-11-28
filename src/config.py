@@ -171,6 +171,9 @@ class ConfigConstantsDefault:
     RELU_MAX_REF_DIFF = 1e-3
 
     IN_NOTEBOOK = "ipykernel" in sys.modules
+    FLAG_FINAL_REPORT: bool = False
+    FLAG_INSPECT_REPORT: bool = True
+    FLAG_ANALYSIS_REPORT: bool = True
 
     THRESHOLDS = { 
                    "backend_max_seconds_per_image": 15.0,    # LIME / SHAP backend accepted if <= (T4)
